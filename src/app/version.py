@@ -1,0 +1,3 @@
+VERSION = "2.0.2"
+PRODUCT_NAME = "ФПВ Ухилянт"
+WINDOW_TITLE = f"{PRODUCT_NAME} {VERSION}"
