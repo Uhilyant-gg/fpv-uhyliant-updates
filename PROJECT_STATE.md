@@ -2,74 +2,53 @@
 
 ## Current baseline
 
-- Source version: `2.0.8`
+- Source version: `2.0.9`
 - Product name: `ФПВ Ухилянт`
 - Release channel: `test`
-- UI: PySide6 + Qt Quick/QML
+- UI: PySide6 + Qt Quick/QML + Qt Multimedia
 - Manifest path: `test/release.json`
 - Signing key ID: `fpv-uhyliant-production-v1`
 - Package integrity: SHA-256
 - Manifest authentication: Ed25519
 - Per-user Windows install path: `%LOCALAPPDATA%\Programs\FPV Uhyliant`
 - Windows layout: launcher + updater helper + `app/current`
-- Atomic application switch, startup-OK handshake and automatic rollback: implemented
 - Runtime/user data: `%LOCALAPPDATA%/FPV-Uhyliant`
 
-## Version 2.0.8 scope
+## Version 2.0.9 checkpoint
 
-- Hardened OpenIPC discovery and device database validation.
-- Safe discovery cancellation and QThread cleanup.
-- Hardened OTA manifest/package validation.
-- Atomic `.part`, `ready.json` and `launcher-state.json` handling.
-- Parallel updater operations are blocked.
-- ZIP path and symbolic-link validation is enforced.
-- CI now compiles Python sources, runs application self-test, checks version consistency, verifies signed test metadata and rejects private signing keys.
+- Devices persistence uses SQLite with legacy `devices.json` migration.
+- SQLite schema includes devices, streams, settings and independent video profiles.
+- Each stream can have its own video profile assignment.
+- OpenIPC discovery uses mDNS, ONVIF, Majestic/OpenIPC fingerprinting and bounded `/24` probing with network-interface selection.
+- RTSP stream runtime and Qt Multimedia playback are integrated into the UI.
+- Diagnostics exposes basic RTSP runtime state/error information.
 
-## Devices module
+## Validation gate
 
-- Persistent local device database is implemented in `%LOCALAPPDATA%/FPV-Uhyliant/devices.json`.
-- Saved devices support active-device selection, editing and deletion.
-- OpenIPC discovery combines mDNS, ONVIF WS-Discovery, Majestic/OpenIPC fingerprinting and bounded local `/24` probing.
-- Results are merged by address and restricted to the selected network interface.
-- Confirmed OpenIPC devices are distinguished from unconfirmed network/ONVIF devices.
-- Unconfirmed devices cannot be saved as OpenIPC cameras through discovery.
-- Discovery reports its current stage, progress, result count, cancellation, completion and errors.
+1. Publish `2.0.9` through `.github/workflows/automated-ota.yml` on the test channel.
+2. Validate OTA install/startup and rollback behavior.
+3. Validate legacy Devices -> SQLite migration on Windows.
+4. Validate discovery with real OpenIPC and generic ONVIF devices.
+5. Validate persistent per-stream video profile assignment.
+6. Validate real OpenIPC RTSP playback, stop/start and error handling.
 
-## OTA/update foundation
+## Next development after validation
 
-- The updater fetches the signed test-channel manifest.
-- Manifest authenticity is verified with Ed25519 using key ID `fpv-uhyliant-production-v1`.
-- Package integrity is verified with SHA-256.
-- Update installation can be blocked when the autopilot is armed, recording is active, or streaming is active.
-- The packaged update helper installs outside the running application process.
-
-## Current validation gate
-
-1. Publish `2.0.8` through `.github/workflows/automated-ota.yml`.
-2. Validate `2.0.7 -> 2.0.8` using OTA only.
-3. Confirm the update completes without Setup.exe and without UAC.
-4. Validate signature and SHA-256 verification, self-test, atomic switch, restart and startup-OK handling.
-5. Validate automatic rollback with a controlled failed-startup test.
-6. Validate Devices discovery and cancellation on Windows with real OpenIPC and generic ONVIF cameras.
-7. Confirm that unverified ONVIF devices cannot be saved as OpenIPC cameras.
-
-## Product roadmap after OTA validation
-
-1. Real OpenIPC camera integration and camera configuration controls.
-2. Persistent video profiles with per-stream assignment and editing.
-3. Real RTSP/OpenIPC video backend, then secondary/thermal source and PiP.
-4. Read-only MAVLink telemetry for ArduPilot/Pixhawk/CubeOrangePlus.
-5. Persistent OSD positions, visibility, scale and profiles.
-6. Network diagnostics for latency, loss, jitter, TX/RX and Starlink/WireGuard/link state.
-7. CRSF, R2D2/OpenIPC and STABX telemetry/overlay integration.
-8. Map/GNSS presentation and local-first pilot data.
+1. Harden RTSP/OpenIPC diagnostics and stream discovery.
+2. OpenIPC camera integration and maximally automated firmware workflow.
+3. Camera presets remain separate from video profiles.
+4. Add read-only ArduPilot/Betaflight/INAV integration using MAVLink/MSP/CRSF as appropriate.
+5. Extend OSD, network diagnostics, secondary/thermal video and PiP.
 
 ## Project rules
 
 1. `src/` is authoritative source.
 2. Release metadata under `releases/<version>/` is immutable after publication.
 3. Private signing keys must never be committed.
-4. Every release must have a signed manifest, SHA-256 metadata and Git tag.
-5. Video profiles remain independent from camera flashing/configuration presets.
-6. The BAT/fullflash method is only for cameras already running the relevant custom OpenIPC firmware.
-7. Generic ONVIF devices must not be classified as OpenIPC without OpenIPC/Majestic evidence.
+4. Every published release must have signed manifest, SHA-256 metadata and Git tag.
+5. Camera presets and video profiles are separate models.
+6. Video profiles are assigned per camera/video stream and are never applied as part of camera flashing.
+7. BAT/fullflash is only for cameras already running the relevant OpenIPC firmware, not the universal primary flashing path.
+8. Generic ONVIF devices must not be classified as OpenIPC without OpenIPC/Majestic evidence.
+9. Target flight stacks/protocols include ArduPilot, Betaflight, INAV and MAVLink/MSP/CRSF.
+10. Primary UI flow: Home -> Devices / Quick connect / Firmware / Update / Diagnostics -> FPV or Service Mode.
