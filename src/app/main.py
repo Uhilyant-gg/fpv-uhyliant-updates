@@ -15,10 +15,11 @@ def main():
  from backend import Station
  from devices import Devices
  from updater_engine import Updater
+ from video import VideoRuntime
  app=QGuiApplication(sys.argv);app.setApplicationName('FPV-Uhyliant');app.setApplicationVersion(VERSION)
  icon=here/'fpv-uhyliant.ico'
  if icon.exists():app.setWindowIcon(QIcon(str(icon)))
- QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();u=Updater(x.install_root,s.canInstallUpdate);e.rootContext().setContextProperty('station',s);e.rootContext().setContextProperty('devicesModel',d);e.rootContext().setContextProperty('updater',u);e.rootContext().setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
+ QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();v=VideoRuntime(d);u=Updater(x.install_root,s.canInstallUpdate);e.rootContext().setContextProperty('station',s);e.rootContext().setContextProperty('devicesModel',d);e.rootContext().setContextProperty('videoRuntime',v);e.rootContext().setContextProperty('updater',u);e.rootContext().setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
  if not e.rootObjects():return 1
  root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized);QTimer.singleShot(1200,lambda:signal_ok(x.startup_token));return app.exec()
 if __name__=='__main__':raise SystemExit(main())
