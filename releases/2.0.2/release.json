@@ -1,0 +1,21 @@
+{
+  "product": "FPV-Uhyliant",
+  "channel": "test",
+  "version": "2.0.2",
+  "build": 202,
+  "mandatory": false,
+  "minimumUpdaterVersion": "2.0.0",
+  "package": {
+    "file": "FPV-Uhyliant-v2.0.2-Test-UA-Windows.zip",
+    "url": "https://<scrubbed-url-domain>/fpv-uhyliant-updates/test/packages/FPV-Uhyliant-v2.0.2-Test-UA-Windows.zip",
+    "sha256": "63099a90164fc4ecfe766e46c62cca9e2897608a186120aefd5e21b0eed1425a"
+  },
+  "releaseNotes": [
+    "FPV Uhyliant 2.0.2: product versioning, Windows packaging and UI fixes"
+  ],
+  "signature": {
+    "algorithm": "Ed25519",
+    "keyId": "fpv-uhyliant-production-v1",
+    "value": "vl7UUIO+fJg0LuHlhpNC/kvU2PxdHM5AkkujGKPiqJyCe/FtJgrnoQ4W/ZX5jcICWs0NG26fLdWz1ngQu9kZCg=="
+  }
+}
