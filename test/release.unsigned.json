@@ -1,0 +1,18 @@
+{
+  "product": "FPV-Uhyliant",
+  "channel": "test",
+  "version": "1.5.1",
+  "build": 1510,
+  "mandatory": false,
+  "minimumUpdaterVersion": "1.5.0",
+  "package": {
+    "file": "fpv-uhyliant-1.5.1-win64.zip",
+    "url": "__BASE_URL__/test/packages/fpv-uhyliant-1.5.1-win64.zip",
+    "sha256": "05793ec3b211a541a8f87898986b45a562dd182364fe5a5c4409414da864ea7f"
+  },
+  "releaseNotes": [
+    "Перший пакет для реального update repository",
+    "Підписаний manifest Ed25519",
+    "Launcher, atomic switch, startup-OK і rollback"
+  ]
+}

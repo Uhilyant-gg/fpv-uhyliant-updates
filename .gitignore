@@ -1,0 +1,8 @@
+*.pem
+!test/release-public-key.pem
+!development/release-public-key.pem
+**/*private*key*
+.venv/
+
+__pycache__/
+*.py[codz]
