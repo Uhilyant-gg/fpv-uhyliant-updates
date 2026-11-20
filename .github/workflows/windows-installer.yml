@@ -1,11 +1,14 @@
 name: build-windows-installer
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version:
         description: Installer version
         required: true
-        default: 2.0.2
+        default: 2.0.3
         type: string
       publish_release:
         description: Attach Setup.exe to GitHub Release vX.Y.Z
@@ -19,14 +22,24 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
-        with: {ref: main, fetch-depth: 0}
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || 'main' }}
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
+      - name: Resolve version
+        id: meta
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq 'push') { $v = $env:GITHUB_REF_NAME.Substring(1) } else { $v = $env:INPUT_VERSION }
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw 'Version must match X.Y.Z' }
+          "version=$v" >> $env:GITHUB_OUTPUT
       - name: Validate version source
         shell: pwsh
-        env: {VERSION: "${{ inputs.version }}"}
+        env: {VERSION: "${{ steps.meta.outputs.version }}"}
         run: |
-          if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Version must match X.Y.Z' }
           $meta = Get-Content VERSION.json -Raw | ConvertFrom-Json
           if ($meta.version -ne $env:VERSION) { throw "VERSION.json mismatch: $($meta.version)" }
           python -c "from pathlib import Path;ns={};exec(Path('src/app/version.py').read_text(encoding='utf-8'),ns);assert ns['VERSION']=='$env:VERSION'"
@@ -50,7 +63,6 @@ jobs:
           pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant --icon assets/fpv-uhyliant.ico --paths src/app --add-data "src/app/Main.qml;." --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.QtWebEngineQuick --exclude-module PySide6.QtPdf --exclude-module PySide6.QtPdfWidgets --exclude-module PySide6.QtBluetooth --exclude-module PySide6.QtNfc --exclude-module PySide6.QtSql --exclude-module PySide6.QtTest src/app/main.py
       - name: Smoke test EXE
         shell: pwsh
-        env: {VERSION: "${{ inputs.version }}"}
         run: |
           $out = & "dist\FPV-Uhyliant\FPV-Uhyliant.exe" --self-test
           if ($LASTEXITCODE -ne 0) { throw "Self-test failed: $LASTEXITCODE" }
@@ -59,7 +71,7 @@ jobs:
         run: choco install innosetup --no-progress -y
       - name: Build installer and hash
         shell: pwsh
-        env: {VERSION: "${{ inputs.version }}"}
+        env: {VERSION: "${{ steps.meta.outputs.version }}"}
         run: |
           New-Item -ItemType Directory -Force installer-output | Out-Null
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:VERSION" "packaging\FPV-Uhyliant.iss"
@@ -69,16 +81,16 @@ jobs:
           "$($h.Hash.ToLower())  $($h.Path | Split-Path -Leaf)" | Set-Content "installer-output\SHA256SUMS-Windows.txt" -Encoding ascii
       - uses: actions/upload-artifact@v4
         with:
-          name: FPV-Uhyliant-Setup-${{ inputs.version }}
+          name: FPV-Uhyliant-Setup-${{ steps.meta.outputs.version }}
           path: |
-            installer-output/FPV-Uhyliant-Setup-${{ inputs.version }}.exe
+            installer-output/FPV-Uhyliant-Setup-${{ steps.meta.outputs.version }}.exe
             installer-output/SHA256SUMS-Windows.txt
           if-no-files-found: error
       - name: Attach Setup to GitHub Release
-        if: ${{ inputs.publish_release }}
+        if: ${{ github.event_name == 'push' || inputs.publish_release }}
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v${{ inputs.version }}
+          tag_name: v${{ steps.meta.outputs.version }}
           files: |
-            installer-output/FPV-Uhyliant-Setup-${{ inputs.version }}.exe
+            installer-output/FPV-Uhyliant-Setup-${{ steps.meta.outputs.version }}.exe
             installer-output/SHA256SUMS-Windows.txt
