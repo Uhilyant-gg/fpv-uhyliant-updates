@@ -38,6 +38,15 @@ jobs:
           python -m pip install pyinstaller pillow
       - name: Build icon
         run: python tools/build_icon.py
+      - name: Prepare application security assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "src\app\security" | Out-Null
+          Copy-Item "test\release-public-key.pem" "src\app\security\production-v1-public.pem" -Force
+          if (-not (Test-Path "src\app\security\production-v1-public.pem")) {
+            throw "Production public key was not prepared"
+          }
+
       - name: Build application EXE
         shell: pwsh
         run: |
