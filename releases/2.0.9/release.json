@@ -1,0 +1,21 @@
+{
+  "product": "FPV-Uhyliant",
+  "channel": "test",
+  "version": "2.0.9",
+  "build": 209,
+  "mandatory": false,
+  "minimumUpdaterVersion": "2.0.4",
+  "package": {
+    "file": "FPV-Uhyliant-v2.0.9-Test-UA-Windows.zip",
+    "url": "https://github.com/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.9/FPV-Uhyliant-v2.0.9-Test-UA-Windows.zip",
+    "sha256": "863703ad6101162ab4fde671f23ca71837e25fc4908f352fad9efc24a587103d"
+  },
+  "releaseNotes": [
+    "2.0.9 integration checkpoint: SQLite Devices, streams, per-stream video profiles and RTSP playback"
+  ],
+  "signature": {
+    "algorithm": "Ed25519",
+    "keyId": "fpv-uhyliant-production-v1",
+    "value": "uxEr8qeqYRzapLdC6hHhHncarRKnyDaoaLBlo8tH4Dq0lVkU8iDhOvAdjoPOah5Jm7ak9dNvPzFHD5W2kciiCg=="
+  }
+}
