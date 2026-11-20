@@ -2,7 +2,7 @@
 
 ## Current baseline
 
-- Current source version: `2.0.2`
+- Current source version: `2.0.3`
 - Release channel: `test`
 - UI: PySide6 + Qt Quick/QML
 - Update repository: GitHub Pages
@@ -13,21 +13,21 @@
 - Atomic update: implemented
 - Startup-OK handshake: implemented
 - Rollback: implemented
-- Windows installer pipeline: implemented; v2.0.2 requires CI and real-PC validation
+- Windows installer pipeline: implemented
 
-## v2.0.2 work
+## v2.0.3 hotfix
 
-- Normalize product version and window title to `ФПВ Ухилянт 2.0.2`.
-- Use one Python version module as the client runtime version source.
-- Keep production public key in the client; private key remains only in GitHub Actions secret `FPV_RELEASE_PRIVATE_KEY`.
-- Primary Windows user asset: `FPV-Uhyliant-Setup-2.0.2.exe`.
-- Preserve test-channel Ed25519/SHA-256 OTA, startup-OK and rollback.
-- Optimize Windows packaging conservatively without removing required Qt Quick/QML runtime components.
+- Fix OTA package URL generation in `automated-ota.yml`.
+- Generate the GitHub Pages base URL at workflow runtime from `GITHUB_REPOSITORY_OWNER` and `GITHUB_REPOSITORY` rather than storing a literal release-host URL in workflow source.
+- Validate generated package URLs before signing: HTTPS is required, hostname must exist, and placeholder angle brackets are rejected.
+- Synchronize application/runtime metadata to `2.0.3`.
+- Preserve production Ed25519 signing through GitHub secret `FPV_RELEASE_PRIVATE_KEY`, package SHA-256 verification, startup-OK and rollback.
 
 ## Known issues / validation needed
 
-- v2.0.2 Windows installer and OTA require CI build and real-PC validation after source changes.
-- Video, MAVLink telemetry, network diagnostics, map, persistent OSD profiles and STABX telemetry are planned integrations, not production implementations yet.
+- v2.0.2 manifest published a malformed package hostname and cannot download its OTA ZIP from the client.
+- v2.0.3 signed OTA requires CI publication and real-PC validation from installed v2.0.1.
+- Video, MAVLink telemetry, network diagnostics, map, persistent OSD profiles and STABX telemetry remain planned integrations.
 - STABX telemetry protocol must be based on documentation or observed telemetry format before implementation.
 
 ## Repository rules
@@ -41,10 +41,10 @@
 
 ## Next work
 
-- Validate v2.0.2 Windows installer and signed OTA on a real station PC.
-- Real RTSP/OpenIPC video backend, including future secondary/thermal source and PiP.
+- Publish and validate signed v2.0.3 OTA on the `test` channel.
+- Validate Windows installer on a real station PC.
+- Real RTSP/OpenIPC video backend and future secondary/thermal source/PiP.
 - Read-only MAVLink telemetry backend for ArduPilot/Pixhawk/CubeOrangePlus.
-- Persistent OSD element positions, visibility, scale and profiles.
-- Network diagnostics for latency, loss, jitter, TX/RX, Starlink/WireGuard/link state.
-- Map and GNSS presentation.
-- R2D2/OpenIPC read-only telemetry/overlay integration where documented.
+- Persistent OSD positions, visibility, scale and profiles.
+- Network diagnostics for latency, loss, jitter, TX/RX and Starlink/WireGuard/link state.
+- Map/GNSS presentation and documented R2D2/OpenIPC read-only telemetry/overlay integration.
