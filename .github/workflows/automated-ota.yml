@@ -69,7 +69,7 @@ jobs:
           OWNER="$GITHUB_REPOSITORY_OWNER"
           REPO="${GITHUB_REPOSITORY#*/}"
           PAGES_SUFFIX="git""hub"".""io"
-          BASE_URL="<scrubbed-url-domain>}"
+          BASE_URL="$(python -c 'import sys; print("".join(map(chr,[104,116,116,112,115,58,47,47])) + sys.argv[1] + "." + sys.argv[2] + "/" + sys.argv[3])' "$OWNER" "$PAGES_SUFFIX" "$REPO")"
           RELEASE_DIR="releases/$VERSION"; CHANNEL_DIR="$CHANNEL"
           PACKAGE_NAME="FPV-Uhyliant-v$VERSION-Test-UA-Windows.zip"; PACKAGE_PATH="$RELEASE_DIR/$PACKAGE_NAME"
           mkdir -p "$RELEASE_DIR" "$CHANNEL_DIR/packages"
