@@ -1,32 +1,63 @@
 name: fpv-uhyliant-release-pipeline
+
 on:
   workflow_dispatch:
     inputs:
-      version: {description: Release version, required: true, default: 2.0.4, type: string}
-      channel: {description: OTA channel, required: true, default: test, type: choice, options: [test, stable, development]}
-      notes: {description: Release notes, required: true, default: Windows OTA bootstrap architecture, type: string}
-      prerelease: {description: Publish as pre-release, required: true, default: true, type: boolean}
-permissions: {contents: write, pages: write, id-token: write}
+      version:
+        description: Release version
+        required: true
+        default: 2.0.4
+        type: string
+      channel:
+        description: OTA channel
+        required: true
+        default: test
+        type: choice
+        options:
+          - test
+          - stable
+          - development
+      notes:
+        description: Release notes
+        required: true
+        default: Windows OTA bootstrap architecture
+        type: string
+      prerelease:
+        description: Publish as pre-release
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 env:
   VERSION: ${{ inputs.version }}
   CHANNEL: ${{ inputs.channel }}
   NOTES: ${{ inputs.notes }}
+
 jobs:
   windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
-        with: {ref: main, fetch-depth: 0}
+        with:
+          ref: main
+          fetch-depth: 0
       - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
+        with:
+          python-version: '3.12'
       - name: Validate source version
         shell: pwsh
         run: |
           if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version' }
-          $meta=Get-Content VERSION.json -Raw|ConvertFrom-Json
+          $meta = Get-Content VERSION.json -Raw | ConvertFrom-Json
           if ($meta.version -ne $env:VERSION) { throw 'VERSION.json mismatch' }
           python -c "from pathlib import Path;ns={};exec(Path('src/app/version.py').read_text(encoding='utf-8'),ns);assert ns['VERSION']=='$env:VERSION'"
-          git rev-parse "v$env:VERSION" 2>$null; if ($LASTEXITCODE -eq 0) { throw 'Tag already exists' }
+          git rev-parse "v$env:VERSION" 2>$null
+          if ($LASTEXITCODE -eq 0) { throw 'Tag already exists' }
       - name: Install build dependencies
         shell: pwsh
         run: |
@@ -37,7 +68,8 @@ jobs:
         shell: pwsh
         run: |
           python tools/build_icon.py
-          New-Item -ItemType Directory -Force src\app\security,bootstrap-output | Out-Null
+          New-Item -ItemType Directory -Force src\app\security | Out-Null
+          New-Item -ItemType Directory -Force bootstrap-output | Out-Null
           Copy-Item test\release-public-key.pem src\app\security\production-v1-public.pem -Force
           Copy-Item assets\fpv-uhyliant.ico src\app\fpv-uhyliant.ico -Force
       - name: Build application launcher and update helper
@@ -53,8 +85,9 @@ jobs:
       - name: Build Windows OTA package and installer
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force release-output,installer-output | Out-Null
-          $pkg="FPV-Uhyliant-v$env:VERSION-Test-UA-Windows.zip"
+          New-Item -ItemType Directory -Force release-output | Out-Null
+          New-Item -ItemType Directory -Force installer-output | Out-Null
+          $pkg = "FPV-Uhyliant-v$env:VERSION-Test-UA-Windows.zip"
           Compress-Archive -Path dist\FPV-Uhyliant\* -DestinationPath "release-output\$pkg" -CompressionLevel Optimal
           choco install innosetup --no-progress -y
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:VERSION" packaging\FPV-Uhyliant.iss
@@ -66,44 +99,72 @@ jobs:
             release-output/*.zip
             installer-output/*.exe
           if-no-files-found: error
+
   sign-publish:
     needs: windows
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with: {ref: main, fetch-depth: 0}
+        with:
+          ref: main
+          fetch-depth: 0
       - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
+        with:
+          python-version: '3.12'
       - uses: actions/download-artifact@v4
-        with: {name: windows-build-${{ inputs.version }}, path: build}
+        with:
+          name: windows-build-${{ inputs.version }}
+          path: build
       - run: python -m pip install --disable-pip-version-check cryptography
       - name: Create sign and verify release
         shell: bash
-        env: {PRIVATE_KEY: "${{ secrets.FPV_RELEASE_PRIVATE_KEY }}"}
+        env:
+          PRIVATE_KEY: ${{ secrets.FPV_RELEASE_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          test -n "$PRIVATE_KEY"; install -m 700 -d "$RUNNER_TEMP/sign"; printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/sign/private.pem"; chmod 600 "$RUNNER_TEMP/sign/private.pem"
-          PACKAGE="FPV-Uhyliant-v$VERSION-Test-UA-Windows.zip"; RELEASE_DIR="releases/$VERSION"; mkdir -p "$RELEASE_DIR" "$CHANNEL/packages"
-          cp "build/release-output/$PACKAGE" "$RELEASE_DIR/$PACKAGE"; cp "build/release-output/$PACKAGE" "$CHANNEL/packages/$PACKAGE"
-          SHA="$(sha256sum "$RELEASE_DIR/$PACKAGE"|awk '{print $1}')"; printf '%s  %s\n' "$SHA" "$PACKAGE" > "$RELEASE_DIR/SHA256SUMS.txt"
-          OWNER="$GITHUB_REPOSITORY_OWNER"; REPO="${GITHUB_REPOSITORY#*/}"; SUFFIX="git""hub"".""io"; BASE="$(python -c 'import sys;print("".join(map(chr,[104,116,116,112,115,58,47,47]))+sys.argv[1]+"."+sys.argv[2]+"/"+sys.argv[3])' "$OWNER" "$SUFFIX" "$REPO")"
+          test -n "$PRIVATE_KEY"
+          install -m 700 -d "$RUNNER_TEMP/sign"
+          printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/sign/private.pem"
+          chmod 600 "$RUNNER_TEMP/sign/private.pem"
+          PACKAGE="FPV-Uhyliant-v$VERSION-Test-UA-Windows.zip"
+          RELEASE_DIR="releases/$VERSION"
+          mkdir -p "$RELEASE_DIR" "$CHANNEL/packages"
+          cp "build/release-output/$PACKAGE" "$RELEASE_DIR/$PACKAGE"
+          cp "build/release-output/$PACKAGE" "$CHANNEL/packages/$PACKAGE"
+          SHA="$(sha256sum "$RELEASE_DIR/$PACKAGE" | awk '{print $1}')"
+          printf '%s  %s\n' "$SHA" "$PACKAGE" > "$RELEASE_DIR/SHA256SUMS.txt"
+          OWNER="$GITHUB_REPOSITORY_OWNER"
+          REPO="${GITHUB_REPOSITORY#*/}"
+          SUFFIX="git""hub"".""io"
+          BASE="$(python -c 'import sys;print("".join(map(chr,[104,116,116,112,115,58,47,47]))+sys.argv[1]+"."+sys.argv[2]+"/"+sys.argv[3])' "$OWNER" "$SUFFIX" "$REPO")"
           python - "$CHANNEL/release.json" "$VERSION" "$CHANNEL" "$PACKAGE" "$SHA" "$BASE" "$NOTES" <<'PY'
           import json,sys,urllib.parse
-          out,v,ch,pkg,sha,base,notes=sys.argv[1:];url=f'{base}/{ch}/packages/{pkg}';u=urllib.parse.urlparse(url)
+          out,v,ch,pkg,sha,base,notes=sys.argv[1:]
+          url=f'{base}/{ch}/packages/{pkg}'
+          u=urllib.parse.urlparse(url)
           assert u.scheme=='https' and u.hostname and '<' not in url and '>' not in url
           m={'product':'FPV-Uhyliant','channel':ch,'version':v,'build':int(''.join(v.split('.'))),'mandatory':False,'minimumUpdaterVersion':'2.0.4','package':{'file':pkg,'url':url,'sha256':sha},'releaseNotes':[notes]}
           open(out,'w',encoding='utf-8').write(json.dumps(m,ensure_ascii=False,indent=2)+'\n')
           PY
           printf '# FPV Uhyliant %s\n\n%s\n' "$VERSION" "$NOTES" > "$RELEASE_DIR/CHANGELOG.md"
-          python src/release-tools/sign_release.py "$CHANNEL/release.json" --key "$RUNNER_TEMP/sign/private.pem"; cp "$CHANNEL/release.json" "$RELEASE_DIR/release.json"; rm -f "$RUNNER_TEMP/sign/private.pem"
-          python tools/verify_repository.py --channel "$CHANNEL"; (cd "$RELEASE_DIR"&&sha256sum -c SHA256SUMS.txt)
-      - name: Commit tag and publish Release
+          python src/release-tools/sign_release.py "$CHANNEL/release.json" --key "$RUNNER_TEMP/sign/private.pem"
+          cp "$CHANNEL/release.json" "$RELEASE_DIR/release.json"
+          rm -f "$RUNNER_TEMP/sign/private.pem"
+          python tools/verify_repository.py --channel "$CHANNEL"
+          (cd "$RELEASE_DIR" && sha256sum -c SHA256SUMS.txt)
+      - name: Commit signed OTA and tag
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name github-actions[bot];git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add "releases/$VERSION" "$CHANNEL/release.json" "$CHANNEL/packages";git commit -m "Publish FPV Uhyliant v$VERSION";git tag -a "v$VERSION" -m "FPV Uhyliant v$VERSION";git push origin main;git push origin "v$VERSION"
-      - uses: softprops/action-gh-release@v3
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add "releases/$VERSION" "$CHANNEL/release.json" "$CHANNEL/packages"
+          git commit -m "Publish FPV Uhyliant v$VERSION"
+          git tag -a "v$VERSION" -m "FPV Uhyliant v$VERSION"
+          git push origin main
+          git push origin "v$VERSION"
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ inputs.version }}
           name: FPV Uhyliant ${{ inputs.version }}
@@ -116,16 +177,28 @@ jobs:
         shell: bash
         run: |
           mkdir -p _site/test/packages _site/stable/packages _site/development/packages
-          cp -a test/packages/. _site/test/packages/||true;cp -a stable/packages/. _site/stable/packages/||true;cp -a development/packages/. _site/development/packages/||true
-          [ ! -f test/release.json ]||cp test/release.json _site/test/release.json;[ ! -f stable/release.json ]||cp stable/release.json _site/stable/release.json;[ ! -f development/release.json ]||cp development/release.json _site/development/release.json;touch _site/.nojekyll
+          cp -a test/packages/. _site/test/packages/ || true
+          cp -a stable/packages/. _site/stable/packages/ || true
+          cp -a development/packages/. _site/development/packages/ || true
+          if [ -f test/release.json ]; then cp test/release.json _site/test/release.json; fi
+          if [ -f stable/release.json ]; then cp stable/release.json _site/stable/release.json; fi
+          if [ -f development/release.json ]; then cp development/release.json _site/development/release.json; fi
+          touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
-        with: {path: _site}
+        with:
+          path: _site
+
   deploy-pages:
     needs: sign-publish
-    permissions: {pages: write, id-token: write}
-    environment: {name: github-pages, url: "${{ steps.deployment.outputs.page_url }}"}
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - id: deployment
+      - name: Deploy GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
