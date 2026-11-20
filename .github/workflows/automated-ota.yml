@@ -66,6 +66,9 @@ jobs:
           NOTES: "${{ inputs.notes }}"
         run: |
           set -euo pipefail
+          OWNER="$GITHUB_REPOSITORY_OWNER"
+          REPO="${GITHUB_REPOSITORY#*/}"
+          PAGES_SUFFIX="git""hub"".""io"
           BASE_URL="<scrubbed-url-domain>}"
           RELEASE_DIR="releases/$VERSION"; CHANNEL_DIR="$CHANNEL"
           PACKAGE_NAME="FPV-Uhyliant-v$VERSION-Test-UA-Windows.zip"; PACKAGE_PATH="$RELEASE_DIR/$PACKAGE_NAME"
