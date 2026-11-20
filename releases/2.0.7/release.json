@@ -1,0 +1,21 @@
+{
+  "product": "FPV-Uhyliant",
+  "channel": "test",
+  "version": "2.0.7",
+  "build": 207,
+  "mandatory": false,
+  "minimumUpdaterVersion": "2.0.4",
+  "package": {
+    "file": "FPV-Uhyliant-v2.0.7-Test-UA-Windows.zip",
+    "url": "https://github.com/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.7/FPV-Uhyliant-v2.0.7-Test-UA-Windows.zip",
+    "sha256": "f29ae724e624499d8a3ff5a0ca09d2cefd060aa9e41a6317071dbfe86eaf452c"
+  },
+  "releaseNotes": [
+    "Per-user OTA foundation and polished station UI"
+  ],
+  "signature": {
+    "algorithm": "Ed25519",
+    "keyId": "fpv-uhyliant-production-v1",
+    "value": "WUosuEYswptItSJqUo1jPnaKp5ireuPT75RFXt4w9EnP8O+eZoIHPSMdooUk96qflm2d1m7InIemMfEIpVyVCg=="
+  }
+}
