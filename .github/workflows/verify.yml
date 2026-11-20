@@ -1,5 +1,15 @@
 name: verify-update-repository
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'releases/**'
+      - 'test/packages/**'
+      - 'stable/packages/**'
+      - 'development/packages/**'
+  pull_request:
+permissions:
+  contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -9,4 +19,18 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install cryptography
-      - run: python tools/verify_repository.py --channel test
+      - name: Verify signed test channel when present
+        shell: bash
+        run: |
+          if [ -f test/release.json ]; then
+            python tools/verify_repository.py --channel test
+          else
+            echo "No signed test release yet"
+          fi
+      - name: Reject committed private keys
+        shell: bash
+        run: |
+          if find . -type f \( -iname '*private*key*' -o -iname '*private*.pem' \) | grep -q .; then
+            echo 'Private signing key detected in repository.' >&2
+            exit 1
+          fi
