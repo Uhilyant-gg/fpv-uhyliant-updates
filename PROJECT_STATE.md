@@ -2,7 +2,7 @@
 
 ## Current baseline
 
-- Source version: `2.0.7`
+- Source version: `2.0.8`
 - Product name: `ФПВ Ухилянт`
 - Release channel: `test`
 - UI: PySide6 + Qt Quick/QML
@@ -12,93 +12,64 @@
 - Manifest authentication: Ed25519
 - Per-user Windows install path: `%LOCALAPPDATA%\Programs\FPV Uhyliant`
 - Windows layout: launcher + updater helper + `app/current`
-- Atomic application switch: implemented
-- Startup-OK handshake: implemented
-- Automatic rollback: implemented
+- Atomic application switch, startup-OK handshake and automatic rollback: implemented
 - Runtime/user data: `%LOCALAPPDATA%/FPV-Uhyliant`
 
-## Current UI foundation
+## Version 2.0.8 scope
 
-- Main station UI is implemented in PySide6 + Qt Quick/QML.
-- Application starts maximized and supports F11 fullscreen mode.
-- Test video state is available through the UI and F2 shortcut.
-- Station menu includes Devices, Video Profiles, Diagnostics, Station Updates and OSD controls.
-- Video profile selection UI foundation is implemented.
-- Video profiles remain separate from camera flashing/configuration presets.
-- Telemetry and real video backends are not implemented yet.
+- Hardened OpenIPC discovery and device database validation.
+- Safe discovery cancellation and QThread cleanup.
+- Hardened OTA manifest/package validation.
+- Atomic `.part`, `ready.json` and `launcher-state.json` handling.
+- Parallel updater operations are blocked.
+- ZIP path and symbolic-link validation is enforced.
+- CI now compiles Python sources, runs application self-test, checks version consistency, verifies signed test metadata and rejects private signing keys.
 
 ## Devices module
 
 - Persistent local device database is implemented in `%LOCALAPPDATA%/FPV-Uhyliant/devices.json`.
-- Saved devices support active-device selection and deletion.
-- Saved device fields can be edited: name, IP/hostname, port and notes.
+- Saved devices support active-device selection, editing and deletion.
 - OpenIPC discovery combines mDNS, ONVIF WS-Discovery, Majestic/OpenIPC fingerprinting and bounded local `/24` probing.
-- Discovery results are merged by address.
+- Results are merged by address and restricted to the selected network interface.
 - Confirmed OpenIPC devices are distinguished from unconfirmed network/ONVIF devices.
-- Unconfirmed devices cannot be added to the database as OpenIPC cameras through the discovery action.
-- Detailed discovery information includes IP, hostname, confirmation state, discovery sources/services and evidence used for OpenIPC identification.
-- Discovery exposes the current stage: `mDNS -> ONVIF -> fingerprint -> /24`.
-- The `/24` stage reports completed and total probe counts.
-- The UI reports the current number of discovered devices.
-- Discovery status reports scanning, cancellation, completion or error.
-- Discovery can be cancelled cooperatively; already collected results are retained.
+- Unconfirmed devices cannot be saved as OpenIPC cameras through discovery.
+- Discovery reports its current stage, progress, result count, cancellation, completion and errors.
 
 ## OTA/update foundation
 
-- The updater fetches the test-channel manifest.
+- The updater fetches the signed test-channel manifest.
 - Manifest authenticity is verified with Ed25519 using key ID `fpv-uhyliant-production-v1`.
-- Downloaded OTA packages are verified with SHA-256 before being marked ready.
-- Update installation can be blocked by the station safety guard when the autopilot is armed, recording is active, or streaming is active.
-- The packaged update helper is used to perform installation outside the running application process.
-- The per-user installation introduced in 2.0.7 is intended to allow future OTA updates without administrator elevation.
+- Package integrity is verified with SHA-256.
+- Update installation can be blocked when the autopilot is armed, recording is active, or streaming is active.
+- The packaged update helper installs outside the running application process.
 
-## Next validation gate
+## Current validation gate
 
-1. Prepare and publish `2.0.8` through the existing release pipeline.
+1. Publish `2.0.8` through `.github/workflows/automated-ota.yml`.
 2. Validate `2.0.7 -> 2.0.8` using OTA only.
 3. Confirm the update completes without Setup.exe and without UAC.
-4. Validate manifest signature verification and OTA package SHA-256 verification.
-5. Validate application self-test, atomic switch, restart and startup-OK handling.
-6. Validate automatic rollback with a controlled failed-startup test.
-7. Validate Devices discovery on Windows with real OpenIPC and generic ONVIF cameras.
-8. Validate discovery cancellation during mDNS, ONVIF and `/24` stages.
-9. Validate that unconfirmed ONVIF devices are not saved as OpenIPC cameras.
+4. Validate signature and SHA-256 verification, self-test, atomic switch, restart and startup-OK handling.
+5. Validate automatic rollback with a controlled failed-startup test.
+6. Validate Devices discovery and cancellation on Windows with real OpenIPC and generic ONVIF cameras.
+7. Confirm that unverified ONVIF devices cannot be saved as OpenIPC cameras.
 
 ## Product roadmap after OTA validation
 
-- Implement real OpenIPC camera integration and camera configuration controls.
-- Implement persistent video profiles and per-stream assignment/editing.
-- Real RTSP/OpenIPC video backend and future secondary/thermal source/PiP.
-- Read-only MAVLink telemetry backend for ArduPilot/Pixhawk/CubeOrangePlus.
-- CRSF-related integration for supported camera/flight-controller workflows.
-- Persistent OSD positions, visibility, scale and profiles.
-- Network diagnostics for latency, loss, jitter, TX/RX and Starlink/WireGuard/link state.
-- Local-first pilot data with Station ID and text pairing/transfer keys; optional encrypted sync relay only.
-- Map/GNSS presentation.
-- Documented R2D2/OpenIPC and STABX telemetry/overlay integration.
+1. Real OpenIPC camera integration and camera configuration controls.
+2. Persistent video profiles with per-stream assignment and editing.
+3. Real RTSP/OpenIPC video backend, then secondary/thermal source and PiP.
+4. Read-only MAVLink telemetry for ArduPilot/Pixhawk/CubeOrangePlus.
+5. Persistent OSD positions, visibility, scale and profiles.
+6. Network diagnostics for latency, loss, jitter, TX/RX and Starlink/WireGuard/link state.
+7. CRSF, R2D2/OpenIPC and STABX telemetry/overlay integration.
+8. Map/GNSS presentation and local-first pilot data.
 
-## Camera and video-profile separation
-
-- Camera firmware/configuration presets and video profiles are separate concepts.
-- A camera flashing preset must not contain or apply video-profile settings.
-- Video profiles belong to a selected video stream and can be managed independently of camera flashing.
-- The existing BAT/fullflash workflow is not the universal camera flashing path; it is a separate method for cameras already running the relevant custom OpenIPC firmware.
-
-## Release architecture
-
-- `.github/workflows/automated-ota.yml` is the authoritative unified release pipeline.
-- The pipeline builds the Windows application, launcher, update helper, OTA ZIP and Setup.exe.
-- OTA manifest is signed from GitHub Actions secret `FPV_RELEASE_PRIVATE_KEY`.
-- Git stores lightweight release metadata only; large binaries are GitHub Release assets.
-- GitHub Pages publishes the signed channel manifest.
-- Standalone release/pages/installer workflows are retired.
-
-## Repository rules
+## Project rules
 
 1. `src/` is authoritative source.
-2. Release metadata is immutable under `releases/<version>/` after publication.
+2. Release metadata under `releases/<version>/` is immutable after publication.
 3. Private signing keys must never be committed.
-4. Every release must carry a signed manifest and SHA-256 metadata.
-5. Every published version must have a Git tag.
-6. Video-profile settings must remain independent from camera flashing/configuration presets.
-7. Discovery must not classify a generic ONVIF camera as OpenIPC without OpenIPC/Majestic evidence.
+4. Every release must have a signed manifest, SHA-256 metadata and Git tag.
+5. Video profiles remain independent from camera flashing/configuration presets.
+6. The BAT/fullflash method is only for cameras already running the relevant custom OpenIPC firmware.
+7. Generic ONVIF devices must not be classified as OpenIPC without OpenIPC/Majestic evidence.
