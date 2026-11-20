@@ -1,21 +1,21 @@
 {
   "product": "FPV-Uhyliant",
   "channel": "test",
-  "version": "2.0.5",
-  "build": 205,
+  "version": "2.0.6",
+  "build": 206,
   "mandatory": false,
   "minimumUpdaterVersion": "2.0.4",
   "package": {
-    "file": "FPV-Uhyliant-v2.0.5-Test-UA-Windows.zip",
-    "url": "https://github.com/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.5/FPV-Uhyliant-v2.0.5-Test-UA-Windows.zip",
-    "sha256": "fba73096124586291b5014ca05eac6fc328ae30c576425636caf9a4db5ab01ae"
+    "file": "FPV-Uhyliant-v2.0.6-Test-UA-Windows.zip",
+    "url": "https://github.com/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.6/FPV-Uhyliant-v2.0.6-Test-UA-Windows.zip",
+    "sha256": "82a9f2fdd122e1e0db1a3a668fc347c8ae88ef163ccc40a24852e1690185e72e"
   },
   "releaseNotes": [
-    "Updater manifest URL bootstrap fix"
+    "First end-to-end OTA proof from 2.0.6"
   ],
   "signature": {
     "algorithm": "Ed25519",
     "keyId": "fpv-uhyliant-production-v1",
-    "value": "B/b7zP4KZ8WJn3qNYXTXu5AUj2zSVHwmZl41LKAxwGNbaHLiZ91xpcPl+82hZTcRxjFQPIl5WxWA0Pr3Z94LBw=="
+    "value": "sRlkOkOJgSy5Szt0NeTwepHZL9RAWQcB2Ct+sRyw+k3XTQIPgl9Pm8K3CIY3rXQZ7MVOdTi0rgiN5pHMMutZCQ=="
   }
 }
