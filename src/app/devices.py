@@ -3,12 +3,12 @@ from pathlib import Path
 from PySide6.QtCore import QObject,Property,Signal,Slot,QThread
 from zeroconf import ServiceBrowser,ServiceListener,Zeroconf
 DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';DB=DATA/'devices.json';SERVICES=('_http._tcp.local.','_rtsp._tcp.local.','_ssh._tcp.local.');WS=('239.255.255.250',3702)
-def merge(f,h,n='',s='',o=False,e=''):
+def merge(f,h,n='',s='',verified=False,e=''):
  if not h:return
  x=f.setdefault(h,{'name':n or h,'host':h,'hostname':n or h,'services':[],'openipc':False,'evidence':[]})
  if n and x['name']==h:x['name']=n;x['hostname']=n
  if s and s not in x['services']:x['services'].append(s)
- x['openipc']|=o
+ if verified:x['openipc']=True
  if e and e not in x['evidence']:x['evidence'].append(e)
 def local_ipv4():
  out=set()
@@ -22,19 +22,19 @@ def local_ipv4():
  return sorted(out)
 def probe(h,cancel):
  if cancel.is_set():return h,False,[]
- ev=[];ok=False
+ ev=[];verified=False
  try:
   q=urllib.request.Request(f'<scrubbed-url-domain>',headers={'Accept':'application/json','User-Agent':'FPV-Uhyliant'})
   with urllib.request.urlopen(q,timeout=.45) as r:d=json.loads(r.read(524288).decode())
-  if isinstance(d,dict) and d and any(k in d for k in ('video0','video1','system','fpv','isp','rtsp')):ok=True;ev.append('Majestic /api/v1/config.json')
+  if isinstance(d,dict) and d and any(k in d for k in ('video0','video1','system','fpv','isp','rtsp')):verified=True;ev.append('Majestic /api/v1/config.json')
  except Exception:pass
- if cancel.is_set():return h,ok,ev
+ if cancel.is_set():return h,verified,ev
  try:
   q=urllib.request.Request(f'<scrubbed-url-domain>',headers={'User-Agent':'FPV-Uhyliant'})
   with urllib.request.urlopen(q,timeout=.35) as r:b=r.read(65536).decode('utf-8','ignore').lower()
-  if 'openipc' in b or 'majestic' in b:ok=True;ev.append('OpenIPC WebUI :85')
+  if 'openipc' in b or 'majestic' in b:verified=True;ev.append('OpenIPC/Majestic WebUI :85')
  except Exception:pass
- return h,ok,ev
+ return h,verified,ev
 def onvif(f,cancel):
  for typ in ('dn:NetworkVideoTransmitter',''):
   if cancel.is_set():return
@@ -47,7 +47,7 @@ def onvif(f,cancel):
    while time.monotonic()<end and not cancel.is_set():
     try:d,a=s.recvfrom(65535)
     except socket.timeout:continue
-    t=d.decode('utf-8','ignore');h=a[0];o='openipc' in t.lower();merge(f,h,'ONVIF '+h,'ONVIF',o,'ONVIF OpenIPC marker' if o else 'ONVIF WS-Discovery')
+    t=d.decode('utf-8','ignore');h=a[0];hint='openipc' in t.lower();merge(f,h,'ONVIF '+h,'ONVIF',False,'ONVIF OpenIPC hint' if hint else 'ONVIF WS-Discovery')
   finally:s.close()
 class Worker(QThread):
  done=Signal(object,bool,str);progress=Signal(str,int,int,int);live=Signal(object)
@@ -64,8 +64,9 @@ class Worker(QThread):
      try:
       i=z.get_service_info(t,n,timeout=800)
       if not i:return
-      p={k.decode(errors='ignore').lower():v.decode(errors='ignore') for k,v in i.properties.items()};server=(i.server or '').rstrip('.');o=p.get('vendor','').lower()=='openipc' or 'openipc' in n.lower()
-      for h in i.parsed_addresses():merge(found,h,server or n.split('.')[0],t,o,'mDNS vendor=OpenIPC' if o else 'mDNS')
+      p={k.decode(errors='ignore').lower():v.decode(errors='ignore') for k,v in i.properties.items()};server=(i.server or '').rstrip('.');vendor=p.get('vendor','').strip().lower();verified=vendor=='openipc';hint='openipc' in n.lower() or 'openipc' in server.lower()
+      evidence='mDNS vendor=OpenIPC' if verified else ('mDNS OpenIPC name hint' if hint else 'mDNS')
+      for h in i.parsed_addresses():merge(found,h,server or n.split('.')[0],t,verified,evidence)
       w.live.emit(list(found.values()));w.emitp('mDNS',0,0,len(found))
      except Exception:pass
     def update_service(self,z,t,n):self.add_service(z,t,n)
@@ -76,23 +77,23 @@ class Worker(QThread):
    z.close()
    if not self.cancel.is_set():self.emitp('ONVIF',0,0,len(found));onvif(found,self.cancel);self.live.emit(list(found.values()))
    if not self.cancel.is_set():
-    self.emitp('fingerprint',0,len(found),len(found))
-    for i,h in enumerate(list(found),1):
+    targets=list(found);self.emitp('fingerprint',0,len(targets),len(found))
+    for i,h in enumerate(targets,1):
      if self.cancel.is_set():break
-     _,ok,ev=probe(h,self.cancel)
-     if ok:
-      merge(found,h,s='Majestic',o=True,e=ev[0])
+     _,verified,ev=probe(h,self.cancel)
+     if verified:
+      merge(found,h,s='Majestic/OpenIPC fingerprint',verified=True,e=ev[0])
       for e in ev[1:]:merge(found,h,e=e)
-     self.emitp('fingerprint',i,len(found),len(found));self.live.emit(list(found.values()))
+     self.emitp('fingerprint',i,len(targets),len(found));self.live.emit(list(found.values()))
    if not self.cancel.is_set():
     nets={ipaddress.ip_network(ip+'/24',strict=False) for ip in local_ipv4()};hosts=[str(h) for n in nets for h in n.hosts()];total=len(hosts);done=0;self.emitp('/24',0,total,len(found));ex=concurrent.futures.ThreadPoolExecutor(max_workers=32);pending={ex.submit(probe,h,self.cancel) for h in hosts}
     try:
      while pending and not self.cancel.is_set():
       finished,pending=concurrent.futures.wait(pending,timeout=.1,return_when=concurrent.futures.FIRST_COMPLETED)
       for fut in finished:
-       done+=1;h,ok,ev=fut.result()
-       if ok:
-        merge(found,h,'OpenIPC '+h,'/24',True,ev[0])
+       done+=1;h,verified,ev=fut.result()
+       if verified:
+        merge(found,h,'OpenIPC '+h,'/24 fingerprint',True,ev[0])
         for e in ev[1:]:merge(found,h,e=e)
        self.emitp('/24',done,total,len(found))
       if finished:self.live.emit(list(found.values()))
@@ -101,7 +102,7 @@ class Worker(QThread):
       for fut in pending:fut.cancel()
      ex.shutdown(wait=not self.cancel.is_set(),cancel_futures=True)
    r=list(found.values())
-   for x in r:x['confidence']='OpenIPC підтверджено' if x['openipc'] else 'Не підтверджено'
+   for x in r:x['confidence']='OpenIPC підтверджено' if x['openipc'] else 'Кандидат, не підтверджено'
    r.sort(key=lambda x:(not x['openipc'],x['host']));self.done.emit(r,self.cancel.is_set(),'')
   except Exception as e:self.done.emit(list(found.values()),False,str(e))
 class Devices(QObject):
@@ -149,10 +150,10 @@ class Devices(QObject):
  def _done(self,r,c,e):self._discovered=list(r);self._found=len(r);self._scanning=False;self._worker=None;self._status='Помилка' if e else ('Скасовано' if c else 'Завершено');self.discoveryChanged.emit();self.notice.emit((e or self._status)+f': {len(r)} знайдено')
  @Slot(str,str,bool,result=str)
  def addDiscovered(self,h,n,confirmed):
-  if not confirmed:self.notice.emit('Камера не підтверджена як OpenIPC. Спочатку потрібен fingerprint.');return ''
+  if not confirmed:self.notice.emit('Камера не підтверджена як OpenIPC. Потрібен vendor=OpenIPC або валідний OpenIPC/Majestic fingerprint.');return ''
   for x in self._items:
    if x.get('host')==h:self._active_id=x['id'];self._save();self.changed.emit();return x['id']
-  return self.addDevice(n or 'OpenIPC '+h,'Камера OpenIPC',h,80,'Мережа','OpenIPC підтверджено discovery/fingerprint')
+  return self.addDevice(n or 'OpenIPC '+h,'Камера OpenIPC',h,80,'Мережа','OpenIPC verified')
  @Slot(str,str,str,int,str,str,result=str)
  def addDevice(self,n,t,h,p,c,note):
   if not n.strip():return ''
