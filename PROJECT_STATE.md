@@ -2,7 +2,7 @@
 
 ## Current baseline
 
-- Current source version: `2.0.0-test`
+- Current source version: `2.0.2`
 - Release channel: `test`
 - UI: PySide6 + Qt Quick/QML
 - Update repository: GitHub Pages
@@ -13,6 +13,22 @@
 - Atomic update: implemented
 - Startup-OK handshake: implemented
 - Rollback: implemented
+- Windows installer pipeline: implemented; v2.0.2 requires CI and real-PC validation
+
+## v2.0.2 work
+
+- Normalize product version and window title to `ФПВ Ухилянт 2.0.2`.
+- Use one Python version module as the client runtime version source.
+- Keep production public key in the client; private key remains only in GitHub Actions secret `FPV_RELEASE_PRIVATE_KEY`.
+- Primary Windows user asset: `FPV-Uhyliant-Setup-2.0.2.exe`.
+- Preserve test-channel Ed25519/SHA-256 OTA, startup-OK and rollback.
+- Optimize Windows packaging conservatively without removing required Qt Quick/QML runtime components.
+
+## Known issues / validation needed
+
+- v2.0.2 Windows installer and OTA require CI build and real-PC validation after source changes.
+- Video, MAVLink telemetry, network diagnostics, map, persistent OSD profiles and STABX telemetry are planned integrations, not production implementations yet.
+- STABX telemetry protocol must be based on documentation or observed telemetry format before implementation.
 
 ## Repository rules
 
@@ -25,9 +41,10 @@
 
 ## Next work
 
-- Real RTSP/OpenIPC video backend.
-- Real MAVLink telemetry backend.
-- Persistent OSD element positions and profiles.
-- Flight-controller OSD pass-through/render mode.
-- Real network measurement workers.
-- Windows EXE packaging and installer.
+- Validate v2.0.2 Windows installer and signed OTA on a real station PC.
+- Real RTSP/OpenIPC video backend, including future secondary/thermal source and PiP.
+- Read-only MAVLink telemetry backend for ArduPilot/Pixhawk/CubeOrangePlus.
+- Persistent OSD element positions, visibility, scale and profiles.
+- Network diagnostics for latency, loss, jitter, TX/RX, Starlink/WireGuard/link state.
+- Map and GNSS presentation.
+- R2D2/OpenIPC read-only telemetry/overlay integration where documented.
