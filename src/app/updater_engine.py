@@ -1,16 +1,17 @@
-﻿import base64,hashlib,json,os,subprocess,sys,urllib.request
+import base64,hashlib,json,os,subprocess,sys,urllib.request
 from pathlib import Path
 from PySide6.QtCore import QObject,Property,Signal,Slot,QThread,QCoreApplication,QTimer
 from cryptography.hazmat.primitives import serialization
 from cryptography.exceptions import InvalidSignature
-VERSION='2.0.1'; KEY_ID='fpv-uhyliant-production-v1'; HERE=Path(__file__).resolve().parent; PUB=HERE/'security/production-v1-public.pem'
-DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant'; UP=DATA/'updates'; CFG=DATA/'updater.json'; DEFAULT='https://uhilyant-gg.github.io/fpv-uhyliant-updates/test/release.json'
+from version import VERSION
+KEY_ID='fpv-uhyliant-production-v1'; HERE=Path(__file__).resolve().parent; PUB=HERE/'security/production-v1-public.pem'
+DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant'; UP=DATA/'updates'; DEFAULT='https://<scrubbed-url-domain>/fpv-uhyliant-updates/test/release.json'
 def canon(o):d=dict(o);d.pop('signature',None);return json.dumps(d,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()
 def verify(o):
  s=o.get('signature') or {}
- if s.get('algorithm')!='Ed25519' or s.get('keyId')!=KEY_ID:raise RuntimeError('РќРµРґРѕРІС–СЂРµРЅРёР№ РїС–РґРїРёСЃ manifest')
+ if s.get('algorithm')!='Ed25519' or s.get('keyId')!=KEY_ID:raise RuntimeError('Недовірений підпис manifest')
  try:serialization.load_pem_public_key(PUB.read_bytes()).verify(base64.b64decode(s['value'],validate=True),canon(o))
- except (InvalidSignature,ValueError,KeyError) as e:raise RuntimeError('РџС–РґРїРёСЃ manifest РЅРµ РїСЂРѕР№С€РѕРІ РїРµСЂРµРІС–СЂРєСѓ') from e
+ except (InvalidSignature,ValueError,KeyError) as e:raise RuntimeError('Підпис manifest не пройшов перевірку') from e
 def vt(v):return tuple(int(x) for x in v.split('-')[0].split('.'))
 def sha(p):
  h=hashlib.sha256()
@@ -33,13 +34,13 @@ class W(QThread):
       b=r.read(524288)
       if not b:break
       f.write(b);n+=len(b);self.progress.emit(int(n*100/total) if total else 0,f'{n//1048576} MB')
-    if sha(t)!=pkg['sha256']:t.unlink(missing_ok=True);raise RuntimeError('SHA-256 РїР°РєРµС‚Р° РЅРµ Р·Р±С–РіР°С”С‚СЊСЃСЏ')
+    if sha(t)!=pkg['sha256']:t.unlink(missing_ok=True);raise RuntimeError('SHA-256 пакета не збігається')
     ready={'version':o['version'],'package':str(t)};(UP/'ready.json').write_text(json.dumps(ready),encoding='utf-8');self.done.emit(True,ready)
   except Exception as e:self.done.emit(False,str(e))
 class Updater(QObject):
  changed=Signal();progressChanged=Signal()
  def __init__(self,root=None,guard=None):
-  super().__init__();self.root=Path(root).resolve() if root else None;self.guard=guard or (lambda:(True,''));self.url=DEFAULT;self.state='idle';self.status='Р“РѕС‚РѕРІРѕ';self.available='';self.notes=[];self.p=0;self.m={};self.w=None
+  super().__init__();self.root=Path(root).resolve() if root else None;self.guard=guard or (lambda:(True,''));self.url=DEFAULT;self.state='idle';self.status='Готово';self.available='';self.notes=[];self.p=0;self.m={};self.w=None
  @Property(str,constant=True)
  def currentVersion(self):return VERSION
  @Property(str,notify=changed)
@@ -57,10 +58,10 @@ class Updater(QObject):
  @Property(bool,notify=changed)
  def installReady(self):return self.state=='ready' and self.root is not None
  @Slot()
- def check(self):self._start('check',{'url':self.url},'РџРµСЂРµРІС–СЂРєР° РїС–РґРїРёСЃР°РЅРѕРіРѕ manifest')
+ def check(self):self._start('check',{'url':self.url},'Перевірка підписаного manifest')
  @Slot()
  def download(self):
-  if self.m:self._start('download',{'m':self.m},'Р—Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ РїР°РєРµС‚Р°')
+  if self.m:self._start('download',{'m':self.m},'Завантаження пакета')
  @Slot()
  def install(self):
   ok,why=self.guard()
@@ -72,7 +73,6 @@ class Updater(QObject):
  def _done(self,a,ok,d):
   if not ok:self.state='error';self.status=str(d)
   elif a=='check':
-   self.m=d;self.available=d['version'];self.notes=d.get('releaseNotes',[]);self.state='available' if vt(d['version'])>vt(VERSION) else 'current';self.status='РћРЅРѕРІР»РµРЅРЅСЏ РґРѕСЃС‚СѓРїРЅРµ' if self.state=='available' else 'Р’РµСЂСЃС–СЏ Р°РєС‚СѓР°Р»СЊРЅР°'
-  else:self.state='ready';self.status='РџР°РєРµС‚ РїРµСЂРµРІС–СЂРµРЅРѕ С– РіРѕС‚РѕРІРѕ РґРѕ СѓСЃС‚Р°РЅРѕРІРєРё'
+   self.m=d;self.available=d['version'];self.notes=d.get('releaseNotes',[]);self.state='available' if vt(d['version'])>vt(VERSION) else 'current';self.status='Оновлення доступне' if self.state=='available' else 'Версія актуальна'
+  else:self.state='ready';self.status='Пакет перевірено і готово до установки'
   self.changed.emit()
-

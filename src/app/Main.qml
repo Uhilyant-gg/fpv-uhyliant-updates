@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-ApplicationWindow{id:w;width:1600;height:950;visible:true;color:"#02070c";title:"ФПВ Ухилянт v2.0 Test";property color fg:"#f4f7fb";property color sub:"#8ea1b9";property color line:"#36506c";property color glass:"#99091420";property color green:"#24d18f";property color blue:"#4da3ff";property bool updateOpen:false
+ApplicationWindow{id:w;width:1600;height:950;visible:true;color:"#02070c";title:appWindowTitle;property color fg:"#f4f7fb";property color sub:"#8ea1b9";property color line:"#36506c";property color glass:"#99091420";property color green:"#24d18f";property color blue:"#4da3ff";property bool updateOpen:false
 component H:Rectangle{color:w.glass;border.color:w.line;radius:9}
 Shortcut{sequence:"F2";onActivated:station.toggleVideo()}Shortcut{sequence:"F11";onActivated:w.visibility=w.visibility===Window.FullScreen?Window.Maximized:Window.FullScreen}Shortcut{sequence:"Escape";onActivated:{station.setOSDEdit(false);updateOpen=false}}
 Image{anchors.fill:parent;source:"preview.jpg";fillMode:Image.PreserveAspectCrop;opacity:station.videoRunning?1:.35}Rectangle{anchors.fill:parent;color:station.videoRunning?"transparent":"#a0000000"}Text{visible:!station.videoRunning;anchors.centerIn:parent;text:"FPV ВІДЕО\nF2 • запуск";color:sub;font.pixelSize:28;horizontalAlignment:Text.AlignHCenter}
