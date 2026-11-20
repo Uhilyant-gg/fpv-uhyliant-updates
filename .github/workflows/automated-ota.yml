@@ -6,7 +6,7 @@ on:
       version:
         description: Release version
         required: true
-        default: 2.0.4
+        default: 2.0.5
         type: string
       channel:
         description: OTA channel
@@ -20,7 +20,7 @@ on:
       notes:
         description: Release notes
         required: true
-        default: Windows OTA bootstrap architecture
+        default: Updater manifest URL bootstrap fix
         type: string
       prerelease:
         description: Publish as pre-release
