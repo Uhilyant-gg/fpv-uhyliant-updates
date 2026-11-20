@@ -1,0 +1,21 @@
+{
+  "product": "FPV-Uhyliant",
+  "channel": "test",
+  "version": "2.0.4",
+  "build": 204,
+  "mandatory": false,
+  "minimumUpdaterVersion": "2.0.4",
+  "package": {
+    "file": "FPV-Uhyliant-v2.0.4-Test-UA-Windows.zip",
+    "url": "https://github.com/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.4/FPV-Uhyliant-v2.0.4-Test-UA-Windows.zip",
+    "sha256": "14c277a23cf4b0725eb560dc44c98e886a2b76c928bccb2f1c374485d13a40a5"
+  },
+  "releaseNotes": [
+    "Windows OTA bootstrap architecture"
+  ],
+  "signature": {
+    "algorithm": "Ed25519",
+    "keyId": "fpv-uhyliant-production-v1",
+    "value": "qyxCRnfOX3kh5LHV07hAPX+CJdmyjEBYujWMQ3LdasM/sNhhb0VBr7sej/mPkmNjl61VJtj0//y97JOOfi2jBQ=="
+  }
+}
