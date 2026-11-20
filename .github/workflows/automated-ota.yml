@@ -1,4 +1,4 @@
-name: fpv-uhyliant-release-pipeline
+name: FPV Uhyliant Release Pipeline
 
 on:
   workflow_dispatch:
