@@ -1,217 +1,131 @@
 name: fpv-uhyliant-release-pipeline
-
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: Release version, for example 2.0.3
-        required: true
-        default: 2.0.3
-        type: string
-      channel:
-        description: OTA channel
-        required: true
-        default: test
-        type: choice
-        options: [test, stable, development]
-      notes:
-        description: Release notes
-        required: true
-        default: Automated FPV Uhyliant release
-        type: string
-      prerelease:
-        description: Publish as pre-release
-        required: true
-        default: true
-        type: boolean
-
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-
+      version: {description: Release version, required: true, default: 2.0.4, type: string}
+      channel: {description: OTA channel, required: true, default: test, type: choice, options: [test, stable, development]}
+      notes: {description: Release notes, required: true, default: Windows OTA bootstrap architecture, type: string}
+      prerelease: {description: Publish as pre-release, required: true, default: true, type: boolean}
+permissions: {contents: write, pages: write, id-token: write}
 env:
   VERSION: ${{ inputs.version }}
   CHANNEL: ${{ inputs.channel }}
   NOTES: ${{ inputs.notes }}
-
 jobs:
-  ota:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.build.outputs.version }}
-      release_dir: ${{ steps.build.outputs.release_dir }}
-      package_name: ${{ steps.build.outputs.package_name }}
+  windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
         with: {ref: main, fetch-depth: 0}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
-      - name: Validate source and release version
-        shell: bash
-        run: |
-          set -euo pipefail
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          python - "$VERSION" <<'PY'
-          import json,pathlib,sys
-          expected=sys.argv[1]; ns={}
-          exec(pathlib.Path('src/app/version.py').read_text(encoding='utf-8'),ns)
-          assert ns['VERSION']==expected
-          assert json.loads(pathlib.Path('VERSION.json').read_text(encoding='utf-8'))['version']==expected
-          PY
-          test "$(git tag -l "v$VERSION")" = ""
-          if find . -type f \( -iname '*private*key*' -o -iname '*private*.pem' \) | grep -q .; then
-            echo 'Private signing key detected in repository.' >&2; exit 1
-          fi
-      - run: python -m pip install --disable-pip-version-check cryptography
-      - name: Materialize signing key
-        shell: bash
-        env: {PRIVATE_KEY: "${{ secrets.FPV_RELEASE_PRIVATE_KEY }}"}
-        run: |
-          set -euo pipefail
-          test -n "$PRIVATE_KEY"
-          install -m 700 -d "$RUNNER_TEMP/fpv-signing"
-          printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/fpv-signing/private.pem"
-          chmod 600 "$RUNNER_TEMP/fpv-signing/private.pem"
-      - name: Build OTA package and manifest
-        id: build
-        shell: bash
-        run: |
-          set -euo pipefail
-          OWNER="$GITHUB_REPOSITORY_OWNER"; REPO="${GITHUB_REPOSITORY#*/}"; PAGES_SUFFIX="git""hub"".""io"
-          BASE_URL="$(python -c 'import sys; print("".join(map(chr,[104,116,116,112,115,58,47,47])) + sys.argv[1] + "." + sys.argv[2] + "/" + sys.argv[3])' "$OWNER" "$PAGES_SUFFIX" "$REPO")"
-          RELEASE_DIR="releases/$VERSION"; CHANNEL_DIR="$CHANNEL"; PACKAGE_NAME="FPV-Uhyliant-v$VERSION-Test-UA-Windows.zip"; PACKAGE_PATH="$RELEASE_DIR/$PACKAGE_NAME"
-          mkdir -p "$RELEASE_DIR" "$CHANNEL_DIR/packages"
-          (cd src/app && zip -qr "../../$PACKAGE_PATH" . -x '__pycache__/*' '*/__pycache__/*' '*.pyc' '*.pyo')
-          cp "$PACKAGE_PATH" "$CHANNEL_DIR/packages/$PACKAGE_NAME"
-          SHA256="$(sha256sum "$PACKAGE_PATH" | awk '{print $1}')"; printf '%s  %s\n' "$SHA256" "$PACKAGE_NAME" > "$RELEASE_DIR/SHA256SUMS.txt"
-          python - "$CHANNEL_DIR/release.json" "$VERSION" "$CHANNEL" "$PACKAGE_NAME" "$SHA256" "$BASE_URL" "$NOTES" <<'PY'
-          import json,sys,urllib.parse
-          out,version,channel,package,sha256,base_url,notes=sys.argv[1:]
-          package_url=f'{base_url}/{channel}/packages/{package}'; p=urllib.parse.urlparse(package_url)
-          if p.scheme!='https' or not p.hostname or '<' in package_url or '>' in package_url: raise SystemExit(f'Invalid package URL: {package_url}')
-          manifest={'product':'FPV-Uhyliant','channel':channel,'version':version,'build':int(''.join(version.split('.'))),'mandatory':False,'minimumUpdaterVersion':'2.0.0','package':{'file':package,'url':package_url,'sha256':sha256},'releaseNotes':[notes]}
-          with open(out,'w',encoding='utf-8',newline='\n') as f: json.dump(manifest,f,ensure_ascii=False,indent=2); f.write('\n')
-          PY
-          printf '# FPV Uhyliant %s\n\n%s\n' "$VERSION" "$NOTES" > "$RELEASE_DIR/CHANGELOG.md"
-          python src/release-tools/sign_release.py "$CHANNEL_DIR/release.json" --key "$RUNNER_TEMP/fpv-signing/private.pem"
-          cp "$CHANNEL_DIR/release.json" "$RELEASE_DIR/release.json"; rm -f "$RUNNER_TEMP/fpv-signing/private.pem"
-          python tools/verify_repository.py --channel "$CHANNEL"; (cd "$RELEASE_DIR" && sha256sum -c SHA256SUMS.txt)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"; echo "release_dir=$RELEASE_DIR" >> "$GITHUB_OUTPUT"; echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
-      - name: Upload release payload
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-payload-${{ inputs.version }}
-          path: |
-            releases/${{ inputs.version }}/
-            ${{ inputs.channel }}/release.json
-            ${{ inputs.channel }}/packages/FPV-Uhyliant-v${{ inputs.version }}-Test-UA-Windows.zip
-          if-no-files-found: error
-
-  windows:
-    needs: ota
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v6
-        with: {ref: main}
-      - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
-      - name: Validate Windows version
+      - name: Validate source version
         shell: pwsh
         run: |
-          $meta = Get-Content VERSION.json -Raw | ConvertFrom-Json
-          if ($meta.version -ne $env:VERSION) { throw "VERSION.json mismatch" }
+          if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version' }
+          $meta=Get-Content VERSION.json -Raw|ConvertFrom-Json
+          if ($meta.version -ne $env:VERSION) { throw 'VERSION.json mismatch' }
+          python -c "from pathlib import Path;ns={};exec(Path('src/app/version.py').read_text(encoding='utf-8'),ns);assert ns['VERSION']=='$env:VERSION'"
+          git rev-parse "v$env:VERSION" 2>$null; if ($LASTEXITCODE -eq 0) { throw 'Tag already exists' }
       - name: Install build dependencies
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r src/requirements.txt
           python -m pip install pyinstaller pillow
-      - name: Prepare icon and security assets
+      - name: Prepare assets
         shell: pwsh
         run: |
           python tools/build_icon.py
-          New-Item -ItemType Directory -Force "src\app\security" | Out-Null
-          Copy-Item "test\release-public-key.pem" "src\app\security\production-v1-public.pem" -Force
-          Copy-Item "assets\fpv-uhyliant.ico" "src\app\fpv-uhyliant.ico" -Force
-      - name: Build and smoke-test application
+          New-Item -ItemType Directory -Force src\app\security,bootstrap-output | Out-Null
+          Copy-Item test\release-public-key.pem src\app\security\production-v1-public.pem -Force
+          Copy-Item assets\fpv-uhyliant.ico src\app\fpv-uhyliant.ico -Force
+      - name: Build application launcher and update helper
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant --icon assets/fpv-uhyliant.ico --paths src/app --add-data "src/app/Main.qml;." --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.QtWebEngineQuick --exclude-module PySide6.QtPdf --exclude-module PySide6.QtPdfWidgets --exclude-module PySide6.QtBluetooth --exclude-module PySide6.QtNfc --exclude-module PySide6.QtSql --exclude-module PySide6.QtTest src/app/main.py
-          & "dist\FPV-Uhyliant\FPV-Uhyliant.exe" --self-test
-          if ($LASTEXITCODE -ne 0) { throw "Self-test failed: $LASTEXITCODE" }
-      - name: Build Windows installer
+          pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant --icon assets/fpv-uhyliant.ico --paths src/app --add-data "src/app/Main.qml;." --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.QtWebEngineQuick --exclude-module PySide6.QtPdf --exclude-module PySide6.QtBluetooth --exclude-module PySide6.QtNfc --exclude-module PySide6.QtSql --exclude-module PySide6.QtTest src/app/main.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name FPV-Uhyliant-Launcher --icon assets/fpv-uhyliant.ico src/launcher.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name FPV-Uhyliant-Update --icon assets/fpv-uhyliant.ico src/update_helper.py
+          Copy-Item dist\FPV-Uhyliant-Launcher.exe bootstrap-output\ -Force
+          Copy-Item dist\FPV-Uhyliant-Update.exe bootstrap-output\ -Force
+          & dist\FPV-Uhyliant\FPV-Uhyliant.exe --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'Application self-test failed' }
+      - name: Build Windows OTA package and installer
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force release-output,installer-output | Out-Null
+          $pkg="FPV-Uhyliant-v$env:VERSION-Test-UA-Windows.zip"
+          Compress-Archive -Path dist\FPV-Uhyliant\* -DestinationPath "release-output\$pkg" -CompressionLevel Optimal
           choco install innosetup --no-progress -y
-          New-Item -ItemType Directory -Force installer-output | Out-Null
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:VERSION" "packaging\FPV-Uhyliant.iss"
-          $setup="installer-output\FPV-Uhyliant-Setup-$env:VERSION.exe"; if (-not (Test-Path $setup)) { throw "Installer not found" }
-          $h=Get-FileHash $setup -Algorithm SHA256; "$($h.Hash.ToLower())  $($h.Path | Split-Path -Leaf)" | Set-Content "installer-output\SHA256SUMS-Windows.txt" -Encoding ascii
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:VERSION" packaging\FPV-Uhyliant.iss
+          if (-not (Test-Path "installer-output\FPV-Uhyliant-Setup-$env:VERSION.exe")) { throw 'Installer not found' }
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-installer-${{ inputs.version }}
+          name: windows-build-${{ inputs.version }}
           path: |
-            installer-output/FPV-Uhyliant-Setup-${{ inputs.version }}.exe
-            installer-output/SHA256SUMS-Windows.txt
+            release-output/*.zip
+            installer-output/*.exe
           if-no-files-found: error
-
-  publish:
-    needs: [ota, windows]
+  sign-publish:
+    needs: windows
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with: {ref: main, fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
       - uses: actions/download-artifact@v4
-        with: {name: release-payload-${{ inputs.version }}, path: payload}
-      - uses: actions/download-artifact@v4
-        with: {name: windows-installer-${{ inputs.version }}, path: windows}
-      - name: Commit signed OTA and create tag
+        with: {name: windows-build-${{ inputs.version }}, path: build}
+      - run: python -m pip install --disable-pip-version-check cryptography
+      - name: Create sign and verify release
+        shell: bash
+        env: {PRIVATE_KEY: "${{ secrets.FPV_RELEASE_PRIVATE_KEY }}"}
+        run: |
+          set -euo pipefail
+          test -n "$PRIVATE_KEY"; install -m 700 -d "$RUNNER_TEMP/sign"; printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/sign/private.pem"; chmod 600 "$RUNNER_TEMP/sign/private.pem"
+          PACKAGE="FPV-Uhyliant-v$VERSION-Test-UA-Windows.zip"; RELEASE_DIR="releases/$VERSION"; mkdir -p "$RELEASE_DIR" "$CHANNEL/packages"
+          cp "build/release-output/$PACKAGE" "$RELEASE_DIR/$PACKAGE"; cp "build/release-output/$PACKAGE" "$CHANNEL/packages/$PACKAGE"
+          SHA="$(sha256sum "$RELEASE_DIR/$PACKAGE"|awk '{print $1}')"; printf '%s  %s\n' "$SHA" "$PACKAGE" > "$RELEASE_DIR/SHA256SUMS.txt"
+          OWNER="$GITHUB_REPOSITORY_OWNER"; REPO="${GITHUB_REPOSITORY#*/}"; SUFFIX="git""hub"".""io"; BASE="$(python -c 'import sys;print("".join(map(chr,[104,116,116,112,115,58,47,47]))+sys.argv[1]+"."+sys.argv[2]+"/"+sys.argv[3])' "$OWNER" "$SUFFIX" "$REPO")"
+          python - "$CHANNEL/release.json" "$VERSION" "$CHANNEL" "$PACKAGE" "$SHA" "$BASE" "$NOTES" <<'PY'
+          import json,sys,urllib.parse
+          out,v,ch,pkg,sha,base,notes=sys.argv[1:];url=f'{base}/{ch}/packages/{pkg}';u=urllib.parse.urlparse(url)
+          assert u.scheme=='https' and u.hostname and '<' not in url and '>' not in url
+          m={'product':'FPV-Uhyliant','channel':ch,'version':v,'build':int(''.join(v.split('.'))),'mandatory':False,'minimumUpdaterVersion':'2.0.4','package':{'file':pkg,'url':url,'sha256':sha},'releaseNotes':[notes]}
+          open(out,'w',encoding='utf-8').write(json.dumps(m,ensure_ascii=False,indent=2)+'\n')
+          PY
+          printf '# FPV Uhyliant %s\n\n%s\n' "$VERSION" "$NOTES" > "$RELEASE_DIR/CHANGELOG.md"
+          python src/release-tools/sign_release.py "$CHANNEL/release.json" --key "$RUNNER_TEMP/sign/private.pem"; cp "$CHANNEL/release.json" "$RELEASE_DIR/release.json"; rm -f "$RUNNER_TEMP/sign/private.pem"
+          python tools/verify_repository.py --channel "$CHANNEL"; (cd "$RELEASE_DIR"&&sha256sum -c SHA256SUMS.txt)
+      - name: Commit tag and publish Release
         shell: bash
         run: |
           set -euo pipefail
-          cp -a payload/. .
-          git config user.name github-actions[bot]; git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add "releases/$VERSION" "$CHANNEL/release.json" "$CHANNEL/packages"
-          git commit -m "Publish FPV Uhyliant v$VERSION OTA"
-          git tag -a "v$VERSION" -m "FPV Uhyliant v$VERSION"
-          git push origin main; git push origin "v$VERSION"
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v3
+          git config user.name github-actions[bot];git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add "releases/$VERSION" "$CHANNEL/release.json" "$CHANNEL/packages";git commit -m "Publish FPV Uhyliant v$VERSION";git tag -a "v$VERSION" -m "FPV Uhyliant v$VERSION";git push origin main;git push origin "v$VERSION"
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ inputs.version }}
           name: FPV Uhyliant ${{ inputs.version }}
           prerelease: ${{ inputs.prerelease }}
           body_path: releases/${{ inputs.version }}/CHANGELOG.md
           files: |
-            releases/${{ inputs.version }}/FPV-Uhyliant-v${{ inputs.version }}-Test-UA-Windows.zip
-            releases/${{ inputs.version }}/SHA256SUMS.txt
-            releases/${{ inputs.version }}/release.json
-            windows/FPV-Uhyliant-Setup-${{ inputs.version }}.exe
-            windows/SHA256SUMS-Windows.txt
-      - name: Prepare GitHub Pages tree
+            releases/${{ inputs.version }}/*
+            build/installer-output/FPV-Uhyliant-Setup-${{ inputs.version }}.exe
+      - name: Prepare Pages
         shell: bash
         run: |
           mkdir -p _site/test/packages _site/stable/packages _site/development/packages
-          cp -a test/packages/. _site/test/packages/ || true; cp -a stable/packages/. _site/stable/packages/ || true; cp -a development/packages/. _site/development/packages/ || true
-          [ ! -f test/release.json ] || cp test/release.json _site/test/release.json
-          [ ! -f stable/release.json ] || cp stable/release.json _site/stable/release.json
-          [ ! -f development/release.json ] || cp development/release.json _site/development/release.json
-          touch _site/.nojekyll
+          cp -a test/packages/. _site/test/packages/||true;cp -a stable/packages/. _site/stable/packages/||true;cp -a development/packages/. _site/development/packages/||true
+          [ ! -f test/release.json ]||cp test/release.json _site/test/release.json;[ ! -f stable/release.json ]||cp stable/release.json _site/stable/release.json;[ ! -f development/release.json ]||cp development/release.json _site/development/release.json;touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with: {path: _site}
-
   deploy-pages:
-    needs: publish
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    needs: sign-publish
+    permissions: {pages: write, id-token: write}
+    environment: {name: github-pages, url: "${{ steps.deployment.outputs.page_url }}"}
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy GitHub Pages
-        id: deployment
+      - id: deployment
         uses: actions/deploy-pages@v4
