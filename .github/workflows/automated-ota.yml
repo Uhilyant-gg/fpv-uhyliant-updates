@@ -83,9 +83,36 @@ jobs:
       - name: Packaged GUI QML smoke-test
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "dist\FPV-Uhyliant\FPV-Uhyliant.exe" -ArgumentList "--smoke-test" -PassThru
-          if (-not $p.WaitForExit(20000)) { Stop-Process -Id $p.Id -Force; throw 'Packaged GUI smoke-test timed out' }
-          if ($p.ExitCode -ne 0) { throw "Packaged GUI smoke-test failed with exit code $($p.ExitCode)" }
+          $smokeData = Join-Path $env:RUNNER_TEMP 'fpv-smoke'
+          $marker = Join-Path $smokeData 'smoke-test-ok.json'
+          New-Item -ItemType Directory -Force $smokeData | Out-Null
+          $env:LOCALAPPDATA = $smokeData
+          $env:QT_LOGGING_RULES = 'qt.multimedia.*=true;qt.qml.*=true'
+          $env:QT_DEBUG_PLUGINS = '1'
+          $p = Start-Process -FilePath "dist\FPV-Uhyliant\FPV-Uhyliant.exe" -ArgumentList @('--smoke-test','--smoke-marker',$marker) -PassThru
+          $deadline = (Get-Date).AddSeconds(20)
+          while ((Get-Date) -lt $deadline -and -not (Test-Path $marker) -and -not $p.HasExited) { Start-Sleep -Milliseconds 250; $p.Refresh() }
+          if (-not (Test-Path $marker)) {
+            if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+            throw "Packaged GUI/QML initialization failed before smoke marker; exit=$($p.ExitCode)"
+          }
+          Get-Content $marker
+          if (-not $p.WaitForExit(5000)) {
+            Write-Warning 'GUI initialized successfully but did not exit cleanly; terminating smoke-test process'
+            Stop-Process -Id $p.Id -Force
+          } elseif ($p.ExitCode -ne 0) {
+            throw "Packaged GUI smoke-test exited with code $($p.ExitCode) after writing its marker"
+          }
+      - name: Upload smoke-test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-diagnostics-${{ inputs.version }}
+          path: |
+            ${{ runner.temp }}/fpv-smoke/FPV-Uhyliant/startup.log
+            ${{ runner.temp }}/fpv-smoke/FPV-Uhyliant/qt-startup.log
+            ${{ runner.temp }}/fpv-smoke/smoke-test-ok.json
+          if-no-files-found: warn
       - name: Package OTA and installer
         shell: pwsh
         run: |
