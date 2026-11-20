@@ -72,7 +72,7 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           Compress-Archive -Path "dist\FPV-Uhyliant\*" -DestinationPath "installer-output\FPV-Uhyliant-Portable-$env:VERSION.zip" -CompressionLevel Optimal
-          Get-FileHash "installer-output\*" -Algorithm SHA256 | Format-Table -AutoSize | Out-File "installer-output\SHA256SUMS-Windows.txt"
+          Get-ChildItem "installer-output" -File | Where-Object { $_.Name -ne "SHA256SUMS-Windows.txt" } | Get-FileHash -Algorithm SHA256 | Format-Table -AutoSize | Out-File "installer-output\SHA256SUMS-Windows.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: FPV-Uhyliant-Windows-${{ inputs.version }}
