@@ -2,12 +2,13 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 Item {
- id:root;signal closeRequested();property color fg:"#f4f7fb";property color sub:"#8fa1b7";property color line:"#273d55";property color blue:"#4aa3ff";property color green:"#27d59a";property string selectedId:""
+ id:root;signal closeRequested();property color fg:"#f4f7fb";property color sub:"#8fa1b7";property color line:"#273d55";property color blue:"#4aa3ff";property color green:"#27d59a";property color red:"#ff6678";property string selectedId:""
  ColumnLayout { anchors.fill:parent;spacing:12
   RowLayout { Layout.fillWidth:true
-   ColumnLayout{Text{text:"ПРИСТРОЇ";color:root.fg;font.pixelSize:22;font.bold:true}Text{text:"Локальна база та автовиявлення: OpenIPC mDNS + ONVIF fallback";color:root.sub}}
+   ColumnLayout{Text{text:"ПРИСТРОЇ";color:root.fg;font.pixelSize:22;font.bold:true}Text{text:"Автовиявлення: OpenIPC mDNS + ONVIF + fingerprint + локальна /24";color:root.sub}}
    Item{Layout.fillWidth:true}
-   Button{text:devicesModel.scanning?"Пошук mDNS + ONVIF...":"Знайти камери";enabled:!devicesModel.scanning;onClicked:devicesModel.discoverOpenIPC()}
+   Button{text:"Знайти камери";visible:!devicesModel.scanning;onClicked:devicesModel.discoverOpenIPC()}
+   Button{text:"Скасувати пошук";visible:devicesModel.scanning;onClicked:devicesModel.cancelDiscovery()}
    Button{text:"Закрити";onClicked:root.closeRequested()}
   }
   Rectangle{Layout.fillWidth:true;height:1;color:root.line}
@@ -20,11 +21,11 @@ Item {
    Rectangle{Layout.fillHeight:true;width:1;color:root.line}
    ColumnLayout { Layout.fillWidth:true;Layout.fillHeight:true;spacing:8
     Text{text:"ЗНАЙДЕНО В МЕРЕЖІ";color:root.sub;font.bold:true}
-    BusyIndicator{visible:devicesModel.scanning;running:devicesModel.scanning;Layout.alignment:Qt.AlignHCenter}
-    Text{visible:!devicesModel.scanning&&devicesModel.discovered.length===0;text:"Натисніть «Знайти камери». Спочатку виконується OpenIPC mDNS, потім ONVIF WS-Discovery; результати об'єднуються за адресою.";color:root.sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+    RowLayout{visible:devicesModel.scanning;Layout.alignment:Qt.AlignHCenter;BusyIndicator{running:devicesModel.scanning}Text{text:"Сканування мережі...";color:root.sub}}
+    Text{visible:!devicesModel.scanning&&devicesModel.discovered.length===0;text:"Натисніть «Знайти камери». Пошук використовує mDNS, ONVIF, OpenIPC fingerprint та локальне /24 сканування.";color:root.sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
     ListView{id:found;Layout.fillWidth:true;Layout.fillHeight:true;clip:true;spacing:8;model:devicesModel.discovered;delegate:Rectangle{required property var modelData;width:found.width;height:94;radius:10;color:"#111d2c";border.color:modelData.openipc?root.green:root.line;RowLayout{anchors.fill:parent;anchors.margins:10;ColumnLayout{Layout.fillWidth:true;Text{text:modelData.name;color:root.fg;font.bold:true}Text{text:modelData.host+" · "+modelData.confidence;color:modelData.openipc?root.green:root.sub}Text{text:modelData.services.join(", ");color:root.sub;font.pixelSize:10;elide:Text.ElideRight;Layout.fillWidth:true}}Button{text:"Додати";onClicked:{var id=devicesModel.addDiscovered(modelData.host,modelData.name);if(id)root.selectedId=id}}}}
     Rectangle{Layout.fillWidth:true;height:1;color:root.line}
-    Text{text:"ONVIF-виявлення саме по собі не підтверджує OpenIPC. Підтверджені OpenIPC-пристрої виділяються зеленим.";color:root.sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+    Text{text:"Пошук можна безпечно скасувати на будь-якому етапі. Уже знайдені результати залишаться у списку після завершення worker.";color:root.sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
     Text{text:"Відеопрофілі не записуються в пристрій і не входять до прошивки камери.";color:root.sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
    }
   }
