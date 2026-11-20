@@ -1,23 +1,33 @@
-import base64,hashlib,json,os,subprocess,urllib.request
+import base64,hashlib,json,os,re,subprocess,urllib.parse,urllib.request
 from pathlib import Path
-from PySide6.QtCore import QObject,Property,Signal,Slot,QThread,QCoreApplication,QTimer
-from cryptography.hazmat.primitives import serialization
 from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from PySide6.QtCore import QCoreApplication,QObject,Property,QThread,QTimer,Signal,Slot
 from version import VERSION
-KEY_ID='fpv-uhyliant-production-v1';HERE=Path(__file__).resolve().parent;PUB=HERE/'security/production-v1-public.pem';DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';UP=DATA/'updates'
+KEY_ID='fpv-uhyliant-production-v1';HERE=Path(__file__).resolve().parent;PUB=HERE/'security/production-v1-public.pem';DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';UP=DATA/'updates';VERSION_RE=re.compile(r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$')
 def _manifest_url():
  scheme=''.join(map(chr,[104,116,116,112,115,58,47,47]));host=''.join(map(chr,[117,104,105,108,121,97,110,116,45,103,103,46,103,105,116,104,117,98,46,105,111]));return scheme+host+'/fpv-uhyliant-updates/test/release.json'
 DEFAULT=_manifest_url()
 def canon(o):d=dict(o);d.pop('signature',None);return json.dumps(d,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()
+def vt(v):
+ if not isinstance(v,str) or not VERSION_RE.fullmatch(v):raise RuntimeError(f'Некоректний номер версії: {v!r}')
+ return tuple(int(x) for x in v.split('-',1)[0].split('.'))
+def https_url(v,label):
+ u=urllib.parse.urlparse(v)
+ if u.scheme!='https' or not u.hostname or u.username or u.password:raise RuntimeError(f'Некоректний HTTPS URL для {label}')
 def verify(o):
- s=o.get('signature') or {}
+ if not isinstance(o,dict):raise RuntimeError('Manifest має некоректний формат')
+ s=o.get('signature') or {};pkg=o.get('package')
  if s.get('algorithm')!='Ed25519' or s.get('keyId')!=KEY_ID:raise RuntimeError('Недовірений підпис manifest')
+ if not isinstance(pkg,dict):raise RuntimeError('Manifest не містить опис пакета')
+ vt(o.get('version'));https_url(pkg.get('url',''),'пакета')
+ if not isinstance(pkg.get('file'),str) or not pkg['file'] or Path(pkg['file']).name!=pkg['file']:raise RuntimeError('Некоректне ім’я файла пакета')
+ if not isinstance(pkg.get('sha256'),str) or not re.fullmatch(r'[0-9a-fA-F]{64}',pkg['sha256']):raise RuntimeError('Некоректний SHA-256 пакета')
  try:serialization.load_pem_public_key(PUB.read_bytes()).verify(base64.b64decode(s['value'],validate=True),canon(o))
- except (InvalidSignature,ValueError,KeyError) as e:raise RuntimeError('Підпис manifest не пройшов перевірку') from e
-def vt(v):return tuple(int(x) for x in v.split('-')[0].split('.'))
+ except (InvalidSignature,ValueError,KeyError,OSError) as e:raise RuntimeError('Підпис manifest не пройшов перевірку') from e
 def sha(p):
  h=hashlib.sha256()
- with open(p,'rb') as f:
+ with p.open('rb') as f:
   for b in iter(lambda:f.read(1048576),b''):h.update(b)
  return h.hexdigest()
 class W(QThread):
@@ -26,17 +36,21 @@ class W(QThread):
  def run(self):
   try:
    if self.a=='check':
-    with urllib.request.urlopen(self.p['url'],timeout=15) as r:o=json.loads(r.read(2097152).decode())
+    https_url(self.p['url'],'manifest')
+    with urllib.request.urlopen(self.p['url'],timeout=15) as r:o=json.loads(r.read(2097152).decode('utf-8'))
     verify(o);self.done.emit(True,o);return
-   o=self.p['m'];pkg=o['package'];UP.mkdir(parents=True,exist_ok=True);t=UP/pkg['file']
-   with urllib.request.urlopen(pkg['url'],timeout=60) as r,open(t,'wb') as f:
-    total=int(r.headers.get('Content-Length') or 0);n=0
-    while True:
-     b=r.read(524288)
-     if not b:break
-     f.write(b);n+=len(b);self.progress.emit(int(n*100/total) if total else 0,f'{n//1048576} MB')
-   if sha(t)!=pkg['sha256']:t.unlink(missing_ok=True);raise RuntimeError('SHA-256 пакета не збігається')
-   ready={'version':o['version'],'package':str(t)};(UP/'ready.json').write_text(json.dumps(ready),encoding='utf-8');self.done.emit(True,ready)
+   o=self.p['m'];verify(o);pkg=o['package'];UP.mkdir(parents=True,exist_ok=True);t=UP/pkg['file'];part=t.with_suffix(t.suffix+'.part');part.unlink(missing_ok=True)
+   try:
+    with urllib.request.urlopen(pkg['url'],timeout=60) as r,part.open('wb') as f:
+     total=int(r.headers.get('Content-Length') or 0);n=0
+     while True:
+      b=r.read(524288)
+      if not b:break
+      f.write(b);n+=len(b);self.progress.emit(int(n*100/total) if total else 0,f'{n//1048576} MB')
+    if sha(part).lower()!=pkg['sha256'].lower():raise RuntimeError('SHA-256 пакета не збігається')
+    os.replace(part,t)
+   except Exception:part.unlink(missing_ok=True);raise
+   ready={'version':o['version'],'package':str(t)};tmp=UP/'ready.tmp';tmp.write_text(json.dumps(ready),encoding='utf-8');os.replace(tmp,UP/'ready.json');self.done.emit(True,ready)
   except Exception as e:self.done.emit(False,str(e))
 class Updater(QObject):
  changed=Signal();progressChanged=Signal()
@@ -56,6 +70,8 @@ class Updater(QObject):
  @Property(int,notify=progressChanged)
  def progress(self):return self.p
  @Property(bool,notify=changed)
+ def busy(self):return self.w is not None and self.w.isRunning()
+ @Property(bool,notify=changed)
  def installReady(self):return self.state=='ready' and self.root is not None and (self.root/'FPV-Uhyliant-Update.exe').exists()
  @Slot()
  def check(self):self._start('check',{'url':self.url},'Перевірка підписаного manifest')
@@ -64,14 +80,21 @@ class Updater(QObject):
   if self.m:self._start('download',{'m':self.m},'Завантаження пакета')
  @Slot()
  def install(self):
+  if self.busy:self.status='Дочекайтеся завершення поточної операції';self.changed.emit();return
   ok,why=self.guard()
   if not ok:self.state='blocked';self.status=why;self.changed.emit();return
   if not self.installReady:self.state='error';self.status='Компонент оновлення недоступний';self.changed.emit();return
   r=json.loads((UP/'ready.json').read_text(encoding='utf-8'));helper=self.root/'FPV-Uhyliant-Update.exe';subprocess.Popen([str(helper),'--root',str(self.root),'--package',r['package'],'--version',r['version'],'--wait-pid',str(os.getpid())],cwd=self.root,creationflags=getattr(subprocess,'DETACHED_PROCESS',0));QTimer.singleShot(300,QCoreApplication.quit)
- def _start(self,a,p,s):self.state=a;self.status=s;self.p=0;self.changed.emit();self.w=W(a,p);self.w.progress.connect(self._prog);self.w.done.connect(lambda ok,d:self._done(a,ok,d));self.w.start()
+ def _start(self,a,p,s):
+  if self.busy:self.status='Операція оновлення вже виконується';self.changed.emit();return
+  self.state=a;self.status=s;self.p=0;self.changed.emit();self.progressChanged.emit();w=W(a,p);self.w=w;w.progress.connect(self._prog);w.done.connect(lambda ok,d,current=w:self._done(a,current,ok,d));w.finished.connect(lambda current=w:self._finished(current));w.start()
  def _prog(self,p,s):self.p=p;self.status=s;self.progressChanged.emit();self.changed.emit()
- def _done(self,a,ok,d):
+ def _done(self,a,w,ok,d):
+  if w is not self.w:return
   if not ok:self.state='error';self.status=str(d)
   elif a=='check':self.m=d;self.available=d['version'];self.notes=d.get('releaseNotes',[]);self.state='available' if vt(d['version'])>vt(VERSION) else 'current';self.status='Оновлення доступне' if self.state=='available' else 'Версія актуальна'
   else:self.state='ready';self.status='Пакет перевірено і готово до установки'
   self.changed.emit()
+ def _finished(self,w):
+  if w is self.w:self.w=None
+  w.deleteLater();self.changed.emit()

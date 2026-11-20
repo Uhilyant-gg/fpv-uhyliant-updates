@@ -19,6 +19,21 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install cryptography
+      - name: Compile all Python sources
+        run: python -m compileall -q -f src tools
+      - name: Run application self-test
+        working-directory: src/app
+        run: python main.py --self-test
+      - name: Check project version consistency
+        shell: python
+        run: |
+          import json
+          import runpy
+          from pathlib import Path
+          version = runpy.run_path('src/app/version.py')['VERSION']
+          root_version = json.loads(Path('VERSION.json').read_text(encoding='utf-8'))['version']
+          if version != root_version:
+              raise SystemExit(f'version mismatch: src/app/version.py={version}, VERSION.json={root_version}')
       - name: Verify signed test channel when present
         shell: bash
         run: |
