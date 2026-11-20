@@ -83,18 +83,23 @@ jobs:
       - name: Packaged GUI QML smoke-test
         shell: pwsh
         run: |
-          $smokeData = Join-Path $env:RUNNER_TEMP 'fpv-smoke'
-          $marker = Join-Path $smokeData 'smoke-test-ok.json'
-          New-Item -ItemType Directory -Force $smokeData | Out-Null
-          $env:LOCALAPPDATA = $smokeData
+          $smokeRoot = Join-Path $env:RUNNER_TEMP 'fpv-smoke'
+          $marker = Join-Path $smokeRoot 'smoke-test-ok.json'
+          New-Item -ItemType Directory -Force $smokeRoot | Out-Null
+          $env:LOCALAPPDATA = $smokeRoot
           $env:QT_LOGGING_RULES = 'qt.multimedia.*=true;qt.qml.*=true'
           $env:QT_DEBUG_PLUGINS = '1'
-          $p = Start-Process -FilePath "dist\FPV-Uhyliant\FPV-Uhyliant.exe" -ArgumentList @('--smoke-test','--smoke-marker',$marker) -PassThru
+          $argLine = "--smoke-test --smoke-marker `"$marker`""
+          $p = Start-Process -FilePath "dist\FPV-Uhyliant\FPV-Uhyliant.exe" -ArgumentList $argLine -PassThru
           $deadline = (Get-Date).AddSeconds(20)
           while ((Get-Date) -lt $deadline -and -not (Test-Path $marker) -and -not $p.HasExited) { Start-Sleep -Milliseconds 250; $p.Refresh() }
           if (-not (Test-Path $marker)) {
+            $exit = if ($p.HasExited) { $p.ExitCode } else { 'running' }
             if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
-            throw "Packaged GUI/QML initialization failed before smoke marker; exit=$($p.ExitCode)"
+            $dataDir = Join-Path $smokeRoot 'FPV-Uhyliant'
+            if (Test-Path (Join-Path $dataDir 'startup.log')) { Write-Host '--- startup.log ---'; Get-Content (Join-Path $dataDir 'startup.log') }
+            if (Test-Path (Join-Path $dataDir 'qt-startup.log')) { Write-Host '--- qt-startup.log ---'; Get-Content (Join-Path $dataDir 'qt-startup.log') }
+            throw "Packaged GUI/QML initialization failed before smoke marker; exit=$exit"
           }
           Get-Content $marker
           if (-not $p.WaitForExit(5000)) {
