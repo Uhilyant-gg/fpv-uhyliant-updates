@@ -18,11 +18,11 @@ Read this file together with `DEVELOPMENT_GUIDE.md` before making changes. These
 
 ## Current 2.0.10 release blocker
 
-The Windows binaries build successfully, but packaged GUI/QML startup validation is still the active blocker before publishing/validating 2.0.10 on the target Windows PC.
+The Windows binaries build successfully, but packaged GUI/QML startup validation remains the active gate before publishing/validating 2.0.10 on the target Windows PC.
 
-The first packaged smoke-test implementation timed out waiting for the process to exit. It was replaced with marker-based validation so initialization failure and shutdown hangs are distinguishable.
+Smoke-test diagnostics identified the concrete startup failure: `QQmlApplicationEngine` could not load `Main.qml` because the QML parser reported `Unexpected token ';'` at lines 13 and 22. This proves the Windows Qt platform plugin was found and loaded, while QML parsing prevented creation of the root object.
 
-A subsequent run failed before creation of the smoke marker with process exit `-1`. The latest `main` changes the PowerShell smoke-test argument passing to a single quoted argument line and prints available diagnostics directly in the failed job.
+Current `main` includes a direct fix to `src/app/Main.qml` that changes affected signal handlers to explicit block bodies and removes parser-ambiguous semicolon boundaries around those handlers. The next required action is to re-run the 2.0.10 Windows release pipeline from current `main` and inspect the packaged smoke-test result.
 
 Current smoke-test contract:
 
@@ -48,18 +48,19 @@ CI smoke testing also uses `smoke-test-ok.json` as its explicit initialization m
 - CI validates the packaged GUI/QML application rather than relying only on the Python-only `--self-test`.
 - Packaged smoke testing is marker-based.
 - Qt/QML/Multimedia startup diagnostics are captured.
+- QML parser errors found by packaged smoke testing have been corrected in `Main.qml` and require CI re-validation.
 - Full release pipeline retains Windows build, signing/publishing, and Pages deployment stages.
 - Inno Setup fallback version is `2.0.10`.
 - Firmware behavior remains unchanged by the 2.0.10 startup hotfix work.
 
 ## Next validation
 
-1. Re-run the `2.0.10` Windows release pipeline from current `main`.
-2. If smoke test fails, inspect the job output plus uploaded `startup.log` / `qt-startup.log` rather than changing timeouts blindly.
+1. Re-run the `2.0.10` Windows release pipeline from current `main` after the `Main.qml` parser fix.
+2. If smoke test fails, inspect the exact QML/Qt diagnostics before making further changes.
 3. Publish/build the test installer only after packaged GUI/QML initialization succeeds.
 4. Install the test EXE on the target Windows PC.
 5. Validate normal launcher startup, OTA/startup verification, and rollback behavior.
-6. After 2.0.10 Windows startup is stable, move immediately to Firmware Center development.
+6. Firmware Center work may be developed in parallel, but 2.0.10 remains gated on packaged startup validation.
 
 ## Development priority after 2.0.10
 
