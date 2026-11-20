@@ -1,63 +1,8 @@
-name: deploy-update-repository
+name: legacy-pages-disabled
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: true
 jobs:
-  validate:
+  notice:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: pip install cryptography
-      - name: Validate repository if signed test release exists
-        shell: bash
-        run: |
-          if [ -f test/release.json ]; then
-            python tools/verify_repository.py --channel test
-          else
-            echo "test/release.json not published yet; skipping signed release validation"
-          fi
-      - name: Reject private keys
-        shell: bash
-        run: |
-          if find . -type f -iname '*private*key*' | grep -q .; then
-            echo "Private signing key detected in repository" >&2
-            exit 1
-          fi
-  deploy:
-    needs: validate
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - name: Prepare public tree
-        shell: bash
-        run: |
-          mkdir -p _site/test/packages _site/stable/packages _site/development/packages
-          cp -a test/packages/. _site/test/packages/
-          cp -a stable/packages/. _site/stable/packages/ || true
-          cp -a development/packages/. _site/development/packages/ || true
-          if [ -f test/release.json ]; then cp test/release.json _site/test/release.json; fi
-          if [ -f stable/release.json ]; then cp stable/release.json _site/stable/release.json; fi
-          if [ -f development/release.json ]; then cp development/release.json _site/development/release.json; fi
-          touch _site/.nojekyll
-      - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: _site
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - run: echo "Pages deployment is handled by automated-ota.yml unified release pipeline."
