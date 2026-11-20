@@ -1,4 +1,4 @@
-import json, os, uuid, socket, re, time
+import json, os, uuid, socket, re, time, urllib.request
 from pathlib import Path
 from PySide6.QtCore import QObject, Property, Signal, Slot, QThread
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
@@ -16,14 +16,29 @@ def merge(found, host, name='', service='', openipc=False, evidence=''):
     if openipc: item['openipc']=True
     if evidence and evidence not in item['evidence']: item['evidence'].append(evidence)
 
+def majestic_fingerprint(found):
+    for host in list(found):
+        item=found[host]
+        try:
+            req=urllib.request.Request(f'<scrubbed-url-domain>',headers={'Accept':'application/json','User-Agent':'FPV-Uhyliant'})
+            with urllib.request.urlopen(req,timeout=1.2) as r:
+                if r.status!=200: continue
+                data=json.loads(r.read(524288).decode('utf-8'))
+            # OpenIPC Dashboard documents a structurally valid Majestic configuration as high-confidence evidence.
+            if isinstance(data,dict) and data and any(k in data for k in ('video0','video1','system','fpv','isp','rtsp')):
+                merge(found,host,item.get('name',host),'Majestic HTTP',True,'Majestic /api/v1/config.json')
+        except Exception:
+            pass
+        # Legacy OpenIPC WebUI port 85 is useful supporting evidence, but not authoritative alone.
+        try:
+            req=urllib.request.Request(f'<scrubbed-url-domain>',headers={'User-Agent':'FPV-Uhyliant'})
+            with urllib.request.urlopen(req,timeout=.8) as r: body=r.read(65536).decode('utf-8','ignore').lower()
+            if 'openipc' in body or 'majestic' in body: merge(found,host,item.get('name',host),'OpenIPC WebUI :85',True,'OpenIPC/Majestic WebUI marker')
+        except Exception: pass
+
 def onvif_probe(found, seconds=5.5):
-    probes=[
-      'dn:NetworkVideoTransmitter',
-      ''
-    ]
-    for ptype in probes:
-        msgid=str(uuid.uuid4())
-        types=f'<d:Types>{ptype}</d:Types>' if ptype else ''
+    for ptype in ('dn:NetworkVideoTransmitter',''):
+        msgid=str(uuid.uuid4());types=f'<d:Types>{ptype}</d:Types>' if ptype else ''
         xml=('<?xml version="1.0" encoding="UTF-8"?>'
              '<e:Envelope xmlns:e="http://<scrubbed-url-domain>/2003/05/soap-envelope" xmlns:w="http://<scrubbed-url-domain>/ws/2004/08/addressing" xmlns:d="http://<scrubbed-url-domain>/ws/2005/04/discovery" xmlns:dn="http://<scrubbed-url-domain>/ver10/network/wsdl">'
              '<e:Header><w:MessageID>uuid:'+msgid+'</w:MessageID><w:To>urn:schemas-xmlsoap-org:ws:2005:04:discovery</w:To><w:Action>http://<scrubbed-url-domain>/ws/2005/04/discovery/Probe</w:Action></e:Header>'
@@ -31,22 +46,20 @@ def onvif_probe(found, seconds=5.5):
         s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM,socket.IPPROTO_UDP)
         try:
             s.setsockopt(socket.IPPROTO_IP,socket.IP_MULTICAST_TTL,2);s.settimeout(.35)
-            for _ in range(2): s.sendto(xml,WS_ADDR)
-            deadline=time.monotonic()+seconds/len(probes)
+            for _ in range(2):s.sendto(xml,WS_ADDR)
+            deadline=time.monotonic()+seconds/2
             while time.monotonic()<deadline:
-                try: data,addr=s.recvfrom(65535)
-                except socket.timeout: continue
-                text=data.decode('utf-8','ignore'); host=addr[0]
+                try:data,addr=s.recvfrom(65535)
+                except socket.timeout:continue
+                text=data.decode('utf-8','ignore');host=addr[0]
                 xaddrs=re.findall(r'<(?:\w+:)?XAddrs[^>]*>(.*?)</(?:\w+:)?XAddrs>',text,re.I|re.S)
                 if xaddrs:
-                    m=re.search(r'https?://([^/:\s]+)',xaddrs[0]); host=m.group(1) if m else host
-                scopes=' '.join(re.findall(r'<(?:\w+:)?Scopes[^>]*>(.*?)</(?:\w+:)?Scopes>',text,re.I|re.S))
-                name='ONVIF '+host
+                    m=re.search(r'https?://([^/:\s]+)',xaddrs[0]);host=m.group(1) if m else host
+                scopes=' '.join(re.findall(r'<(?:\w+:)?Scopes[^>]*>(.*?)</(?:\w+:)?Scopes>',text,re.I|re.S));name='ONVIF '+host
                 nm=re.search(r'onvif://www\.onvif\.org/name/([^\s<]+)',scopes,re.I)
-                if nm: name=nm.group(1).replace('%20',' ')
-                openipc='openipc' in text.lower()
-                merge(found,host,name,'ONVIF WS-Discovery',openipc,'ONVIF'+(' OpenIPC marker' if openipc else ''))
-        finally: s.close()
+                if nm:name=nm.group(1).replace('%20',' ')
+                openipc='openipc' in text.lower();merge(found,host,name,'ONVIF WS-Discovery',openipc,'ONVIF OpenIPC marker' if openipc else 'ONVIF')
+        finally:s.close()
 
 class DiscoveryWorker(QThread):
     done=Signal(object)
@@ -58,7 +71,7 @@ class DiscoveryWorker(QThread):
                     info=zc.get_service_info(service_type,name,timeout=1200)
                     if not info:return
                     props={k.decode(errors='ignore').lower():v.decode(errors='ignore') for k,v in info.properties.items()};vendor=props.get('vendor','').lower();server=(info.server or '').rstrip('.')
-                    for host in info.parsed_addresses(): merge(found,host,server or name.split('.')[0],service_type,vendor=='openipc' or 'openipc' in name.lower() or 'openipc' in server.lower(),'mDNS vendor=OpenIPC' if vendor=='openipc' else 'mDNS')
+                    for host in info.parsed_addresses():merge(found,host,server or name.split('.')[0],service_type,vendor=='openipc' or 'openipc' in name.lower() or 'openipc' in server.lower(),'mDNS vendor=OpenIPC' if vendor=='openipc' else 'mDNS')
                 except Exception:pass
             def update_service(self,zc,service_type,name):self.add_service(zc,service_type,name)
             def remove_service(self,zc,service_type,name):pass
@@ -71,11 +84,11 @@ class DiscoveryWorker(QThread):
                 try:b.cancel()
                 except Exception:pass
             zc.close()
-        # Fallback/second-stage discovery: ONVIF WS-Discovery. Results are merged by IP/host.
         onvif_probe(found)
+        majestic_fingerprint(found)
         results=[]
         for item in found.values():
-            item['confidence']='OpenIPC' if item['openipc'] else ('ONVIF камера' if 'ONVIF WS-Discovery' in item['services'] else 'Мережева камера');results.append(item)
+            item['confidence']='OpenIPC підтверджено' if item['openipc'] else ('ONVIF камера' if 'ONVIF WS-Discovery' in item['services'] else 'Мережева камера');results.append(item)
         results.sort(key=lambda x:(not x['openipc'],x['host']));self.done.emit(results)
 
 class Devices(QObject):
@@ -111,7 +124,7 @@ class Devices(QObject):
         if self._scanning:return
         self._scanning=True;self._discovered=[];self.discoveryChanged.emit();self._worker=DiscoveryWorker();self._worker.done.connect(self._discoveryDone);self._worker.start()
     @Slot(object)
-    def _discoveryDone(self,results):self._discovered=list(results);self._scanning=False;self.discoveryChanged.emit();self.notice.emit(f'Пошук mDNS + ONVIF завершено: {len(self._discovered)} знайдено')
+    def _discoveryDone(self,results):self._discovered=list(results);self._scanning=False;self.discoveryChanged.emit();self.notice.emit(f'Пошук mDNS + ONVIF + fingerprint завершено: {len(self._discovered)} знайдено')
     @Slot(str,str,result=str)
     def addDiscovered(self,host,name):
         for x in self._items:
