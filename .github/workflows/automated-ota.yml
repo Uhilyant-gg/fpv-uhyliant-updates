@@ -6,7 +6,7 @@ on:
       version:
         description: Release version
         required: true
-        default: 2.0.5
+        default: 2.0.6
         type: string
       channel:
         description: OTA channel
@@ -20,7 +20,7 @@ on:
       notes:
         description: Release notes
         required: true
-        default: Updater manifest URL bootstrap fix
+        default: First end-to-end OTA proof from 2.0.5
         type: string
       prerelease:
         description: Publish as pre-release
