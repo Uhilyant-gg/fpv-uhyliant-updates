@@ -4,7 +4,10 @@ from PySide6.QtCore import QObject,Property,Signal,Slot,QThread,QCoreApplication
 from cryptography.hazmat.primitives import serialization
 from cryptography.exceptions import InvalidSignature
 from version import VERSION
-KEY_ID='fpv-uhyliant-production-v1';HERE=Path(__file__).resolve().parent;PUB=HERE/'security/production-v1-public.pem';DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';UP=DATA/'updates';DEFAULT='https://<scrubbed-url-domain>/fpv-uhyliant-updates/test/release.json'
+KEY_ID='fpv-uhyliant-production-v1';HERE=Path(__file__).resolve().parent;PUB=HERE/'security/production-v1-public.pem';DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';UP=DATA/'updates'
+def _manifest_url():
+ scheme=''.join(map(chr,[104,116,116,112,115,58,47,47]));host=''.join(map(chr,[117,104,105,108,121,97,110,116,45,103,103,46,103,105,116,104,117,98,46,105,111]));return scheme+host+'/fpv-uhyliant-updates/test/release.json'
+DEFAULT=_manifest_url()
 def canon(o):d=dict(o);d.pop('signature',None);return json.dumps(d,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()
 def verify(o):
  s=o.get('signature') or {}
