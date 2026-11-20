@@ -2,7 +2,7 @@
 
 ## Current baseline
 
-- Source version: `2.0.9`
+- Source version: `2.0.10`
 - Product name: `ФПВ Ухилянт`
 - Release channel: `test`
 - UI: PySide6 + Qt Quick/QML + Qt Multimedia
@@ -14,31 +14,20 @@
 - Windows layout: launcher + updater helper + `app/current`
 - Runtime/user data: `%LOCALAPPDATA%/FPV-Uhyliant`
 
-## Version 2.0.9 checkpoint
+## Version 2.0.10 hotfix
 
-- Devices persistence uses SQLite with legacy `devices.json` migration.
-- SQLite schema includes devices, streams, settings and independent video profiles.
-- Each stream can have its own video profile assignment.
-- OpenIPC discovery uses mDNS, ONVIF, Majestic/OpenIPC fingerprinting and bounded `/24` probing with network-interface selection.
-- RTSP stream runtime and Qt Multimedia playback are integrated into the UI.
-- Diagnostics exposes basic RTSP runtime state/error information.
+- Windows frozen build explicitly imports PySide6.QtMultimedia and collects its required PyInstaller package data/plugins.
+- CI runs a packaged GUI/QML smoke-test instead of relying only on the Python-only self-test.
+- Unhandled startup failures are written to `%LOCALAPPDATA%/FPV-Uhyliant/startup.log`.
+- Firmware behavior is unchanged by this hotfix.
 
-## Validation gate
+## Next validation
 
-1. Publish `2.0.9` through `.github/workflows/automated-ota.yml` on the test channel.
-2. Validate OTA install/startup and rollback behavior.
-3. Validate legacy Devices -> SQLite migration on Windows.
-4. Validate discovery with real OpenIPC and generic ONVIF devices.
-5. Validate persistent per-stream video profile assignment.
-6. Validate real OpenIPC RTSP playback, stop/start and error handling.
-
-## Next development after validation
-
-1. Harden RTSP/OpenIPC diagnostics and stream discovery.
-2. OpenIPC camera integration and maximally automated firmware workflow.
-3. Camera presets remain separate from video profiles.
-4. Add read-only ArduPilot/Betaflight/INAV integration using MAVLink/MSP/CRSF as appropriate.
-5. Extend OSD, network diagnostics, secondary/thermal video and PiP.
+1. Build `2.0.10` on Windows CI.
+2. Verify packaged GUI/QML startup in CI.
+3. Install the test EXE on the target Windows PC.
+4. Confirm normal startup or inspect `startup.log` if startup fails.
+5. Continue camera/firmware work only after the Windows executable is stable.
 
 ## Project rules
 
