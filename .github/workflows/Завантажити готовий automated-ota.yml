@@ -1,0 +1,164 @@
+name: automated-signed-ota
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version, for example 2.0.2
+        required: true
+        type: string
+      channel:
+        description: OTA channel
+        required: true
+        default: test
+        type: choice
+        options:
+          - test
+          - stable
+          - development
+      notes:
+        description: Release notes
+        required: true
+        type: string
+      prerelease:
+        description: Publish as pre-release
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+env:
+  BASE_URL: https://uhilyant-gg.github.io/fpv-uhyliant-updates
+
+jobs:
+  build-sign-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate inputs and source version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          grep -q "VERSION='$VERSION'" src/app/updater_engine.py
+          grep -q "'version':'$VERSION'" src/app/main.py
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists" >&2
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install signing dependency
+        run: python -m pip install --disable-pip-version-check cryptography
+
+      - name: Materialize signing key
+        shell: bash
+        env:
+          PRIVATE_KEY: ${{ secrets.FPV_RELEASE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$PRIVATE_KEY"
+          install -m 700 -d "$RUNNER_TEMP/fpv-signing"
+          printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/fpv-signing/private.pem"
+          chmod 600 "$RUNNER_TEMP/fpv-signing/private.pem"
+
+      - name: Build OTA package and unsigned manifest
+        id: build
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          CHANNEL: ${{ inputs.channel }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          set -euo pipefail
+          RELEASE_DIR="releases/$VERSION"
+          CHANNEL_DIR="$CHANNEL"
+          PACKAGE_NAME="FPV-Uhyliant-v$VERSION-Test-UA-Windows.zip"
+          PACKAGE_PATH="$RELEASE_DIR/$PACKAGE_NAME"
+          mkdir -p "$RELEASE_DIR" "$CHANNEL_DIR/packages"
+          (cd src/app && zip -qr "../../$PACKAGE_PATH" . -x '__pycache__/*' '*.pyc' '*.pyo')
+          cp "$PACKAGE_PATH" "$CHANNEL_DIR/packages/$PACKAGE_NAME"
+          SHA256="$(sha256sum "$PACKAGE_PATH" | awk '{print $1}')"
+          printf '%s  %s\n' "$SHA256" "$PACKAGE_NAME" > "$RELEASE_DIR/SHA256SUMS.txt"
+          python - "$CHANNEL_DIR/release.json" "$VERSION" "$CHANNEL" "$PACKAGE_NAME" "$SHA256" "$BASE_URL" "$NOTES" <<'PY'
+          import json, sys
+          out, version, channel, package, sha256, base_url, notes = sys.argv[1:]
+          manifest = {
+              'product': 'FPV-Uhyliant',
+              'channel': channel,
+              'version': version,
+              'build': int(''.join(version.split('.'))),
+              'mandatory': False,
+              'minimumUpdaterVersion': '2.0.0',
+              'package': {
+                  'file': package,
+                  'url': f'{base_url}/{channel}/packages/{package}',
+                  'sha256': sha256,
+              },
+              'releaseNotes': [notes],
+          }
+          with open(out, 'w', encoding='utf-8', newline='\n') as f:
+              json.dump(manifest, f, ensure_ascii=False, indent=2)
+              f.write('\n')
+          PY
+          printf '# FPV Uhyliant v%s\n\n%s\n' "$VERSION" "$NOTES" > "$RELEASE_DIR/CHANGELOG.md"
+          echo "release_dir=$RELEASE_DIR" >> "$GITHUB_OUTPUT"
+          echo "package_path=$PACKAGE_PATH" >> "$GITHUB_OUTPUT"
+          echo "manifest_path=$CHANNEL_DIR/release.json" >> "$GITHUB_OUTPUT"
+
+      - name: Sign manifest with Ed25519
+        shell: bash
+        run: |
+          set -euo pipefail
+          python src/release-tools/sign_release.py "${{ steps.build.outputs.manifest_path }}" --key "$RUNNER_TEMP/fpv-signing/private.pem"
+          cp "${{ steps.build.outputs.manifest_path }}" "${{ steps.build.outputs.release_dir }}/release.json"
+          rm -f "$RUNNER_TEMP/fpv-signing/private.pem"
+
+      - name: Verify signature and package
+        shell: bash
+        env:
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          python tools/verify_repository.py --channel "$CHANNEL"
+          (cd "${{ steps.build.outputs.release_dir }}" && sha256sum -c SHA256SUMS.txt)
+
+      - name: Commit release artifacts and create tag
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add "releases/$VERSION" "$CHANNEL/release.json" "$CHANNEL/packages"
+          git commit -m "Publish FPV Uhyliant v$VERSION OTA"
+          git tag -a "v$VERSION" -m "FPV Uhyliant v$VERSION OTA"
+          git push origin main
+          git push origin "v$VERSION"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ inputs.version }}
+          name: FPV Uhyliant ${{ inputs.version }}
+          prerelease: ${{ inputs.prerelease }}
+          body_path: ${{ steps.build.outputs.release_dir }}/CHANGELOG.md
+          files: |
+            ${{ steps.build.outputs.package_path }}
+            ${{ steps.build.outputs.release_dir }}/SHA256SUMS.txt
+            ${{ steps.build.outputs.release_dir }}/release.json
