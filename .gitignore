@@ -6,3 +6,11 @@
 
 __pycache__/
 *.py[codz]
+__pycache__/
+*.py[codz]
+.venv/
+*.tmp
+*.log
+secrets/
+**/*private*key*
+release-tools/*private*.pem
