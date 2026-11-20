@@ -5,13 +5,12 @@ from PySide6.QtCore import QObject, Property, QThread, Signal, Slot
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
 
 DATA=Path(os.environ.get("LOCALAPPDATA",Path.home()))/"FPV-Uhyliant"; LEGACY_DB=DATA/"devices.json"; DB=DATA/"devices.sqlite3"
-SERVICES=("_http._tcp.local.","_rtsp._tcp.local.","_ssh._tcp.local."); WS_DISCOVERY=("239.255.255.250",3702); MAX_WORKERS=32; SCHEMA_VERSION=2
+SERVICES=("_http._tcp.local.","_rtsp._tcp.local.","_ssh._tcp.local."); WS_DISCOVERY=("239.255.255.250",3702); MAX_WORKERS=32; SCHEMA_VERSION=3
 HOST_RE=re.compile(r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*\.?$")
 def valid_host(host):
  host=host.strip()
  if not host or "://" in host or "/" in host or "\\" in host or any(c.isspace() for c in host):return False
- try:
-  ip=ipaddress.ip_address(host);return ip.version==4 and not(ip.is_unspecified or ip.is_multicast)
+ try:ip=ipaddress.ip_address(host);return ip.version==4 and not(ip.is_unspecified or ip.is_multicast)
  except ValueError:return bool(HOST_RE.fullmatch(host))
 def merge(found,host,name="",service="",verified=False,evidence=""):
  if not host:return
@@ -43,8 +42,7 @@ def probe(host,cancel):
    with urllib.request.urlopen(req,timeout=.45) as r:raw=r.read(524288 if jmode else 65536)
    if jmode:
     data=json.loads(raw.decode());matched=isinstance(data,dict) and data and any(k in data for k in ("video0","video1","system","fpv","isp","rtsp"))
-   else:
-    body=raw.decode("utf-8","ignore").lower();matched="openipc" in body or "majestic" in body
+   else:body=raw.decode("utf-8","ignore").lower();matched="openipc" in body or "majestic" in body
    if matched:verified=True;evidence.append(label)
   except (urllib.error.URLError,TimeoutError,socket.timeout,UnicodeError,json.JSONDecodeError,OSError):pass
  return host,verified,evidence
@@ -132,17 +130,20 @@ class Worker(QThread):
    result.sort(key=host_sort_key);self.done.emit(result,self.cancel.is_set(),"")
   except Exception as e:self.done.emit(list(found.values()),self.cancel.is_set(),str(e))
 class Devices(QObject):
- changed=Signal();notice=Signal(str);discoveryChanged=Signal();streamsChanged=Signal()
+ changed=Signal();notice=Signal(str);discoveryChanged=Signal();streamsChanged=Signal();profilesChanged=Signal()
  def __init__(self):
-  super().__init__();DATA.mkdir(parents=True,exist_ok=True);self._items=[];self._active_id="";self._streams=[];self._discovered=[];self._scanning=False;self._worker=None;self._stage="Готово";self._pd=self._pt=self._found=0;self._status="Готово";self._interfaces=[];self._selected_interface="";self._init_db();self._load();self.refreshInterfaces()
- def _connect(self):
-  db=sqlite3.connect(DB,timeout=5);db.execute("PRAGMA foreign_keys=ON");return db
+  super().__init__();DATA.mkdir(parents=True,exist_ok=True);self._items=[];self._active_id="";self._streams=[];self._profiles=[];self._discovered=[];self._scanning=False;self._worker=None;self._stage="Готово";self._pd=self._pt=self._found=0;self._status="Готово";self._interfaces=[];self._selected_interface="";self._init_db();self._load();self.refreshInterfaces()
+ def _connect(self):db=sqlite3.connect(DB,timeout=5);db.execute("PRAGMA foreign_keys=ON");return db
  def _init_db(self):
   with self._connect() as db:
    db.execute("PRAGMA journal_mode=WAL");db.execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)");ver=db.execute("PRAGMA user_version").fetchone()[0]
    db.execute("CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT NOT NULL,host TEXT NOT NULL,port INTEGER NOT NULL,connection TEXT NOT NULL,notes TEXT NOT NULL)");db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_host_port ON devices(host,port)")
    if ver<2:
-    db.execute("CREATE TABLE IF NOT EXISTS streams(id TEXT PRIMARY KEY,device_id TEXT NOT NULL,name TEXT NOT NULL,kind TEXT NOT NULL DEFAULT 'main',protocol TEXT NOT NULL DEFAULT 'rtsp',port INTEGER NOT NULL DEFAULT 554,path TEXT NOT NULL DEFAULT '/',video_profile_id TEXT,enabled INTEGER NOT NULL DEFAULT 1,FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE)");db.execute("CREATE INDEX IF NOT EXISTS idx_streams_device ON streams(device_id)");db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_streams_device_kind ON streams(device_id,kind)");db.execute("PRAGMA user_version=2")
+    db.execute("CREATE TABLE IF NOT EXISTS streams(id TEXT PRIMARY KEY,device_id TEXT NOT NULL,name TEXT NOT NULL,kind TEXT NOT NULL DEFAULT 'main',protocol TEXT NOT NULL DEFAULT 'rtsp',port INTEGER NOT NULL DEFAULT 554,path TEXT NOT NULL DEFAULT '/',video_profile_id TEXT,enabled INTEGER NOT NULL DEFAULT 1,FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE)");db.execute("CREATE INDEX IF NOT EXISTS idx_streams_device ON streams(device_id)");db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_streams_device_kind ON streams(device_id,kind)")
+   if ver<3:
+    db.execute("CREATE TABLE IF NOT EXISTS video_profiles(id TEXT PRIMARY KEY,name TEXT NOT NULL UNIQUE,codec TEXT NOT NULL DEFAULT 'h264',width INTEGER,height INTEGER,fps INTEGER,bitrate_kbps INTEGER,latency_mode TEXT NOT NULL DEFAULT 'balanced',notes TEXT NOT NULL DEFAULT '')")
+    defaults=(("low-latency","Мінімальна затримка","h264",None,None,60,None,"low_latency",""),("balanced","Збалансований","h264",None,None,30,None,"balanced",""),("low-bitrate","Низький бітрейт","h264",None,None,30,2000,"balanced",""),("max-quality","Максимальна якість","h265",None,None,30,None,"quality",""))
+    db.executemany("INSERT OR IGNORE INTO video_profiles VALUES(?,?,?,?,?,?,?,?,?)",defaults);db.execute("PRAGMA user_version=3")
    if db.execute("SELECT COUNT(*) FROM devices").fetchone()[0]==0 and LEGACY_DB.exists():
     try:
      raw=json.loads(LEGACY_DB.read_text(encoding="utf-8"));items=raw.get("devices",[]) if isinstance(raw,dict) else []
@@ -156,13 +157,15 @@ class Devices(QObject):
    with self._connect() as db:
     cols="id,name,type,host,port,connection,notes";self._items=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM devices ORDER BY name COLLATE NOCASE")];row=db.execute("SELECT value FROM settings WHERE key='activeDeviceId'").fetchone();self._active_id=row[0] if row else ""
    if not any(i["id"]==self._active_id for i in self._items):self._active_id=self._items[0]["id"] if self._items else "";self._save_active()
-   self._load_streams()
-  except sqlite3.Error as e:self._items=[];self._streams=[];self._active_id="";self.notice.emit("Помилка бази пристроїв: "+str(e))
+   self._load_streams();self._load_profiles()
+  except sqlite3.Error as e:self._items=[];self._streams=[];self._profiles=[];self._active_id="";self.notice.emit("Помилка бази пристроїв: "+str(e))
  def _load_streams(self):
-  with self._connect() as db:
-   cols="id,device_id,name,kind,protocol,port,path,video_profile_id,enabled";self._streams=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM streams ORDER BY device_id,kind,name")]
+  with self._connect() as db:cols="id,device_id,name,kind,protocol,port,path,video_profile_id,enabled";self._streams=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM streams ORDER BY device_id,kind,name")]
   for s in self._streams:s["enabled"]=bool(s["enabled"])
   self.streamsChanged.emit()
+ def _load_profiles(self):
+  with self._connect() as db:cols="id,name,codec,width,height,fps,bitrate_kbps,latency_mode,notes";self._profiles=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM video_profiles ORDER BY name COLLATE NOCASE")]
+  self.profilesChanged.emit()
  def _save_active(self):
   with self._connect() as db:db.execute("INSERT OR REPLACE INTO settings VALUES('activeDeviceId',?)",(self._active_id,))
  def _public_item(self,i):return {**i,"active":i["id"]==self._active_id}
@@ -178,6 +181,8 @@ class Devices(QObject):
  def streams(self):return self._streams
  @Property("QVariantList",notify=streamsChanged)
  def activeStreams(self):return [s for s in self._streams if s["device_id"]==self._active_id]
+ @Property("QVariantList",notify=profilesChanged)
+ def videoProfiles(self):return self._profiles
  @Slot(str,str,str,int,str,str,result=str)
  def addStream(self,device_id,name,kind,port,path,protocol):
   if not any(i["id"]==device_id for i in self._items):self.notice.emit("Пристрій для потоку не знайдено");return ""
@@ -190,12 +195,23 @@ class Devices(QObject):
   self._load_streams();return sid
  @Slot(str,str)
  def setStreamVideoProfile(self,stream_id,profile_id):
-  with self._connect() as db:db.execute("UPDATE streams SET video_profile_id=? WHERE id=?",(profile_id.strip() or None,stream_id))
+  profile_id=profile_id.strip() or None
+  if profile_id and not any(p["id"]==profile_id for p in self._profiles):self.notice.emit("Відеопрофіль не знайдено");return
+  with self._connect() as db:db.execute("UPDATE streams SET video_profile_id=? WHERE id=?",(profile_id,stream_id))
   self._load_streams()
  @Slot(str)
  def removeStream(self,stream_id):
   with self._connect() as db:db.execute("DELETE FROM streams WHERE id=?",(stream_id,))
   self._load_streams()
+ @Slot(str,str,str,int,int,int,int,str,str,result=str)
+ def saveVideoProfile(self,profile_id,name,codec,width,height,fps,bitrate,latency_mode,notes):
+  profile_id=profile_id.strip() or uuid.uuid4().hex;name=name.strip();codec=codec.strip().lower();latency_mode=latency_mode.strip().lower() or "balanced"
+  if not name or codec not in ("h264","h265"):self.notice.emit("Некоректний відеопрофіль");return ""
+  def nullable(v):return int(v) if int(v)>0 else None
+  try:
+   with self._connect() as db:db.execute("INSERT INTO video_profiles(id,name,codec,width,height,fps,bitrate_kbps,latency_mode,notes) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,codec=excluded.codec,width=excluded.width,height=excluded.height,fps=excluded.fps,bitrate_kbps=excluded.bitrate_kbps,latency_mode=excluded.latency_mode,notes=excluded.notes",(profile_id,name,codec,nullable(width),nullable(height),nullable(fps),nullable(bitrate),latency_mode,notes.strip()))
+  except sqlite3.IntegrityError:self.notice.emit("Назва відеопрофілю вже використовується");return ""
+  self._load_profiles();return profile_id
  @Property("QVariantList",notify=discoveryChanged)
  def discovered(self):return self._discovered
  @Property("QVariantList",notify=discoveryChanged)
