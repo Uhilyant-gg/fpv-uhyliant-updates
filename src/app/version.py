@@ -1,3 +1,3 @@
-VERSION = "2.0.5"
+VERSION = "2.0.6"
 PRODUCT_NAME = "ФПВ Ухилянт"
 WINDOW_TITLE = f"{PRODUCT_NAME} {VERSION}"
