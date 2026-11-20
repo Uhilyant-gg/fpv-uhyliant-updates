@@ -1,6 +1,6 @@
 # FPV Uhyliant development guide
 
-This file is the persistent handoff/context for future development chats. Read this file together with `PROJECT_STATE.md` before making changes.
+This file and `PROJECT_STATE.md` are the canonical persistent handoff/context for future development chats. Read both from current `main` before making changes. Update both whenever project state, blockers, architecture decisions, release behavior, priorities, or the development plan materially change. Do not let either file become a historical snapshot that contradicts current `main`.
 
 ## Product goal
 
@@ -41,19 +41,28 @@ Devices -> Camera -> Firmware
 
 ## Immediate release priority: 2.0.10
 
-The current blocker is reliable startup of the packaged Windows application.
+The current blocker is reliable startup validation of the packaged Windows application.
 
-2.0.10 changes include:
+Current 2.0.10 work includes:
 
 - explicit PySide6.QtMultimedia inclusion in the PyInstaller build;
 - packaged GUI/QML smoke testing;
 - `startup.log` for unhandled startup exceptions;
 - `qt-startup.log` for Qt/QML/Multimedia messages;
-- marker-based smoke testing so GUI initialization failure can be distinguished from shutdown hangs.
+- marker-based smoke testing so GUI initialization failure can be distinguished from shutdown hangs;
+- full signing/publishing/Pages release pipeline preserved;
+- Inno Setup fallback version aligned to 2.0.10.
 
-Do not move the release forward when the packaged GUI/QML validation is failing. Diagnose the failure first.
+Observed CI history relevant to the current blocker:
 
-Expected runtime diagnostics directory:
+1. The original packaged smoke test timed out while waiting for the GUI process to exit.
+2. Marker-based validation was introduced.
+3. A later run exited with `-1` before creating the smoke marker.
+4. Current `main` uses a single quoted PowerShell argument line for `--smoke-test --smoke-marker <path>` and prints available startup/Qt diagnostics into the failed CI job.
+
+Do not move the release forward while packaged GUI/QML validation is failing. Diagnose the actual failure first and keep the diagnostic evidence.
+
+Expected installed runtime diagnostics directory:
 
 `%LOCALAPPDATA%/FPV-Uhyliant`
 
@@ -62,8 +71,9 @@ Important diagnostic files may include:
 - `startup.log`
 - `qt-startup.log`
 - `startup-ok.json`
-- `smoke-test-ok.json` during smoke testing
 - `updater.log`
+
+CI also uses `smoke-test-ok.json` as the explicit successful-GUI-initialization marker.
 
 ## Development priority after 2.0.10 is validated
 
@@ -166,18 +176,19 @@ Do not invent telemetry. Display only values actually received from the connecte
 
 ## Development workflow
 
-For non-trivial changes:
-
-1. Inspect current `main` before writing.
-2. Preserve existing release/update/security behavior unless the change explicitly targets it.
-3. Prefer a focused branch and PR for risky changes.
-4. Run CI before merge.
-5. Do not merge a failing CI change.
-6. For release-pipeline changes, ensure the signing/publishing/Pages jobs remain present.
-7. For Windows GUI changes, validate the frozen executable, not only Python source execution.
-8. When diagnostics fail, preserve or upload useful logs/artifacts instead of replacing the error with a generic timeout.
-9. Firmware changes must not silently apply video profiles.
-10. After each meaningful milestone, update this file and `PROJECT_STATE.md` so a new development chat can recover context from the repository itself.
+1. At the start of a new development chat, read current `DEVELOPMENT_GUIDE.md` and `PROJECT_STATE.md` from `main` before proposing or applying changes.
+2. Inspect the actual current source files related to the requested change before writing.
+3. After every material change to state, blockers, roadmap, architecture, release behavior, or workflow, update both canonical context files in the same development cycle.
+4. `PROJECT_STATE.md` should answer: what is true right now, what is blocked, what was most recently changed, and what should happen next.
+5. `DEVELOPMENT_GUIDE.md` should answer: what are we building, what rules must remain true, and in what priority/order should functionality be implemented.
+6. Small corrective changes may be committed directly to `main` when appropriate, per the current user preference.
+7. Risky/substantial changes should use focused review and CI before merge.
+8. Preserve existing release/update/security behavior unless the change explicitly targets it.
+9. Do not merge or publish failing validation.
+10. For release-pipeline changes, ensure signing/publishing/Pages jobs remain present.
+11. For Windows GUI changes, validate the frozen executable, not only Python source execution.
+12. When diagnostics fail, preserve or upload useful logs/artifacts instead of replacing the error with a generic timeout.
+13. Firmware changes must not silently apply video profiles.
 
 ## Definition of done for the next major milestone
 
