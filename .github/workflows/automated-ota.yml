@@ -56,8 +56,8 @@ jobs:
           $meta = Get-Content VERSION.json -Raw | ConvertFrom-Json
           if ($meta.version -ne $env:VERSION) { throw 'VERSION.json mismatch' }
           python -c "from pathlib import Path;ns={};exec(Path('src/app/version.py').read_text(encoding='utf-8'),ns);assert ns['VERSION']=='$env:VERSION'"
-          git rev-parse "v$env:VERSION" 2>$null
-          if ($LASTEXITCODE -eq 0) { throw 'Tag already exists' }
+          $existingTag = git tag -l "v$env:VERSION"
+          if ($existingTag) { throw "Tag v$env:VERSION already exists" }
       - name: Install build dependencies
         shell: pwsh
         run: |
