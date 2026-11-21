@@ -5,12 +5,15 @@
 ## Product direction
 Windows FPV ground station using Python + PySide6 + Qt Quick/QML. Target stacks: ArduPilot, Betaflight and INAV; target telemetry protocols: MAVLink, MSP and CRSF. FPV remains video-first.
 
+## UI navigation
+The application now has an explicit Home surface with entry points for Devices, Quick Connect, Firmware, Update and Diagnostics. Quick Connect only uses already saved devices; it does not invent discovery or peer state. Connecting a saved device enters the video-first FPV surface. Service Mode is an explicit route from FPV and exposes existing management/diagnostic surfaces only; it does not synthesize hardware observations or protocol capabilities. Update UI is a view over the existing guarded updater lifecycle.
+
 ## Runtime architecture
 Normalized telemetry preserves unknown/stale state. Verified OpenIPC identity stays distinct from generic ONVIF. Primary and secondary video runtimes remain isolated while the workspace prevents one stream from driving both decoder roles at once. Primary takeover stops a conflicting secondary selection, PiP shutdown stops only secondary, and late playback events cannot resurrect a stopped runtime.
 
 Prepared video runtimes retain detached canonical source/profile/device metadata snapshots and fail closed when the active device, stream existence/enabled state, stream endpoint metadata, device metadata or referenced video profile changes. Canonical RTSP path normalization is applied consistently at prepare and revalidation time, so equivalent stored paths do not self-invalidate. Device/stream/profile change signals reconcile both decoder roles immediately; invalidated metadata is cleared instead of remaining presented as current, and invalidating secondary disables PiP without stopping a still-valid primary. Reconnect requires the prepared source snapshot to remain current. Invalid RTSP endpoint metadata remains unavailable instead of being probed or invented. Endpoint check timing is reachability timing only, never video latency.
 
-Stream workspace reconciliation now preserves valid explicit primary/secondary choices, replaces only selections that became unavailable, and never reuses the primary as secondary. QML derives PiP state from the backend runtime, so backend invalidation cannot leave the UI, recovery timer or secondary player presenting PiP as enabled. Physical Windows dual-decoder validation is still pending.
+Stream workspace reconciliation preserves valid explicit primary/secondary choices, replaces only selections that became unavailable, and never reuses the primary as secondary. QML derives PiP state from the backend runtime, so backend invalidation cannot leave the UI, recovery timer or secondary player presenting PiP as enabled. Physical Windows dual-decoder validation is still pending.
 
 Read-only link diagnostics preserve unknown measurements; StabX and Starlink/WireGuard still require real observations.
 

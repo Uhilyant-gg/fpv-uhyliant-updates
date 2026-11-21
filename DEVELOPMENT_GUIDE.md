@@ -5,6 +5,9 @@ Read this file and `PROJECT_STATE.md` from current `main` before development. `m
 ## Invariants
 Windows ground station: Python + PySide6 + Qt Quick/QML. FPV remains video-first. Unknown telemetry stays unavailable. Camera presets, video profiles and firmware remain separate. Generic ONVIF is not verified OpenIPC. Recovery/fullflash is not a generic install path. Secrets/private signing keys are not repository data.
 
+## UI navigation
+Keep the product route explicit: Home exposes Devices, Quick Connect, Firmware, Update and Diagnostics; connecting a saved device enters FPV. Service Mode is a separate route for existing management and diagnostic surfaces. Quick Connect must only operate on actual saved devices/streams and must not imply discovery, identity, trust or connectivity that was not observed. Service Mode must not add placeholder StabX, Starlink/WireGuard, pairing peer or hardware-adapter observations. Update UI must delegate to the existing guarded updater instead of bypassing its signature/hash/install gates.
+
 ## Video lifecycle
 Primary and secondary `VideoRuntime` instances are isolated. A single stream must not be prepared in both decoder roles simultaneously. Primary selection wins conflicts by stopping secondary first; secondary preparation rejects the current primary stream. Disabling PiP stops secondary only.
 
