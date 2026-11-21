@@ -1,0 +1,56 @@
+name: Windows startup diagnostics
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/app/main.py'
+      - 'src/app/startup_harness.py'
+      - 'src/app/test_startup_harness*.py'
+      - 'src/requirements.txt'
+      - '.github/workflows/startup-diagnostics.yml'
+permissions:
+  contents: read
+jobs:
+  packaged-startup-probes:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: Create clean build environment
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\python -m pip install --upgrade pip
+          .\.venv\Scripts\python -m pip install -r src\requirements.txt
+          .\.venv\Scripts\python -m pip install pyinstaller==6.11.1 pillow
+      - name: Prepare assets
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\python tools\build_icon.py
+          New-Item -ItemType Directory -Force src\app\security | Out-Null
+          Copy-Item test\release-public-key.pem src\app\security\production-v1-public.pem -Force
+          Copy-Item assets\fpv-uhyliant.ico src\app\fpv-uhyliant.ico -Force
+      - name: Build diagnostic onedir executable
+        shell: pwsh
+        run: |
+          $qmlArgs = Get-ChildItem src\app\*.qml | Sort-Object Name | ForEach-Object { @('--add-data', "$($_.FullName);.") }
+          & .\.venv\Scripts\pyinstaller --noconfirm --clean --onedir --console --debug bootloader --noupx --name FPV-Uhyliant-Diagnostics --paths src/app @qmlArgs --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --hidden-import PySide6.QtMultimedia --hidden-import PySide6.QtSerialPort --hidden-import pymavlink --hidden-import pymavlink.mavutil --hidden-import paramiko --collect-all PySide6.QtMultimedia --collect-all pymavlink --collect-all paramiko src/app/main.py
+      - name: Run packaged startup diagnostics
+        shell: pwsh
+        run: |
+          $marker = Join-Path $env:RUNNER_TEMP 'fpv-startup-stages.jsonl'
+          $p = Start-Process -FilePath 'dist\FPV-Uhyliant-Diagnostics\FPV-Uhyliant-Diagnostics.exe' -ArgumentList '--startup-diagnostics','--startup-marker',"`"$marker`"" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { if (Test-Path $marker) { Get-Content $marker }; throw "Startup diagnostics failed: $($p.ExitCode)" }
+          $rows = @(Get-Content $marker | ForEach-Object { $_ | ConvertFrom-Json })
+          if (-not $rows.Count -or $rows[-1].stage -ne 'event-processing-complete') { throw 'Startup diagnostics did not reach final stage' }
+          Get-Content $marker
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-startup-diagnostics-${{ github.sha }}
+          path: |
+            dist/FPV-Uhyliant-Diagnostics/**
+            ${{ runner.temp }}/fpv-startup-stages.jsonl
+          if-no-files-found: error
+          retention-days: 7
