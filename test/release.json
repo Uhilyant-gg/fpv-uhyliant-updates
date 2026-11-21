@@ -1,21 +1,21 @@
 {
   "product": "FPV-Uhyliant",
   "channel": "test",
-  "version": "2.0.10",
-  "build": 2010,
+  "version": "2.0.11",
+  "build": 2011,
   "mandatory": false,
-  "minimumUpdaterVersion": "2.0.4",
+  "minimumUpdaterVersion": "1.5.0",
   "package": {
-    "file": "FPV-Uhyliant-v2.0.10-Test-UA-Windows.zip",
-    "url": "https://github.com/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.10/FPV-Uhyliant-v2.0.10-Test-UA-Windows.zip",
-    "sha256": "d5d345713f1288d716531fd22f922180692b4c2907539634a5df975a5b797313"
+    "file": "FPV-Uhyliant-v2.0.11-test-UA-Windows.zip",
+    "url": "https://<scrubbed-url-domain>/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.11/FPV-Uhyliant-v2.0.11-test-UA-Windows.zip",
+    "sha256": "196cfb2cfa94799691b9301b4a10038cb6ee12e55135fa80a861a5deed64090f"
   },
   "releaseNotes": [
-    "Hotfix packaged Qt Multimedia startup"
+    "UI preview prerelease"
   ],
   "signature": {
     "algorithm": "Ed25519",
     "keyId": "fpv-uhyliant-production-v1",
-    "value": "fT6/LVMEfJHH+iU2CySOniF063KKPV5Mc3cqOoOZgbBwY/vc/OQ1va9lbZvrUvtOrKjsCz+uLhMH5fAM7zMCBQ=="
+    "value": "YF05KzrHcEBXZW6muWQzM2V28h8CSm56Z/vMxOsO9fzGvmFnaZC9+39NW7t+YYpg4xElfXu13bg4u3tg/AawDw=="
   }
 }
