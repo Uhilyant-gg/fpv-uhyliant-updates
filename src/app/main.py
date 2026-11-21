@@ -18,7 +18,7 @@ def main():
  from PySide6.QtQml import QQmlApplicationEngine
  from PySide6.QtQuickControls2 import QQuickStyle
  from backend import Station
- from devices import Devices
+ from devices_routeaware import Devices
  from updater_engine import Updater
  from video import VideoWorkspaceRuntime
  from stream_workspace import StreamWorkspace
