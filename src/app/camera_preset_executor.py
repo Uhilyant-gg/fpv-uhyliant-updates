@@ -26,19 +26,19 @@ class CameraPresetExecutor(QObject):
   return plan
  @Slot(result=bool)
  def executePrepared(self):
-  if self._locked_device:self._set('blocked',error='Інша preset operation вже активна');return False
+  if self._locked_device:self._set('blocked',error='Інша операція з пресетом уже активна');return False
   plan=self._validate_plan()
-  if plan is None:self._set('blocked',error='Camera preset plan або verified hardware identity невалідні');return False
-  if self._adapter is None:self._set('hardware-validation-pending',deviceId=plan['deviceId'],presetId=plan['presetId'],presetVersion=plan['presetVersion'],step='executor',error='Camera preset hardware adapter не підключений');return False
+  if plan is None:self._set('blocked',error='План пресета камери або підтверджена апаратна ідентичність невалідні');return False
+  if self._adapter is None:self._set('hardware-validation-pending',deviceId=plan['deviceId'],presetId=plan['presetId'],presetVersion=plan['presetVersion'],step='executor',error='Апаратний адаптер пресета камери не підключений');return False
   self._locked_device=plan['deviceId'];self._set('executing',deviceId=plan['deviceId'],presetId=plan['presetId'],presetVersion=plan['presetVersion'],step='apply',error='')
   try:
-   ok=bool(self._adapter.execute(plan['deviceId'],deepcopy(plan)));self._set('applied-pending-verification' if ok else 'error',step='verify' if ok else 'apply',error='' if ok else 'Preset executor повідомив про помилку');return ok
+   ok=bool(self._adapter.execute(plan['deviceId'],deepcopy(plan)));self._set('applied-pending-verification' if ok else 'error',step='verify' if ok else 'apply',error='' if ok else 'Виконавець пресета повідомив про помилку');return ok
   except Exception as exc:self._set('error',step='apply',error=str(exc));return False
   finally:self._locked_device='';self.changed.emit()
  @Slot(bool,result=bool)
  def verifyObserved(self,identity_verified):
   if self._state.get('state')!='applied-pending-verification':return False
-  device=self._device(self._state.get('deviceId',''));ok=bool(identity_verified and device and (device.get('openipcIdentity') or {}).get('verified') is True);self._set('verified' if ok else 'error',step='verify',error='' if ok else 'Post-preset verified hardware observation unavailable');return ok
+  device=self._device(self._state.get('deviceId',''));ok=bool(identity_verified and device and (device.get('openipcIdentity') or {}).get('verified') is True);self._set('verified' if ok else 'error',step='verify',error='' if ok else 'Підтверджене апаратне спостереження після застосування пресета недоступне');return ok
  @Slot()
  def reset(self):
   if not self._locked_device:self._state=self._idle();self.changed.emit()
