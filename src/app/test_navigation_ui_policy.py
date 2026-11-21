@@ -6,8 +6,11 @@ class NavigationUiPolicyTests(unittest.TestCase):
  def test_home_has_single_camera_management_entry(self):
   self.assertEqual(self.home.count('onClicked:root.openDevices()'),1);self.assertIn('Знайти / додати',self.home);self.assertNotIn('Швидке підключення',self.home);self.assertNotIn('Popup{id:quick',self.home)
  def test_home_keeps_secondary_app_entry_points_compact(self):
-  for label in ('Прошивка','Оновлення','Діагностика'):self.assertIn(label,self.home)
+  for label in ('Прошивка','Діагностика'):self.assertIn(label,self.home)
+  self.assertIn('Версія ',self.home);self.assertIn('Оновити до ',self.home);self.assertIn('visible:updater.updateState==="available"||updater.updateState==="ready"',self.home);self.assertNotIn('Button{text:"Оновлення"',self.home)
   self.assertNotIn('Пристрої · Додати камеру',self.home);self.assertNotIn('Відео передусім',self.home)
+ def test_home_checks_for_updates_and_routes_contextual_action_to_guarded_ui(self):
+  self.assertIn('Component.onCompleted:updater.check()',self.home);self.assertIn('onClicked:root.openUpdate()',self.home)
  def test_saved_camera_rows_are_direct_fpv_entry(self):
   self.assertIn('model:devicesModel.items',self.home);self.assertIn('devicesModel.streams',self.home);self.assertIn('streams[n].enabled===true',self.home);self.assertIn('root.connectDevice(modelData.id)',self.home)
  def test_devices_activation_uses_unified_fpv_handoff(self):
