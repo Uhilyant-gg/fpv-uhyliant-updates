@@ -4,7 +4,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from PySide6.QtCore import QCoreApplication,QObject,Property,QThread,QTimer,Signal,Slot
 from version import VERSION
-from updater_install import helper_args,install_decision
+from updater_install import helper_args,install_decision,stage_ready_package
 KEY_ID='fpv-uhyliant-production-v1';HERE=Path(__file__).resolve().parent;PUB=HERE/'security/production-v1-public.pem';DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';UP=DATA/'updates';VERSION_RE=re.compile(r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$')
 def _manifest_url():scheme=''.join(map(chr,[104,116,116,112,115,58,47,47]));host=''.join(map(chr,[117,104,105,108,121,97,110,116,45,103,103,46,103,105,116,104,117,98,46,105,111]));return scheme+host+'/fpv-uhyliant-updates/test/release.json'
 DEFAULT=_manifest_url()
@@ -103,7 +103,7 @@ class Updater(QObject):
   if decision=='busy':self.status='Дочекайтеся завершення поточної операції';self.changed.emit();return
   if decision=='blocked':self.state='blocked';self.status=why;self.changed.emit();return
   if decision=='unavailable':self.state='error';self.status='Компонент оновлення недоступний: запустіть встановлену програму через FPV-Uhyliant-Launcher.exe';self.changed.emit();return
-  try:r=load_ready(self.m);args=helper_args(self.root/'FPV-Uhyliant-Update.exe',self.root,r,os.getpid());subprocess.Popen(args,cwd=self.root,creationflags=getattr(subprocess,'DETACHED_PROCESS',0))
+  try:r=stage_ready_package(self.root,load_ready(self.m));args=helper_args(self.root/'FPV-Uhyliant-Update.exe',self.root,r,os.getpid());subprocess.Popen(args,cwd=self.root,creationflags=getattr(subprocess,'DETACHED_PROCESS',0))
   except (RuntimeError,OSError,ValueError) as e:self.state='error';self.status=str(e);self.changed.emit();return
   QTimer.singleShot(300,QCoreApplication.quit)
  def _start(self,a,p,s):
