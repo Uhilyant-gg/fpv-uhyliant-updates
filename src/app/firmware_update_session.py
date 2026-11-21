@@ -2,10 +2,11 @@
 from copy import deepcopy
 import ipaddress,threading
 from PySide6.QtCore import QObject,Property,Signal,Slot
+from devices import interfaces
 from firmware_update_lifecycle import FirmwareUpdateLifecycle
 from firmware_rediscovery import FirmwareRediscovery
 from openipc_upgrade_transport import OpenIPCUpgradeAdapter
-from route_discovery import fingerprint
+from route_discovery import fingerprint,plan_targets,system_routes
 
 class FirmwareUpdateSession(QObject):
  changed=Signal()
@@ -20,6 +21,7 @@ class FirmwareUpdateSession(QObject):
   self.executor.register_adapter(OpenIPCUpgradeAdapter(self.devices,transport) if transport is not None else None)
   self._result={'enabled':True,'state':'ready','reason':'Транспорт підключено для явної апаратної перевірки','observedFirmware':'','verification':{}} if self._enabled else self._empty();self.changed.emit();return True
  def _probe(self,host):return fingerprint(host,threading.Event())
+ def _rediscovery_candidates(self,original_host):return plan_targets(interfaces(),system_routes(),[original_host])
  def _sync(self,ok=None):
   status=self.executor.status;verification=status.get('verification') or {};identity=verification.get('identity') or {}
   self._result={'enabled':self._enabled,'state':status.get('state',''),'reason':status.get('error',''),'observedFirmware':identity.get('firmware',''),'verification':verification};self.changed.emit();return bool(ok) if ok is not None else True
@@ -35,7 +37,7 @@ class FirmwareUpdateSession(QObject):
   try:address=ipaddress.ip_address(context.get('host',''))
   except ValueError:return self._sync(self.executor.failRediscovery())
   if address.version!=4 or address.is_unspecified or address.is_loopback or address.is_multicast:return self._sync(self.executor.failRediscovery())
-  lifecycle=FirmwareUpdateLifecycle(self.executor,FirmwareRediscovery(self._probe));ok=lifecycle.verify_after_reboot();return self._sync(ok)
+  lifecycle=FirmwareUpdateLifecycle(self.executor,FirmwareRediscovery(self._probe,candidates=self._rediscovery_candidates));ok=lifecycle.verify_after_reboot();return self._sync(ok)
  @Slot()
  def reset(self):
   if self.executor.busy:return False
