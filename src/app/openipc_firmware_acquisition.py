@@ -6,10 +6,7 @@ from urllib.parse import urlparse
 from PySide6.QtCore import QObject,Property,Signal,Slot
 OFFICIAL_MANIFEST_URL=''.join(('https://','openipc.github.io','/firmware/manifest.json'))
 OFFICIAL_DOWNLOAD_HOSTS=('openipc.org','openipc.github.io')
-MAX_MANIFEST_BYTES=4*1024*1024
-MAX_FIRMWARE_BYTES=64*1024*1024
-NETWORK_TIMEOUT=15
-
+MAX_MANIFEST_BYTES=4*1024*1024;MAX_FIRMWARE_BYTES=64*1024*1024;NETWORK_TIMEOUT=15
 def _text(value):return str(value).strip() if isinstance(value,(str,int)) else ''
 def _sha(value):
  value=_text(value).lower();return value if len(value)==64 and all(c in '0123456789abcdef' for c in value) else ''
@@ -68,7 +65,6 @@ def verify_download(path,artifact):
     h.update(chunk)
  except OSError:return False
  return size==expected_size and h.hexdigest()==expected
-
 def _read_response(response,limit):
  final=response.geturl()
  if not _official_url(final):raise ValueError('redirected outside official OpenIPC hosts')
@@ -80,15 +76,19 @@ def _read_response(response,limit):
  data=response.read(limit+1)
  if len(data)>limit:raise ValueError('response is too large')
  return data
-
 class OpenIPCFirmwareAcquisition(QObject):
  changed=Signal()
- def __init__(self,firmware_center,cache_dir,opener=None):
-  super().__init__();self.center=firmware_center;self.cache=Path(cache_dir);self.opener=opener or urllib.request.urlopen;self._catalog=[];self._status={'state':'idle','reason':'','count':0,'selection':{}}
+ def __init__(self,firmware_center,cache_dir,opener=None):super().__init__();self.center=firmware_center;self.cache=Path(cache_dir);self.opener=opener or urllib.request.urlopen;self._catalog=[];self._status={'state':'idle','reason':'','count':0,'selection':{}}
  @Property('QVariantMap',notify=changed)
  def status(self):return deepcopy(self._status)
  @Property('QVariantList',notify=changed)
  def catalog(self):return deepcopy(self._catalog)
+ @Property('QStringList',notify=changed)
+ def channels(self):return sorted({x['channel'] for x in self._catalog})
+ @Slot(str,str,str,result='QStringList')
+ def variants(self,platform,sensor,channel):return sorted({x['variant'] for x in self._catalog if x['platform']==_text(platform).lower() and x['sensor']==_text(sensor).lower() and (not channel or x['channel']==channel)})
+ @Slot(str,str,str,str,result='QStringList')
+ def builds(self,platform,sensor,channel,variant):return sorted({x['build'] for x in self._catalog if x['platform']==_text(platform).lower() and x['sensor']==_text(sensor).lower() and (not channel or x['channel']==channel) and (not variant or x['variant']==_text(variant).lower())})
  def _set(self,state,reason='',selection=None,**extra):
   if selection is None:selection={}
   self._status={'state':state,'reason':reason,'count':len(self._catalog),'selection':deepcopy(selection),**extra};self.changed.emit()

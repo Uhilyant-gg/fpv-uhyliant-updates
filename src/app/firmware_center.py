@@ -28,6 +28,10 @@ class FirmwareCenter(QObject):
  @Slot(str,result="QVariantMap")
  def upgradeReadiness(self,device_id):return upgrade_candidate(next((d for d in self.devices.items if d.get("id")==device_id),None))
  @Slot(str,result="QVariantMap")
+ def acquisitionIdentity(self,device_id):
+  device=next((d for d in self.devices.items if d.get("id")==device_id),None);identity=(device or {}).get("openipcIdentity") or {}
+  return {"ready":bool(identity.get("verified") is True and str(identity.get("platform","")).strip() and str(identity.get("sensor","")).strip()),"platform":str(identity.get("platform","")).strip().lower(),"sensor":str(identity.get("sensor","")).strip().lower(),"verifiedOpenIPC":identity.get("verified") is True}
+ @Slot(str,result="QVariantMap")
  def modePolicy(self,mode):
   if mode=="primary":return {"title":"Первинне встановлення","requiresExistingOpenIPC":False,"description":"Первинне встановлення. Не використовує recovery/fullflash як універсальний метод."}
   if mode=="upgrade":return {"title":"Оновлення","requiresExistingOpenIPC":True,"description":"Штатне оновлення лише для підтвердженого сумісного OpenIPC."}
