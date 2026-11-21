@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 class Tests(unittest.TestCase):
  def setUp(self):self.qml=(Path(__file__).parent/'FirmwareCenter.qml').read_text(encoding='utf-8');self.center=(Path(__file__).parent/'firmware_center.py').read_text(encoding='utf-8')
@@ -10,5 +11,6 @@ class Tests(unittest.TestCase):
  def test_acquisition_uses_observed_device_identity(self):
   self.assertIn('firmwareCenter.acquisitionIdentity(deviceBox.currentValue',self.qml);self.assertIn('def acquisitionIdentity',self.center);self.assertIn('identity.get("verified") is True',self.center)
  def test_busy_executor_blocks_catalog_mutations(self):
-  self.assertIn('enabled:!firmwareExecutor.busy',self.qml);self.assertIn('!firmwareExecutor.busy;onClicked:firmwareAcquisition.download',self.qml)
+  self.assertRegex(self.qml,r'Оновити каталог";enabled:!firmwareExecutor\.busy;onClicked:\{')
+  self.assertRegex(self.qml,r'Завантажити і перевірити";enabled:[^\n}]*!firmwareExecutor\.busy;onClicked:\{firmwareAcquisition\.download\(')
 if __name__=='__main__':unittest.main()
