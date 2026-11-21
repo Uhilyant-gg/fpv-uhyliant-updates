@@ -14,7 +14,7 @@ def upgrade_candidate(device):
     host=str((device or {}).get("host","")).strip()
     try: address=ipaddress.ip_address(host)
     except ValueError:return {"ready":False,"reason":"Адреса камери не є IPv4","host":"","argv":[]}
-    if address.version!=4 or address.is_unspecified or address.is_multicast or address.is_loopback:
+    if address.version!=4 or not address.is_private or address.is_unspecified or address.is_multicast or address.is_loopback or address.is_link_local:
         return {"ready":False,"reason":"Адреса камери непридатна для оновлення","host":"","argv":[]}
     if identity.get("verified") is not True:
         return {"ready":False,"reason":"OpenIPC не підтверджено","host":host,"argv":[]}
