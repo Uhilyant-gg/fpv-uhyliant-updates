@@ -14,8 +14,8 @@ Item {
    Rectangle{width:110;height:32;radius:16;color:surface;Text{anchors.centerIn:parent;text:"v"+updater.currentVersion;color:sub;font.pixelSize:12}}
   }
   RowLayout{Layout.fillWidth:true;spacing:12
-   Button{id:devicesButton;text:"＋  Додати камеру";Layout.preferredWidth:190;Layout.preferredHeight:48;font.bold:true;onClicked:root.openDevices();HoverHint{text:"Знайти, перевірити або додати камеру."}}
-   Button{id:quickButton;text:"Підключитися";Layout.preferredHeight:48;enabled:devicesModel.count>0;onClicked:quick.open();HoverHint{text:"Вибрати збережену камеру з налаштованим відеопотоком."}}
+   Button{id:devicesButton;text:"Пристрої · Додати камеру";Layout.preferredWidth:210;Layout.preferredHeight:48;font.bold:true;onClicked:root.openDevices();HoverHint{text:"Знайти, перевірити або додати камеру."}}
+   Button{id:quickButton;text:"Швидке підключення";Layout.preferredHeight:48;enabled:devicesModel.count>0;onClicked:quick.open();HoverHint{text:"Вибрати збережену камеру з налаштованим відеопотоком."}}
    Item{Layout.fillWidth:true}
    Button{id:firmwareButton;text:"Прошивка";flat:true;onClicked:root.openFirmware();HoverHint{text:"Відкрити безпечне керування прошивкою."}}
    Button{id:updateButton;text:"Оновлення";flat:true;onClicked:root.openUpdate();HoverHint{text:"Перевірити оновлення програми."}}
@@ -29,7 +29,7 @@ Item {
      RowLayout{anchors.fill:parent;anchors.margins:13;spacing:12
       Rectangle{width:42;height:42;radius:12;color:modelData.openipcIdentity.verified?"#15392f":"#172334";Text{anchors.centerIn:parent;text:"●";color:modelData.openipcIdentity.verified?green:sub;font.pixelSize:16}}
       ColumnLayout{Layout.fillWidth:true;spacing:3;Text{text:modelData.name;color:fg;font.bold:true;font.pixelSize:15}Text{text:modelData.host+(modelData.openipcIdentity.verified?" · OpenIPC":"");color:sub;font.pixelSize:12}}
-      Text{visible:modelData.active;text:"АКТИВНА";color:green;font.bold:true;font.pixelSize:11}
+      Text{visible:modelData.active;text:"АКТИВНИЙ";color:green;font.bold:true;font.pixelSize:11}
       Button{text:"FPV";enabled:root.canEnterFpv(modelData.id);onClicked:root.connectDevice(modelData.id);HoverHint{text:"Відкрити FPV. Доступність потоку перевіряється перед запуском."}}
      }
     }
@@ -44,7 +44,7 @@ Item {
  Popup{id:quick;modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(560,root.width-48);height:Math.min(460,root.height-60);padding:0;background:Rectangle{color:elevated;border.color:line;radius:18}
   contentItem:ColumnLayout{anchors.fill:parent;anchors.margins:20;spacing:12
    RowLayout{Layout.fillWidth:true;Text{text:"Швидке підключення";color:fg;font.pixelSize:22;font.bold:true}Item{Layout.fillWidth:true}Button{text:"Закрити";flat:true;onClicked:quick.close()}}
-   Text{text:"Оберіть камеру. Перед входом у FPV програма перевірить доступність налаштованого потоку.";color:sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+   Text{text:"Використовуються лише збережені камери з налаштованим увімкненим відеопотоком. Наявність потоку не означає підтверджену мережеву доступність. Перед входом у FPV програма перевірить його кінцеву точку.";color:sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
    ListView{id:quickList;Layout.fillWidth:true;Layout.fillHeight:true;model:devicesModel.items;spacing:8;delegate:Button{required property var modelData;width:quickList.width;height:54;text:modelData.name+"   ·   "+modelData.host;enabled:root.canEnterFpv(modelData.id);onClicked:{quick.close();root.connectDevice(modelData.id)}HoverHint{text:"Підключити камеру і перевірити її RTSP-потік."}}}
   }
  }
