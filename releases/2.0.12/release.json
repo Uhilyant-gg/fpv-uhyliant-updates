@@ -1,0 +1,21 @@
+{
+  "product": "FPV-Uhyliant",
+  "channel": "test",
+  "version": "2.0.12",
+  "build": 2012,
+  "mandatory": false,
+  "minimumUpdaterVersion": "1.5.0",
+  "package": {
+    "file": "FPV-Uhyliant-v2.0.12-test-UA-Windows.zip",
+    "url": "https://<scrubbed-url-domain>/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.12/FPV-Uhyliant-v2.0.12-test-UA-Windows.zip",
+    "sha256": "134035409c470d861514568f223d21188627294efaef924509d4ef4d07b7c6f2"
+  },
+  "releaseNotes": [
+    "Authenticated guarded OpenIPC update pipeline"
+  ],
+  "signature": {
+    "algorithm": "Ed25519",
+    "keyId": "fpv-uhyliant-production-v1",
+    "value": "CWuzmR+rbee8wGq9G99XKWNFFP90hxaVykN9TdY7kb7bdVPgyz5KgfPT2tyWpep005YnYdhZVFCxuU80aNFWBQ=="
+  }
+}
