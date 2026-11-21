@@ -1,0 +1,28 @@
+name: Apply camera discovery auth flow
+on:
+  push:
+    branches: [fix/camera-discovery-auth-flow]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/camera-discovery-auth-flow
+      - name: Apply discovery flow
+        run: python tools/apply_camera_discovery_auth_flow.py
+      - name: Validate Python and policy tests
+        run: |
+          python -m py_compile src/app/route_discovery.py src/app/devices_routeaware.py src/app/test_camera_discovery_auth_flow.py
+          python -m pip install pytest
+          python -m pytest -q src/app/test_camera_discovery_auth_flow.py src/app/test_route_discovery.py
+      - name: Commit implementation
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/app/route_discovery.py src/app/devices_routeaware.py src/app/DevicesPanel.qml src/app/test_camera_discovery_auth_flow.py
+          git commit -m "Implement camera discovery authentication flow"
+          git push
