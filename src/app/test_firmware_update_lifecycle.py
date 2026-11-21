@@ -23,6 +23,15 @@ class Tests(unittest.TestCase):
   td,x,l=self.make(lambda host:{'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx415','firmware':'new'},'evidence':['Majestic /api/v1/config.json']})
   try:self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(x.status['state'],'error')
   finally:td.cleanup()
+ def test_partial_post_reboot_hardware_is_rejected(self):
+  for identity in ({'platform':'ssc30kq','firmware':'new'},{'sensor':'imx335','firmware':'new'}):
+   td,x,l=self.make(lambda host,i=identity:{'openipc':True,'identity':i,'evidence':['Majestic /api/v1/config.json']})
+   try:self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(x.status['state'],'error')
+   finally:td.cleanup()
+ def test_missing_observed_firmware_is_rejected(self):
+  td,x,l=self.make(lambda host:{'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335'},'evidence':['OpenIPC status.cgi']})
+  try:self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(x.status['state'],'error')
+  finally:td.cleanup()
  def test_sysupgrade_dispatch_remains_reboot_pending_until_rediscovery(self):
   td,x,l=self.make(lambda host:None)
   try:self.assertEqual(x.status['state'],'reboot-pending')

@@ -16,4 +16,9 @@ class Tests(unittest.TestCase):
   calls=[]
   def probe(host):calls.append(host);raise RuntimeError('probe failed')
   r=FirmwareRediscovery(probe,lambda _:None).wait('192.168.1.50',2,0);self.assertFalse(r['rediscovered']);self.assertEqual(r['attempts'],2);self.assertEqual(len(calls),2)
+ def test_malformed_probe_shapes_fail_closed(self):
+  malformed=(True,[],{'openipc':True,'identity':None,'evidence':['Majestic /api/v1/config.json']},{'openipc':True,'identity':{},'evidence':'Majestic /api/v1/config.json'},{'openipc':1,'identity':{'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':['Majestic /api/v1/config.json']})
+  for value in malformed:
+   with self.subTest(value=value):
+    r=FirmwareRediscovery(lambda host,v=value:v,lambda _:None).wait('192.168.1.50',1,0);self.assertFalse(r['rediscovered']);self.assertFalse(r['identity']['verified'])
 if __name__=='__main__':unittest.main()

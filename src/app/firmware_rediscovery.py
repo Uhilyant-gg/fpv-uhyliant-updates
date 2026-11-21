@@ -11,10 +11,12 @@ class FirmwareRediscovery:
   for index in range(attempts):
    try:result=self.probe(host)
    except Exception:result=None
-   if result and result.get('openipc'):
-    evidence=list(result.get('evidence') or []);fresh_evidence=[item for item in evidence if item in _FRESH_OPENIPC_EVIDENCE]
-    payload=dict(result.get('identity') or {});payload['verified']=bool(fresh_evidence)
-    identity=normalize_openipc_identity(payload,fresh_evidence)
-    if identity.get('verified'):return {'rediscovered':True,'attempts':index+1,'identity':identity}
+   if isinstance(result,dict) and result.get('openipc') is True:
+    evidence=result.get('evidence');identity_data=result.get('identity')
+    if isinstance(evidence,(list,tuple)) and isinstance(identity_data,dict):
+     fresh_evidence=[item for item in evidence if isinstance(item,str) and item in _FRESH_OPENIPC_EVIDENCE]
+     payload=dict(identity_data);payload['verified']=bool(fresh_evidence)
+     identity=normalize_openipc_identity(payload,fresh_evidence)
+     if identity.get('verified'):return {'rediscovered':True,'attempts':index+1,'identity':identity}
    if index+1<attempts:self.sleep(interval)
   return {'rediscovered':False,'attempts':attempts,'identity':normalize_openipc_identity()}
