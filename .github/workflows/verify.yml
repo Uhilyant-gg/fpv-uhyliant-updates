@@ -48,6 +48,8 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
+          QT_MEDIA_BACKEND: null
+          PULSE_SERVER: /dev/null
         run: |
           marker="$RUNNER_TEMP/fpv-uhyliant-smoke.json"
           python main.py --smoke-test --smoke-marker "$marker"
