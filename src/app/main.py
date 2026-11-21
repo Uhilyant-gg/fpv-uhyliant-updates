@@ -10,28 +10,19 @@ def log_startup():
  DATA.mkdir(parents=True,exist_ok=True)
  try:(DATA/'startup.log').write_text(traceback.format_exc(),encoding='utf-8')
  except Exception:pass
-def load_main_qml(engine,here,smoke,QUrl):
- path=here/'Main.qml'
- if not smoke:engine.load(QUrl.fromLocalFile(str(path)));return
- source=path.read_text(encoding='utf-8')
- replacements={
-  'import QtMultimedia\n':'',
-  'ApplicationWindow {\n id:w;visible:true;visibility:Window.Maximized;minimumWidth:1024;minimumHeight:640;color:"#050a12";title:appWindowTitle':'Item {\n id:w;width:1280;height:720;visible:false;property int visibility:Window.Hidden;property int minimumWidth:1024;property int minimumHeight:640;property color color:"#050a12";property string title:appWindowTitle',
-  'AudioOutput{id:audioOut;muted:true}':'QtObject{id:audioOut;property bool muted:true}',
-  'MediaPlayer{id:player;videoOutput:videoOut;audioOutput:audioOut;onPlayingChanged:{if(playing){videoRecovery.stop();videoRecoveryCount=0;videoRuntime.markPlaying()}else if(videoRuntime.state==="playing"){videoRuntime.markStalled("Основний RTSP несподівано зупинився");videoRecovery.restart()}}onErrorOccurred:function(error,errorString){videoRuntime.playbackError(errorString);if(videoRuntime.streamId!=="")videoRecovery.restart()}}':'QtObject{id:player;property url source:"";readonly property int playbackState:0;function stop(){} function play(){}}',
-  'MediaPlayer{id:secondaryPlayer;videoOutput:secondaryVideoOut;onPlayingChanged:{if(playing){secondaryRecovery.stop();secondaryRecoveryCount=0;secondaryVideoRuntime.markPlaying()}else if(pipEnabled&&secondaryVideoRuntime.state==="playing"){secondaryVideoRuntime.markStalled("Додатковий RTSP несподівано зупинився");secondaryRecovery.restart()}}onErrorOccurred:function(error,errorString){secondaryVideoRuntime.playbackError(errorString);if(pipEnabled&&secondaryVideoRuntime.streamId!=="")secondaryRecovery.restart()}}':'QtObject{id:secondaryPlayer;property url source:"";readonly property int playbackState:0;function stop(){} function play(){}}',
-  'VideoOutput{id:videoOut;anchors.fill:parent;fillMode:VideoOutput.PreserveAspectFit}':'Item{id:videoOut;anchors.fill:parent}',
-  'VideoOutput{id:secondaryVideoOut;anchors.fill:parent;fillMode:VideoOutput.PreserveAspectFit}':'Item{id:secondaryVideoOut;anchors.fill:parent}',
- }
- for production,headless in replacements.items():
-  if source.count(production)!=1:raise RuntimeError('QML smoke boundary is out of sync with Main.qml')
-  source=source.replace(production,headless)
- if 'MediaPlayer.PlayingState' not in source:raise RuntimeError('QML smoke playback-state boundary is out of sync with Main.qml')
- source=source.replace('MediaPlayer.PlayingState','1')
- engine.loadData(source.encode('utf-8'),QUrl.fromLocalFile(str(here)+os.sep))
+def compile_qml_smoke(here):
+ from PySide6.QtQml import QQmlComponent,QQmlEngine
+ engine=QQmlEngine();errors=[]
+ for path in sorted(here.glob('*.qml')):
+  component=QQmlComponent(engine);component.loadUrl(path.as_uri())
+  if component.isError():errors.extend(f'{path.name}: {error.toString()}' for error in component.errors())
+ if errors:raise RuntimeError('QML smoke compile failed:\n'+'\n'.join(errors))
 def main():
  a=argparse.ArgumentParser(add_help=False);a.add_argument('--self-test',action='store_true');a.add_argument('--mavlink-self-test',action='store_true');a.add_argument('--smoke-test',action='store_true');a.add_argument('--smoke-marker');a.add_argument('--install-root');a.add_argument('--startup-token');x,_=a.parse_known_args();here=Path(__file__).resolve().parent
  if x.self_test:print(json.dumps({'status':'ok','version':VERSION}));return 0
+ if x.smoke_test:
+  from PySide6.QtCore import QCoreApplication
+  app=QCoreApplication(sys.argv);compile_qml_smoke(here);signal_smoke(x.smoke_marker or str(DATA/'smoke-test-ok.json'));return 0
  from PySide6.QtCore import QUrl,QTimer,qInstallMessageHandler
  from PySide6.QtGui import QGuiApplication,QIcon
  from PySide6.QtQml import QQmlApplicationEngine
@@ -71,13 +62,10 @@ def main():
  QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();video=VideoWorkspaceRuntime(d);v=video.primary;secondary=video.secondary;streams=StreamWorkspace(d);fw=FirmwareCenter(d);fwexec=FirmwareExecutor(fw);fwsession=FirmwareUpdateSession(fwexec,d);credentials=CameraCredentials();presets=CameraPresets(d);presetexec=CameraPresetExecutor(presets);links=LinkDiagnostics();backup=StationBackup(d);pairing=PairingRegistry(metadata_store=JsonMetadataStore(DATA/'pairing-trust.json'));telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate)
  d.streamsChanged.connect(streams.autoSelect);streams.autoSelect();pairing.reconcile();ctx=e.rootContext()
  for name,obj in [('station',s),('devicesModel',d),('videoRuntime',v),('secondaryVideoRuntime',secondary),('videoWorkspaceRuntime',video),('streamWorkspace',streams),('firmwareCenter',fw),('firmwareExecutor',fwexec),('firmwareUpdateSession',fwsession),('cameraCredentials',credentials),('cameraPresets',presets),('cameraPresetExecutor',presetexec),('linkDiagnostics',links),('stationBackup',backup),('pairingRegistry',pairing),('mavlinkRuntime',m),('mspSerial',msp_serial),('crsfSerial',crsf_serial),('telemetryRuntime',telemetry),('vehicleRuntime',vehicle),('updater',u)]:ctx.setContextProperty(name,obj)
- ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);load_main_qml(e,here,x.smoke_test,QUrl)
+ ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
  def shutdown():credentials.clear();video.stopAll();links.clear();pairing.clearPending();m.shutdown();msp_serial.stop();crsf_serial.stop()
  if not e.rootObjects():shutdown();raise RuntimeError('QML root object failed to load')
- app.aboutToQuit.connect(shutdown);root=e.rootObjects()[0]
- if x.smoke_test:
-  marker=x.smoke_marker or str(DATA/'smoke-test-ok.json');signal_smoke(marker);os._exit(0)
- QTimer.singleShot(0,root.showMaximized);QTimer.singleShot(1200,lambda:signal_ok(x.startup_token))
+ app.aboutToQuit.connect(shutdown);root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized);QTimer.singleShot(1200,lambda:signal_ok(x.startup_token))
  return app.exec()
 if __name__=='__main__':
  try:raise SystemExit(main())
