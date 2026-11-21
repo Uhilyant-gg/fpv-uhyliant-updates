@@ -35,6 +35,23 @@ class FirmwareRediscovery:
  def _probe_one(self,candidate):
   try:return self.probe(candidate)
   except Exception:return None
+ def _probe_candidates(self,candidates,original,platform,sensor):
+  pool=concurrent.futures.ThreadPoolExecutor(max_workers=min(_MAX_REDISCOVERY_WORKERS,len(candidates)))
+  futures={pool.submit(self._probe_one,candidate):candidate for candidate in candidates}
+  try:
+   for future in concurrent.futures.as_completed(futures):
+    candidate=futures[future]
+    try:result=future.result()
+    except Exception:result=None
+    identity=self._matches(candidate,result,original,platform,sensor)
+    if identity is not None:
+     for pending in futures:
+      if pending is not future:pending.cancel()
+     pool.shutdown(wait=False,cancel_futures=True)
+     return candidate,identity
+  finally:
+   if all(future.done() for future in futures):pool.shutdown(wait=True)
+  return None,None
  def wait(self,host,attempts=30,interval=2.0,expected_identity=None):
   attempts=max(1,min(int(attempts),120));interval=max(0.0,min(float(interval),10.0));expected=expected_identity if isinstance(expected_identity,dict) else {};platform=str(expected.get('platform','')).strip().lower();sensor=str(expected.get('sensor','')).strip().lower();hosts=self._hosts(host);original=str(host).strip()
   for index in range(attempts):
@@ -42,15 +59,7 @@ class FirmwareRediscovery:
    if identity is not None:return {'rediscovered':True,'attempts':index+1,'host':original,'identity':identity}
    candidates=[candidate for candidate in hosts if candidate!=original]
    if platform and sensor and candidates:
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(_MAX_REDISCOVERY_WORKERS,len(candidates))) as pool:
-     futures={pool.submit(self._probe_one,candidate):candidate for candidate in candidates}
-     for future in concurrent.futures.as_completed(futures):
-      candidate=futures[future]
-      try:result=future.result()
-      except Exception:result=None
-      identity=self._matches(candidate,result,original,platform,sensor)
-      if identity is not None:
-       for pending in futures:pending.cancel()
-       return {'rediscovered':True,'attempts':index+1,'host':candidate,'identity':identity}
+    candidate,identity=self._probe_candidates(candidates,original,platform,sensor)
+    if identity is not None:return {'rediscovered':True,'attempts':index+1,'host':candidate,'identity':identity}
    if index+1<attempts:self.sleep(interval)
   return {'rediscovered':False,'attempts':attempts,'host':'','identity':normalize_openipc_identity()}

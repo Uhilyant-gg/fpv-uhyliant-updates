@@ -11,7 +11,10 @@ class Transport:
  def run(self,host,argv):self.calls.append(('run',host,list(argv)));return True
 class SessionTests(unittest.TestCase):
  def setUp(self):
-  self.tmp=tempfile.TemporaryDirectory();image=Path(self.tmp.name)/'fw.bin';image.write_bytes(b'x');self.devices=Devices();center=FirmwareCenter(self.devices);center.verifyImage(str(image),hashlib.sha256(b'x').hexdigest());center.precheck('cam','ssc30kq-imx335','upgrade',True,True);center.prepareExecution('cam','ssc30kq-imx335','upgrade');self.executor=FirmwareExecutor(center);self.session=FirmwareUpdateSession(self.executor,self.devices)
+  self.tmp=tempfile.TemporaryDirectory();image=Path(self.tmp.name)/'fw.bin';image.write_bytes(b'x');self.devices=Devices();center=FirmwareCenter(self.devices);center.verifyImage(str(image),hashlib.sha256(b'x').hexdigest());center.precheck('cam','ssc30kq-imx335','upgrade',True,True);center.prepareExecution('cam','ssc30kq-imx335','upgrade');self.executor=FirmwareExecutor(center);self.probe_calls=[];self.candidate_calls=[]
+  def probe(host):self.probe_calls.append(host);return {}
+  def candidates(host):self.candidate_calls.append(host);return []
+  self.session=FirmwareUpdateSession(self.executor,self.devices,probe=probe,candidates=candidates,sleep=lambda _:None,rediscovery_attempts=1,rediscovery_interval=0)
  def tearDown(self):self.tmp.cleanup()
  def test_disabled_session_cannot_execute(self):self.assertFalse(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.session.result['state'],'hardware-validation-pending')
  def test_opt_in_transport_authenticates_then_fixed_upgrade(self):
@@ -23,5 +26,9 @@ class SessionTests(unittest.TestCase):
  def test_active_transaction_rejects_transport_reconfiguration_and_reset(self):
   first=Transport();second=Transport();self.assertTrue(self.session.configure_transport(first));self.assertTrue(self.session.execute('cam','ssc30kq-imx335','upgrade'));before=dict(self.session.result);self.assertFalse(self.session.configure_transport(second));self.assertFalse(self.session.reset());self.assertTrue(self.executor.busy);self.assertEqual(self.executor.status['state'],'reboot-pending');self.assertEqual(self.session.result,before);self.assertEqual(second.calls,[])
  def test_invalid_post_reboot_host_fails_closed_without_probe(self):
-  t=Transport();self.session.configure_transport(t);self.assertTrue(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.devices.items[0]['host']='not-an-ip';self.assertFalse(self.session.verifyAfterReboot());self.assertEqual(self.session.result['state'],'error')
+  t=Transport();self.session.configure_transport(t);self.assertTrue(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.devices.items[0]['host']='not-an-ip';self.assertFalse(self.session.verifyAfterReboot());self.assertEqual(self.session.result['state'],'error');self.assertEqual(self.probe_calls,[]);self.assertEqual(self.candidate_calls,[])
+ def test_post_reboot_verification_uses_injected_network_boundaries(self):
+  evidence={'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':['OpenIPC status.cgi']}
+  self.session._probe_provider=lambda host:(self.probe_calls.append(host) or evidence)
+  t=Transport();self.session.configure_transport(t);self.assertTrue(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertTrue(self.session.verifyAfterReboot());self.assertEqual(self.probe_calls,['192.168.1.50']);self.assertEqual(self.candidate_calls,['192.168.1.50']);self.assertEqual(self.session.result['state'],'verified')
 if __name__=='__main__':unittest.main()
