@@ -66,8 +66,9 @@ class FirmwareExecutor(QObject):
   self._set('error',step='rediscover',error='Підтверджену OpenIPC не виявлено після перезапуску',verification={});self._release_lock();return False
  def acceptRediscoveredVerification(self,rediscovery,verification,nonce=None):
   if not self._locked_device or self._state.get('state')!='rediscovering' or nonce is not self._verification_nonce or not isinstance(rediscovery,dict) or rediscovery.get('rediscovered') is not True or not isinstance(verification,dict):return False
-  result=deepcopy(verification);result['rediscoveryAttempts']=rediscovery.get('attempts',0)
-  ok=result.get('ok') is True;self._set('verified' if ok else 'error',step='verify',verification=result,error='' if ok else 'Перевірка після операції не пройдена');self._release_lock();return ok
+  result=deepcopy(verification);result['rediscoveryAttempts']=rediscovery.get('attempts',0);identity=result.get('identity') or {};observed=str(identity.get('firmware') or '').strip()
+  ok=result.get('ok') is True and bool(observed);result['ok']=ok
+  self._set('verified' if ok else 'error',step='verify',verification=result,error='' if ok else 'Перевірка після операції не пройдена');self._release_lock();return ok
  @Slot()
  def reset(self):
   if self._locked_device:return False
