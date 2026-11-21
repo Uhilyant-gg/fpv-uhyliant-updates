@@ -16,6 +16,7 @@ def load_main_qml(engine,here,smoke,QUrl):
  source=path.read_text(encoding='utf-8')
  replacements={
   'import QtMultimedia\n':'',
+  'id:w;visible:true;visibility:Window.Maximized;':'id:w;visible:false;visibility:Window.Hidden;',
   'AudioOutput{id:audioOut;muted:true}':'QtObject{id:audioOut;property bool muted:true}',
   'MediaPlayer{id:player;videoOutput:videoOut;audioOutput:audioOut;onPlayingChanged:{if(playing){videoRecovery.stop();videoRecoveryCount=0;videoRuntime.markPlaying()}else if(videoRuntime.state==="playing"){videoRuntime.markStalled("Основний RTSP несподівано зупинився");videoRecovery.restart()}}onErrorOccurred:function(error,errorString){videoRuntime.playbackError(errorString);if(videoRuntime.streamId!=="")videoRecovery.restart()}}':'QtObject{id:player;property url source:"";readonly property int playbackState:0;function stop(){} function play(){}}',
   'MediaPlayer{id:secondaryPlayer;videoOutput:secondaryVideoOut;onPlayingChanged:{if(playing){secondaryRecovery.stop();secondaryRecoveryCount=0;secondaryVideoRuntime.markPlaying()}else if(pipEnabled&&secondaryVideoRuntime.state==="playing"){secondaryVideoRuntime.markStalled("Додатковий RTSP несподівано зупинився");secondaryRecovery.restart()}}onErrorOccurred:function(error,errorString){secondaryVideoRuntime.playbackError(errorString);if(pipEnabled&&secondaryVideoRuntime.streamId!=="")secondaryRecovery.restart()}}':'QtObject{id:secondaryPlayer;property url source:"";readonly property int playbackState:0;function stop(){} function play(){}}',
@@ -23,7 +24,7 @@ def load_main_qml(engine,here,smoke,QUrl):
   'VideoOutput{id:secondaryVideoOut;anchors.fill:parent;fillMode:VideoOutput.PreserveAspectFit}':'Item{id:secondaryVideoOut;anchors.fill:parent}',
  }
  for production,headless in replacements.items():
-  if source.count(production)!=1:raise RuntimeError('QML smoke multimedia boundary is out of sync with Main.qml')
+  if source.count(production)!=1:raise RuntimeError('QML smoke boundary is out of sync with Main.qml')
   source=source.replace(production,headless)
  if 'MediaPlayer.PlayingState' not in source:raise RuntimeError('QML smoke playback-state boundary is out of sync with Main.qml')
  source=source.replace('MediaPlayer.PlayingState','1')
@@ -73,10 +74,10 @@ def main():
  ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);load_main_qml(e,here,x.smoke_test,QUrl)
  def shutdown():credentials.clear();video.stopAll();links.clear();pairing.clearPending();m.shutdown();msp_serial.stop();crsf_serial.stop()
  if not e.rootObjects():shutdown();raise RuntimeError('QML root object failed to load')
- app.aboutToQuit.connect(shutdown);root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized)
+ app.aboutToQuit.connect(shutdown);root=e.rootObjects()[0]
  if x.smoke_test:
-  marker=x.smoke_marker or str(DATA/'smoke-test-ok.json');signal_smoke(marker);QTimer.singleShot(1500,lambda:os._exit(0))
- else:QTimer.singleShot(1200,lambda:signal_ok(x.startup_token))
+  marker=x.smoke_marker or str(DATA/'smoke-test-ok.json');signal_smoke(marker);os._exit(0)
+ QTimer.singleShot(0,root.showMaximized);QTimer.singleShot(1200,lambda:signal_ok(x.startup_token))
  return app.exec()
 if __name__=='__main__':
  try:raise SystemExit(main())
