@@ -3,7 +3,7 @@
 `main` is the single source of truth. Historical chat code must not replace newer repository code.
 
 ## Product priority
-Current priority is the complete OpenIPC camera lifecycle plus a reliable packaged Windows update path. UI polish is secondary.
+Current priority is the complete OpenIPC camera lifecycle plus a reliable packaged Windows update path. Before physical hardware E2E, add a small diagnostics/observability foundation so real-device failures can be captured precisely. UI polish is secondary.
 
 ## Discovery
 Discovery is route-aware and bounded. Saved, last-seen and manual IPv4 addresses are direct candidates. Public/default, loopback, multicast, link-local, oversized and known virtual-adapter routes are not swept. ICMP is not required. Generic reachability is not OpenIPC evidence. Platform, SoC, sensor, variant and firmware remain absent unless observed. Runtime OpenIPC probes use only a validated observed IPv4 plus fixed `/api/v1/config.json` and `/cgi-bin/status.cgi` paths; placeholder URLs are forbidden by regression tests.
@@ -21,6 +21,20 @@ Command dispatch means only `reboot-pending`. Post-reboot rediscovery first retr
 
 ## Application updater
 The signed test manifest and package SHA-256 remain mandatory. Installation is offered only when `--install-root` resolves to the complete installed launcher layout containing the update helper, launcher and `app/current/FPV-Uhyliant.exe`. Update helper staging, payload self-test, atomic current/rollback switching and startup acknowledgement remain fail-closed.
+
+## Diagnostics and observability
+Before physical OpenIPC E2E, add a deterministic local diagnostics layer with structured events and tri-state/health results that preserve unknown values. It should produce a sanitized diagnostic snapshot covering application/build identity, discovered devices and evidence, relevant network state, video/runtime state, protocol health, updater state, bounded recent errors/warnings and correlation/timestamp data. Secrets, credentials and private signing material must never be exported.
+
+Provide an explicit diagnostic bundle export suitable for offline inspection. AI-assisted diagnosis is a later layer over the same sanitized structured bundle, not a prerequisite for local diagnostics and never an authority for destructive actions. Any future AI integration must remain behind the existing safety boundaries; firmware flashing, sysupgrade, reset/erase, network reconfiguration and flight-controller parameter changes require the normal application approval/validation path.
+
+## Execution order
+1. Finish and verify the packaged Windows updater software path.
+2. Run a focused software audit rather than indefinite defensive hardening.
+3. Add the diagnostics/observability foundation and diagnostic bundle export.
+4. Run real OpenIPC hardware E2E with actual credentials and accepted SSH host key.
+5. Fix failures found from real hardware evidence and repeat E2E.
+6. Validate the integrated user journey from discovery through firmware selection/update/reboot/rediscovery/observed version.
+7. Perform the larger video-first UI/UX polish and release-readiness pass.
 
 ## Physical boundary
 Destructive OpenIPC transport remains disabled at application startup. Real end-to-end camera update still requires actual credentials, accepted SSH host key and explicit destructive hardware validation.
