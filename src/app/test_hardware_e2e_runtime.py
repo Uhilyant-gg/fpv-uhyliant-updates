@@ -8,9 +8,10 @@ class Signal:
 class Obj:
  def __init__(self):self.changed=Signal()
 class Diagnostics(Obj):
- def __init__(self):super().__init__()
+ def __init__(self):super().__init__();self.exports=[]
  def build(self):return {'network':{'evidence':{'summary':{'safeRoutes':1},'devices':[{'host':'192.168.1.50','reachable':True},{'host':'192.168.1.51','reachable':True}]}}}
  def export(self):return 'bundle.json'
+ def exportStage(self,label):self.exports.append(label);return label+'.json'
 class Credentials(Obj):
  def __init__(self):super().__init__();self.password=True
  def snapshot(self):return {'hasPassword':self.password}
@@ -23,7 +24,10 @@ class Tests(unittest.TestCase):
   devices=Devices();diagnostics=Diagnostics();credentials=Credentials();firmware=Firmware();return HardwareE2ERuntime(devices,diagnostics,credentials,firmware),devices,diagnostics,credentials,firmware
  def test_host_key_is_explicit_last_gate(self):
   r,_,_,_,_=self.make();self.assertFalse(r.readiness['ready']);self.assertIn('hostKeyAccepted',r.readiness['missing']);r.setHostKeyAccepted(True);self.assertTrue(r.readiness['ready'])
- def test_preflight_export_uses_sanitized_diagnostics_boundary(self):r,_,_,_,_=self.make();self.assertEqual(r.exportPreflight(),'bundle.json')
+ def test_preflight_export_uses_sanitized_staged_diagnostics_boundary(self):
+  r,_,diagnostics,_,_=self.make();self.assertEqual(r.exportPreflight(),'hardware-e2e-preflight.json');self.assertEqual(diagnostics.exports,['hardware-e2e-preflight']);self.assertEqual(r.captures['preflight'],'hardware-e2e-preflight.json')
+ def test_all_e2e_capture_stages_use_staged_diagnostics_boundary(self):
+  r,_,diagnostics,_,_=self.make();self.assertEqual(r.capture('post-update'),'hardware-e2e-post-update.json');self.assertEqual(r.capture('failure'),'hardware-e2e-failure.json');self.assertEqual(diagnostics.exports,['hardware-e2e-post-update','hardware-e2e-failure']);self.assertEqual(r.capture('other'),'')
  def test_host_key_confirmation_is_bound_to_selected_device_identity(self):
   r,devices,_,_,_=self.make();r.setHostKeyAccepted(True);self.assertTrue(r.hostKeyAccepted);devices._items[0]['host']='192.168.1.51';devices.changed.emit();self.assertFalse(r.hostKeyAccepted);self.assertFalse(r.readiness['ready'])
  def test_platform_or_sensor_change_invalidates_confirmation(self):
