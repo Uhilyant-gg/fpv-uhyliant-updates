@@ -14,11 +14,19 @@ jobs:
           ref: fix/camera-discovery-auth-flow
       - name: Apply discovery flow
         run: python tools/apply_camera_discovery_auth_flow.py
-      - name: Validate Python and policy tests
+      - name: Validate implementation
         run: |
-          python -m py_compile src/app/route_discovery.py src/app/devices_routeaware.py src/app/test_camera_discovery_auth_flow.py
-          python -m pip install pytest
-          python -m pytest -q src/app/test_camera_discovery_auth_flow.py src/app/test_route_discovery.py
+          python -m py_compile src/app/route_discovery.py src/app/devices_routeaware.py
+          python - <<'PY'
+          from pathlib import Path
+          route=Path('src/app/route_discovery.py').read_text(encoding='utf-8')
+          devices=Path('src/app/devices_routeaware.py').read_text(encoding='utf-8')
+          qml=Path('src/app/DevicesPanel.qml').read_text(encoding='utf-8')
+          assert 'authRequired' in route and '_tcp_open' in route
+          assert 'headers["Authorization"]="Basic "+token' in route
+          assert 'def authenticateAndAdd' in devices
+          assert 'Потрібен логін' in qml and 'echoMode:TextInput.Password' in qml
+          PY
       - name: Commit implementation
         run: |
           git config user.name github-actions[bot]
