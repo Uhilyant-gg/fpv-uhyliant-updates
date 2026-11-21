@@ -1,6 +1,6 @@
 import unittest
 from PySide6.QtCore import QObject, Signal
-from telemetry_provider import MavlinkProvider
+from telemetry_provider import MavlinkProvider, MspProvider
 
 
 class FakeRuntime(QObject):
@@ -22,6 +22,15 @@ class TelemetryProviderTests(unittest.TestCase):
         self.assertNotIn("unexpected", telemetry)
         self.assertTrue(provider.readOnly)
         self.assertTrue(provider.available)
+
+    def test_msp_uses_same_normalized_boundary(self):
+        provider = MspProvider(FakeRuntime())
+        telemetry = provider.telemetry
+        self.assertEqual(telemetry["provider"], "MSP")
+        self.assertEqual(telemetry["batteryVoltage"], 15.2)
+        self.assertIsNone(telemetry["hdop"])
+        self.assertNotIn("unexpected", telemetry)
+        self.assertTrue(provider.readOnly)
 
 
 if __name__ == "__main__":

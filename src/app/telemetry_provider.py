@@ -51,3 +51,10 @@ class TelemetryProvider(QObject):
 class MavlinkProvider(TelemetryProvider):
     def __init__(self, runtime):
         super().__init__("MAVLink", runtime)
+
+
+class MspProvider(TelemetryProvider):
+    """Normalized read-only provider for Betaflight/INAV MSP telemetry."""
+
+    def __init__(self, runtime):
+        super().__init__("MSP", runtime)
