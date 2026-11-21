@@ -12,10 +12,15 @@ class Tests(unittest.TestCase):
   d=self.device();d['openipcIdentity']={'verified':False};r=hardware_e2e_readiness(d,self.evidence(),True,True,self.firmware());self.assertIn('openipcVerified',r['missing']);self.assertIn('hardwareIdentityObserved',r['missing'])
  def test_unknown_reachability_fails_closed(self):
   e=self.evidence();e['devices'][0]['reachable']=None;r=hardware_e2e_readiness(self.device(),e,True,True,self.firmware());self.assertIn('deviceReachableObserved',r['missing'])
+ def test_non_private_or_unsafe_device_host_is_not_selected_for_destructive_e2e(self):
+  for host in ('8.8.8.8','127.0.0.1','169.254.1.2',''):
+   d=self.device();d['host']=host;e=self.evidence();e['devices']=[{'host':host,'reachable':True}];r=hardware_e2e_readiness(d,e,True,True,self.firmware());self.assertIn('deviceSelected',r['missing'])
+ def test_reachability_evidence_must_belong_to_selected_host(self):
+  e=self.evidence();e['devices']=[{'host':'192.168.1.51','reachable':True}];r=hardware_e2e_readiness(self.device(),e,True,True,self.firmware());self.assertIn('deviceReachableObserved',r['missing'])
  def test_artifact_requires_real_sha_and_positive_integer_size(self):
   for sha,size in (('short',1024),('a'*64,0),('a'*64,1.5)):
    fw=self.firmware();fw['artifact']['sha256']=sha;fw['artifact']['size']=size;r=hardware_e2e_readiness(self.device(),self.evidence(),True,True,fw);self.assertIn('firmwareArtifactVerified',r['missing'])
  def test_plan_approval_and_artifact_must_form_one_immutable_binding(self):
-  for section,key,value in (('plan','deviceId','other'),('approval','deviceId','other'),('plan','approvalToken','other'),('approval','approvalToken','other'),('plan','artifactSha256','b'*64),('approval','artifactSha256','b'*64),('plan','artifactSize',2048),('plan','mode','primary')):
+  for section,key,value in (('plan','deviceId','other'),('approval','deviceId','other'),('plan','approvalToken','other'),('approval','approvalToken','other'),('plan','artifactSha256','b'*64),('approval','artifactSha256','b'*64),('plan','artifactSize',2048),('plan','mode','primary'),('approval','ready',False)):
    fw=self.firmware();fw[section][key]=value;r=hardware_e2e_readiness(self.device(),self.evidence(),True,True,fw);self.assertIn('executionPlanReady',r['missing'])
 if __name__=='__main__':unittest.main()
