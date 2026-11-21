@@ -12,7 +12,7 @@ def load_state():
  except Exception:return {}
 def save_state(st):
  S.parent.mkdir(parents=True,exist_ok=True);tmp=S.with_suffix('.tmp');tmp.write_text(json.dumps(st),encoding='utf-8');os.replace(tmp,S)
-def valid_pending(st):return isinstance(st.get('current'),str) and bool(st['current']) and isinstance(st.get('packageSha256'),str) and bool(SHA_RE.fullmatch(st['packageSha256']))
+def valid_pending(st):return set(st)=={'current','pendingStartup','packageSha256','updatedAt'} and st.get('pendingStartup') is True and isinstance(st.get('current'),str) and bool(st['current']) and isinstance(st.get('packageSha256'),str) and bool(SHA_RE.fullmatch(st['packageSha256'])) and type(st.get('updatedAt')) is int and st['updatedAt']>0
 def run_current(token=None):
  exe=C/'FPV-Uhyliant.exe'
  if not exe.is_file():raise RuntimeError('current FPV-Uhyliant.exe missing')
