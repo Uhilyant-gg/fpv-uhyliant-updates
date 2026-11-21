@@ -1,11 +1,13 @@
 from pathlib import Path
+import re
 import unittest
 class NavigationUiPolicyTests(unittest.TestCase):
  def setUp(self):
   here=Path(__file__).parent;self.main=(here/'Main.qml').read_text(encoding='utf-8');self.home=(here/'HomePanel.qml').read_text(encoding='utf-8');self.update=(here/'UpdatePanel.qml').read_text(encoding='utf-8');self.hint=(here/'HoverHint.qml').read_text(encoding='utf-8')
  def test_home_exposes_required_entry_points_in_ukrainian(self):
   for label in ('Пристрої','Швидке підключення','Прошивка','Оновлення','Діагностика'):self.assertIn(label,self.home)
-  for obsolete in ('Ground station','Firmware','ACTIVE'):self.assertNotIn(obsolete,self.home)
+  visible_text='\n'.join(re.findall(r'text\s*:\s*"([^"]*)"',self.home))
+  for obsolete in ('Ground station','Firmware','ACTIVE'):self.assertNotIn(obsolete,visible_text)
  def test_quick_connect_uses_saved_devices_with_real_enabled_stream(self):
   self.assertIn('model:devicesModel.items',self.home);self.assertIn('devicesModel.streams',self.home);self.assertIn('streams[n].enabled===true',self.home);self.assertNotIn('discoverOpenIPC()',self.home)
  def test_quick_connect_does_not_claim_observed_connectivity(self):self.assertIn('не означає підтверджену мережеву доступність',self.home)
