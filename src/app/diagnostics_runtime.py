@@ -8,7 +8,7 @@ from devices import interfaces
 from route_discovery import system_routes
 class DiagnosticsRuntime(QObject):
  changed=Signal()
- def __init__(self,version,devices,links,telemetry,updater,events,data_dir,video=None):super().__init__();self.version=version;self.devices=devices;self.links=links;self.telemetry=telemetry;self.updater=updater;self.events=events;self.data_dir=Path(data_dir);self.video=video;self._last_remediation={}
+ def __init__(self,version,devices,links,telemetry,updater,events,data_dir,video=None):super().__init__();self.version=version;self.devices=devices;self.links=links;self.telemetry=telemetry;self.updater=updater;self.events=events;self.data_dir=Path(data_dir);self.video=video;self._last_remediation={};self._correlation_id=None
  def _devices(self):return deepcopy(getattr(self.devices,'_items',[]) or [])
  def _video(self):
   v=self.video
@@ -21,7 +21,7 @@ class DiagnosticsRuntime(QObject):
  def _network_health(self,network,video,devices,evidence):
   finding=classify_network(network,(video.get('primary') or {}).get('state'),bool(devices));finding['remediation']=remediation(finding.get('action'));finding['evidenceSummary']=deepcopy(evidence.get('summary',{}));return finding
  def build(self):
-  devices=self._devices();network=dict(self.links.snapshot);video=self._video();evidence=self._network_evidence(devices);network['evidence']=evidence;bundle=diagnostic_bundle(self.version,devices=devices,network=network,video=video,protocols={'active':self.telemetry.name,'available':self.telemetry.available,'error':self.telemetry.error,'telemetry':dict(self.telemetry.telemetry)},updater={'state':self.updater.updateState,'status':self.updater.updateStatus,'availableVersion':self.updater.availableVersion,'progress':self.updater.progress},events=self.events.snapshot());bundle['networkHealth']=self._network_health(network,video,devices,evidence);bundle['lastRemediation']=deepcopy(self._last_remediation);return bundle
+  devices=self._devices();network=dict(self.links.snapshot);video=self._video();evidence=self._network_evidence(devices);network['evidence']=evidence;bundle=diagnostic_bundle(self.version,devices=devices,network=network,video=video,protocols={'active':self.telemetry.name,'available':self.telemetry.available,'error':self.telemetry.error,'telemetry':dict(self.telemetry.telemetry)},updater={'state':self.updater.updateState,'status':self.updater.updateStatus,'availableVersion':self.updater.availableVersion,'progress':self.updater.progress},events=self.events.snapshot(),correlation_id=self._correlation_id);self._correlation_id=bundle['correlationId'];bundle['networkHealth']=self._network_health(network,video,devices,evidence);bundle['lastRemediation']=deepcopy(self._last_remediation);return bundle
  def _run_safe(self,action):
   if action=='rediscover' and hasattr(self.devices,'discoverOpenIPC'):self.devices.discoverOpenIPC();return True
   if action=='reconnect-video' and self.video is not None:
