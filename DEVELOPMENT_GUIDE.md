@@ -8,6 +8,9 @@ Windows ground station: Python + PySide6 + Qt Quick/QML. FPV remains video-first
 ## UI navigation
 Keep the product route explicit: Home exposes Devices, Quick Connect, Firmware, Update and Diagnostics; connecting a saved device enters FPV. Quick Connect may enable only saved devices with an actual enabled video stream, but configured stream existence is not evidence of network availability; FPV entry must still use the runtime endpoint check. Service Mode is a separate route for existing management and diagnostic surfaces. Quick Connect must not imply discovery, identity, trust or connectivity that was not observed. Service Mode must not add placeholder StabX, Starlink/WireGuard, pairing peer or hardware-adapter observations. Update UI must delegate to the existing guarded updater instead of bypassing its signature/hash/install gates. UI transitions that stop a decoder must also clear its `MediaPlayer.source`; do not leave a stopped runtime paired with a stale displayed/source binding.
 
+## Telemetry lifecycle
+Normalized telemetry is tri-state where the protocol observation can be absent. Provider/router fallback must expose every normalized field as unavailable (`None`), not synthesize `connected=false`, `health=unavailable`, numeric zero or another plausible value. Vehicle diagnostics may warn when connectivity is not confirmed, but must preserve whether `connected` was explicitly false or unknown and must leave missing telemetry health nullable.
+
 ## Video lifecycle
 Primary and secondary `VideoRuntime` instances are isolated. A single stream must not be prepared in both decoder roles simultaneously. Primary selection wins conflicts by stopping secondary first; secondary preparation rejects the current primary stream. Disabling PiP stops secondary only.
 
@@ -27,7 +30,7 @@ Destructive firmware execution requires prepared approval, unchanged SHA-256 and
 1. Run physical Windows dual-decoder/RTSP validation when target hardware is available.
 2. Connect real StabX and Starlink/WireGuard observers when observations/contracts are available.
 3. Validate firmware/preset executors on physical SSC30KQ / IMX335 targets.
-4. Add Authenticode only when real signing credentials are available.
+4. Add Authenticode only when signing credentials become available.
 
 ## Workflow
 Inspect actual `main`, test software/tooling paths, synchronize canonical docs after material changes, and never claim CI success without evidence.

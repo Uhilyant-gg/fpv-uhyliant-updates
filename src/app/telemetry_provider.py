@@ -8,6 +8,9 @@ NORMALIZED_FIELDS = (
     "rssi", "health", "ages", "link",
 )
 
+def unavailable_telemetry(provider=""):
+    telemetry={key:None for key in NORMALIZED_FIELDS};telemetry["provider"]=provider;return telemetry
+
 class TelemetryProvider(QObject):
     changed=Signal()
     def __init__(self,name,runtime):
@@ -22,7 +25,7 @@ class TelemetryProvider(QObject):
     @Property(str,notify=changed)
     def error(self):return str(self._runtime.error or "")
     @Property(bool,notify=changed)
-    def available(self):return bool(self.telemetry.get("connected"))
+    def available(self):return self.telemetry.get("connected") is True
 
 class MavlinkProvider(TelemetryProvider):
     def __init__(self,runtime):super().__init__("MAVLink",runtime)
@@ -47,7 +50,7 @@ class TelemetryRouter(QObject):
     def readOnly(self):return True
     @Property("QVariantMap",notify=changed)
     def telemetry(self):
-        provider=self._providers.get(self._active);return dict(provider.telemetry) if provider else {"provider":self._active,"connected":False,"health":"unavailable"}
+        provider=self._providers.get(self._active);return dict(provider.telemetry) if provider else unavailable_telemetry(self._active)
     @Property(str,notify=changed)
     def error(self):
         provider=self._providers.get(self._active);return provider.error if provider else ""

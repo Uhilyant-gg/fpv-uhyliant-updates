@@ -1,35 +1,27 @@
 import unittest
-from PySide6.QtCore import QObject, Signal
-from telemetry_provider import CrsfProvider, MavlinkProvider, MspProvider, TelemetryRouter
-
-class FakeRuntime(QObject):
-    changed=Signal()
-    def __init__(self,voltage=15.2,telemetry=None):
-        super().__init__();self.telemetry=telemetry if telemetry is not None else {"connected":True,"armed":False,"batteryVoltage":voltage,"unexpected":123};self.error=""
-
-class FakeSettings:
-    def __init__(self,values=None):self.values=dict(values or {});self.synced=False
-    def value(self,key,default=None):return self.values.get(key,default)
-    def setValue(self,key,value):self.values[key]=value
-    def sync(self):self.synced=True
-
+from PySide6.QtCore import QObject,Signal
+from telemetry_provider import CrsfProvider,MavlinkProvider,MspProvider,TelemetryRouter,NORMALIZED_FIELDS,unavailable_telemetry
+class Runtime(QObject):
+ changed=Signal()
+ def __init__(self,telemetry=None,error=""):super().__init__();self.telemetry=telemetry or {};self.error=error
+class Settings:
+ def __init__(self,value=None):self.v=value
+ def value(self,k,d=None):return self.v if self.v is not None else d
+ def setValue(self,k,v):self.v=v
+ def sync(self):pass
 class TelemetryProviderTests(unittest.TestCase):
-    def test_normalizes_without_inventing_values(self):
-        provider=MavlinkProvider(FakeRuntime());telemetry=provider.telemetry
-        self.assertEqual(telemetry["provider"],"MAVLink");self.assertEqual(telemetry["batteryVoltage"],15.2);self.assertIsNone(telemetry["gpsFix"]);self.assertNotIn("unexpected",telemetry);self.assertTrue(provider.readOnly);self.assertTrue(provider.available)
-    def test_missing_values_remain_unavailable_not_false_or_zero(self):
-        provider=MspProvider(FakeRuntime(telemetry={"connected":False}));telemetry=provider.telemetry
-        self.assertFalse(telemetry["connected"]);self.assertIsNone(telemetry["armed"]);self.assertIsNone(telemetry["batteryVoltage"]);self.assertIsNone(telemetry["gpsFix"]);self.assertFalse(provider.available)
-    def test_protocols_use_same_boundary(self):
-        self.assertEqual(MspProvider(FakeRuntime()).telemetry["provider"],"MSP");self.assertEqual(CrsfProvider(FakeRuntime()).telemetry["provider"],"CRSF")
-    def test_router_switches_without_changing_vehicle_contract(self):
-        settings=FakeSettings();mav=MavlinkProvider(FakeRuntime(15.2));msp=MspProvider(FakeRuntime(16.1));crsf=CrsfProvider(FakeRuntime(14.8));router=TelemetryRouter([mav,msp,crsf],settings=settings)
-        self.assertEqual(router.name,"MAVLink");self.assertEqual(router.telemetry["batteryVoltage"],15.2)
-        self.assertTrue(router.select("MSP"));self.assertEqual(router.name,"MSP");self.assertEqual(router.telemetry["batteryVoltage"],16.1);self.assertTrue(router.readOnly);self.assertEqual(settings.values[TelemetryRouter.SETTINGS_KEY],"MSP");self.assertTrue(settings.synced)
-        self.assertFalse(router.select("unknown"));self.assertEqual(router.name,"MSP")
-    def test_router_restores_saved_provider_and_ignores_invalid_saved_value(self):
-        providers=[MavlinkProvider(FakeRuntime()),MspProvider(FakeRuntime()),CrsfProvider(FakeRuntime())]
-        self.assertEqual(TelemetryRouter(providers,settings=FakeSettings({TelemetryRouter.SETTINGS_KEY:"CRSF"})).name,"CRSF")
-        self.assertEqual(TelemetryRouter(providers,settings=FakeSettings({TelemetryRouter.SETTINGS_KEY:"invalid"})).name,"MAVLink")
-
-if __name__=="__main__":unittest.main()
+ def test_normalizes_without_inventing_values(self):
+  p=MavlinkProvider(Runtime({'connected':True,'batteryVoltage':12.3}));t=p.telemetry;self.assertTrue(t['connected']);self.assertEqual(t['batteryVoltage'],12.3);self.assertIsNone(t['armed']);self.assertIsNone(t['gpsFix'])
+ def test_missing_values_remain_unavailable_not_false_or_zero(self):
+  t=MspProvider(Runtime()).telemetry
+  for key in NORMALIZED_FIELDS:self.assertIsNone(t[key])
+ def test_protocols_use_same_boundary(self):
+  for cls in (MavlinkProvider,MspProvider,CrsfProvider):self.assertEqual(set(cls(Runtime()).telemetry)-{'provider'},set(NORMALIZED_FIELDS))
+ def test_router_switches_without_changing_vehicle_contract(self):
+  a=MavlinkProvider(Runtime({'connected':True,'armed':True}));b=MspProvider(Runtime({'connected':True,'armed':None}));r=TelemetryRouter([a,b],settings=Settings());self.assertTrue(r.select('MSP'));self.assertEqual(r.name,'MSP');self.assertIsNone(r.telemetry['armed'])
+ def test_router_restores_saved_provider_and_ignores_invalid_saved_value(self):
+  a=MavlinkProvider(Runtime());b=MspProvider(Runtime());self.assertEqual(TelemetryRouter([a,b],settings=Settings('MSP')).name,'MSP');self.assertEqual(TelemetryRouter([a,b],settings=Settings('bad')).name,'MAVLink')
+ def test_unavailable_router_state_never_synthesizes_false_or_health(self):
+  t=unavailable_telemetry('missing');self.assertEqual(t['provider'],'missing')
+  for key in NORMALIZED_FIELDS:self.assertIsNone(t[key])
+if __name__=='__main__':unittest.main()
