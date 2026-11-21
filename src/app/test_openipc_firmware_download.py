@@ -29,6 +29,11 @@ class Tests(unittest.TestCase):
   data=b'firmware'
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
    service,center=self.selected_service(td,data,lambda *a,**k:Response(b'wrong'));self.assertFalse(service.downloadSelected('cam'));self.assertEqual(center.calls,[]);self.assertEqual(list(Path(td).glob('*.part')),[])
+ def test_corrupt_cache_is_discarded_and_replaced_only_by_verified_download(self):
+  data=b'firmware';calls=[]
+  with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
+   def opener(*a,**k):calls.append(1);return Response(data)
+   service,center=self.selected_service(td,data,opener);target=Path(td)/('openipc-'+hashlib.sha256(data).hexdigest()[:16]+'.tgz');target.write_bytes(b'corrupt');self.assertTrue(service.downloadSelected('cam'));self.assertEqual(target.read_bytes(),data);self.assertEqual(calls,[1]);self.assertEqual(len(center.calls),1);self.assertEqual(list(Path(td).glob('*.part')),[])
  def test_center_rejection_remains_fail_closed(self):
   data=b'firmware'
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
