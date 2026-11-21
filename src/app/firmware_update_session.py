@@ -1,10 +1,10 @@
 """Safe orchestration boundary for a complete OpenIPC update session."""
 from copy import deepcopy
-import ipaddress,threading,time
+import threading,time
 from PySide6.QtCore import QObject,Property,Signal,Slot
 from devices import interfaces
 from firmware_update_lifecycle import FirmwareUpdateLifecycle
-from firmware_rediscovery import FirmwareRediscovery
+from firmware_rediscovery import FirmwareRediscovery,_private_candidate
 from openipc_upgrade_transport import OpenIPCUpgradeAdapter
 from authenticated_camera_transport import AuthenticatedCameraTransport
 from route_discovery import fingerprint,plan_targets,system_routes
@@ -29,6 +29,7 @@ class FirmwareUpdateSession(QObject):
   if not isinstance(readiness,dict) or readiness.get('ready') is not True:return False
   if not isinstance(snapshot,dict) or not str(snapshot.get('username','')).strip() or snapshot.get('hasPassword') is not True:return False
   expected=(readiness.get('host'),readiness.get('platform'),readiness.get('sensor'))
+  if not _private_candidate(expected[0]) or not str(expected[1] or '').strip() or not str(expected[2] or '').strip():return False
   device=next((dict(d) for d in self.devices.items if d.get('active')),None)
   if device is None:return False
   identity=dict(device.get('openipcIdentity') or {})
@@ -55,9 +56,9 @@ class FirmwareUpdateSession(QObject):
   if not self._enabled:return False
   context=self.executor.verificationContext()
   if not context.get('ready'):return self._sync(False)
-  try:address=ipaddress.ip_address(context.get('host',''))
-  except ValueError:return self._sync(self.executor.failRediscovery())
-  if address.version!=4 or address.is_unspecified or address.is_loopback or address.is_multicast:return self._sync(self.executor.failRediscovery())
+  if not _private_candidate(context.get('host','')):return self._sync(self.executor.failRediscovery())
+  before=context.get('before') or {}
+  if not str(before.get('platform','')).strip() or not str(before.get('sensor','')).strip():return self._sync(self.executor.failRediscovery())
   rediscovery=FirmwareRediscovery(self._probe,sleep=self._sleep,candidates=self._rediscovery_candidates)
   lifecycle=FirmwareUpdateLifecycle(self.executor,rediscovery)
   ok=lifecycle.verify_after_reboot(self._rediscovery_attempts,self._rediscovery_interval);return self._sync(ok)

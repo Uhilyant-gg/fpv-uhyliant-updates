@@ -31,4 +31,12 @@ class Tests(unittest.TestCase):
   td,x,l=self.make(lambda host:{'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335'},'evidence':['OpenIPC status.cgi']})
   try:self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(x.status['state'],'error')
   finally:td.cleanup()
+ def test_non_private_original_host_fails_before_probe(self):
+  calls=[];td,x,l=self.make(lambda host:(calls.append(host) or {}));x._transaction['host']='8.8.8.8'
+  try:self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(x.status['state'],'error');self.assertEqual(calls,[])
+  finally:td.cleanup()
+ def test_missing_pre_update_hardware_identity_fails_before_rediscovery(self):
+  calls=[];td,x,l=self.make(lambda host:(calls.append(host) or {}));x._transaction['before']['sensor']=''
+  try:self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(x.status['state'],'error');self.assertEqual(calls,[])
+  finally:td.cleanup()
 if __name__=='__main__':unittest.main()

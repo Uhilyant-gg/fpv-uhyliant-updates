@@ -32,6 +32,8 @@ class SessionTests(unittest.TestCase):
   credentials=Credentials();self.assertFalse(self.session.enableAuthenticatedTransport(credentials));self.assertFalse(self.session.enableAuthenticatedTransport(credentials,Preflight(False)));self.assertFalse(self.session.result['enabled'])
  def test_preflight_identity_must_still_match_live_device(self):
   credentials=Credentials();self.assertFalse(self.session.enableAuthenticatedTransport(credentials,Preflight(host='192.168.1.99')));self.assertFalse(self.session.result['enabled']);self.devices.items[0]['openipcIdentity']['sensor']='imx415';self.assertFalse(self.session.enableAuthenticatedTransport(credentials,Preflight()));self.assertFalse(self.session.result['enabled'])
+ def test_preflight_rejects_non_private_or_incomplete_identity(self):
+  credentials=Credentials();self.devices.items[0]['host']='8.8.8.8';self.assertFalse(self.session.enableAuthenticatedTransport(credentials,Preflight(host='8.8.8.8')));self.devices.items[0]['host']='192.168.1.50';self.assertFalse(self.session.enableAuthenticatedTransport(credentials,Preflight(sensor='')))
  def test_disable_transport_returns_to_hardware_pending(self):
   self.assertTrue(self.session.configure_transport(Transport()));self.assertTrue(self.session.disableTransport());self.assertFalse(self.session.result['enabled']);self.assertEqual(self.session.result['state'],'hardware-validation-pending')
  def test_opt_in_transport_authenticates_then_fixed_upgrade(self):
