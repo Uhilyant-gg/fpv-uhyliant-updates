@@ -1,11 +1,17 @@
+import json
 import math
+import os
 import threading
 import time
 from collections import Counter, deque
+from datetime import datetime, timezone
+from pathlib import Path
 from PySide6.QtCore import QObject, Property, QSettings, QThread, Signal, Slot
 from pymavlink import mavutil
 
+DATA=Path(os.environ.get("LOCALAPPDATA",Path.home()))/"FPV-Uhyliant"
 DEFAULT_ENDPOINT="udpin:0.0.0.0:14550";HEARTBEAT_TIMEOUT=3.0
+PRESETS={"UDP Listen":"udpin:0.0.0.0:14550","UDP Out":"udpout:127.0.0.1:14550","TCP":"tcp:127.0.0.1:5760"}
 STALE_AFTER={"heartbeat":3.0,"battery":5.0,"gps":5.0,"position":3.0,"attitude":2.0,"radio":5.0,"home":30.0}
 GROUP_FIELDS={"heartbeat":("armed","flightMode"),"battery":("batteryVoltage","current","batteryRemaining"),"gps":("gpsFix","satellites","hdop"),"position":("altitude","groundSpeed","heading","homeDistance"),"attitude":("roll","pitch","yaw"),"radio":("rssi","rssiSource"),"home":()}
 
@@ -30,8 +36,8 @@ def _version(value):
 
 class MavlinkWorker(QThread):
  telemetry=Signal(object);failed=Signal(str)
- def __init__(self,endpoint,baud):
-  super().__init__();self.endpoint=endpoint;self.baud=baud;self._stop=threading.Event();self._master=None;self._data={};self._seen={};self._home=None;self._position=None;self._last_heartbeat=0.0;self._started=time.monotonic();self._received=0;self._bad=0;self._lost=0;self._last_seq={};self._types=Counter();self._window=deque();self._last_packet=0.0;self._vehicle=None
+ def __init__(self,endpoint,baud,target_system=0,target_component=0):
+  super().__init__();self.endpoint=endpoint;self.baud=baud;self.target_system=target_system;self.target_component=target_component;self._stop=threading.Event();self._master=None;self._data={};self._seen={};self._home=None;self._position=None;self._last_heartbeat=0.0;self._started=time.monotonic();self._received=0;self._bad=0;self._lost=0;self._last_seq={};self._types=Counter();self._window=deque();self._last_packet=0.0;self._vehicle=None
  def stop(self):
   self._stop.set()
   if self._master is not None:
@@ -48,16 +54,20 @@ class MavlinkWorker(QThread):
    seen=self._seen.get(group);age=None if seen is None else max(0.0,now-seen);ages[group]=age;fresh=age is not None and age<limit;out[group+"Fresh"]=fresh
    if not fresh:
     for field in GROUP_FIELDS[group]:out[field]=None
-  connected=self._last_heartbeat>0 and now-self._last_heartbeat<HEARTBEAT_TIMEOUT;out["connected"]=connected;out["heartbeat"]=connected;out["ages"]=ages;out["link"]=self._link(now)
+  connected=self._last_heartbeat>0 and now-self._last_heartbeat<HEARTBEAT_TIMEOUT;out["connected"]=connected;out["heartbeat"]=connected;out["ages"]=ages;out["link"]=self._link(now);out["health"]="connected" if connected else ("traffic-no-heartbeat" if self._last_packet and now-self._last_packet<3 else "disconnected")
   return out
  def _emit(self,group=None,**values):
   if group:self._touch(group)
   self._data.update(values);self.telemetry.emit(self._snapshot())
- def _accept_identity(self,msg):
+ def _candidate(self,msg):
   sysid,compid=msg.get_srcSystem(),msg.get_srcComponent()
-  if self._vehicle is None:
-   autopilot=getattr(msg,"autopilot",mavutil.mavlink.MAV_AUTOPILOT_INVALID)
-   if autopilot!=mavutil.mavlink.MAV_AUTOPILOT_INVALID:self._vehicle=(sysid,compid)
+  if self.target_system and sysid!=self.target_system:return False
+  if self.target_component and compid!=self.target_component:return False
+  return True
+ def _accept_identity(self,msg):
+  if not self._candidate(msg):return False
+  sysid,compid=msg.get_srcSystem(),msg.get_srcComponent();autopilot=getattr(msg,"autopilot",mavutil.mavlink.MAV_AUTOPILOT_INVALID)
+  if self._vehicle is None and autopilot!=mavutil.mavlink.MAV_AUTOPILOT_INVALID:self._vehicle=(sysid,compid)
   return self._vehicle==(sysid,compid)
  def _account(self,msg):
   now=time.monotonic();kind=msg.get_type();self._last_packet=now;self._window.append(now)
@@ -76,8 +86,7 @@ class MavlinkWorker(QThread):
    except Exception:mode="UNKNOWN"
    self._emit("heartbeat",armed=armed,flightMode=mode,systemId=msg.get_srcSystem(),componentId=msg.get_srcComponent(),vehicleType=_enum_name("MAV_TYPE_",msg.type),autopilotType=_enum_name("MAV_AUTOPILOT_",msg.autopilot),systemStatus=_enum_name("MAV_STATE_",msg.system_status),mavlinkVersion=int(msg.mavlink_version));return
   if self._vehicle and (msg.get_srcSystem(),msg.get_srcComponent())!=self._vehicle and kind!="RADIO_STATUS":self.telemetry.emit(self._snapshot());return
-  if kind=="AUTOPILOT_VERSION":
-   uid=int(getattr(msg,"uid",0));self._emit(flightSoftwareVersion=_version(getattr(msg,"flight_sw_version",0)),middlewareVersion=_version(getattr(msg,"middleware_sw_version",0)),osVersion=_version(getattr(msg,"os_sw_version",0)),boardVersion=int(getattr(msg,"board_version",0)),vendorId=int(getattr(msg,"vendor_id",0)),productId=int(getattr(msg,"product_id",0)),vehicleUid=str(uid) if uid else "",capabilities=int(getattr(msg,"capabilities",0)))
+  if kind=="AUTOPILOT_VERSION":self._emit(flightSoftwareVersion=_version(getattr(msg,"flight_sw_version",0)),middlewareVersion=_version(getattr(msg,"middleware_sw_version",0)),osVersion=_version(getattr(msg,"os_sw_version",0)),boardVersion=int(getattr(msg,"board_version",0)),vendorId=int(getattr(msg,"vendor_id",0)),productId=int(getattr(msg,"product_id",0)),vehicleUid=str(int(getattr(msg,"uid",0))) if getattr(msg,"uid",0) else "",capabilities=int(getattr(msg,"capabilities",0)))
   elif kind=="SYS_STATUS":self._emit("battery",batteryVoltage=_num(msg.voltage_battery,1000.0,65535),current=_num(msg.current_battery,100.0,-1),batteryRemaining=_num(msg.battery_remaining,1.0,-1),controllerLoad=_num(getattr(msg,"load",None),10.0,65535),communicationErrors=int(getattr(msg,"errors_comm",0)))
   elif kind=="BATTERY_STATUS":
    cells=getattr(msg,"voltages",None) or [];valid=[v for v in cells if 0<v<65535];voltage=sum(valid)/1000.0 if valid else self._data.get("batteryVoltage");self._emit("battery",batteryVoltage=voltage,current=_num(getattr(msg,"current_battery",None),100.0,-1),batteryRemaining=_num(getattr(msg,"battery_remaining",None),1.0,-1))
@@ -112,9 +121,9 @@ class MavlinkWorker(QThread):
    self._master=None
 
 class MavlinkRuntime(QObject):
- changed=Signal()
+ changed=Signal();notice=Signal(str)
  def __init__(self):
-  super().__init__();settings=QSettings("FPV-Uhyliant","FPV-Uhyliant");self._endpoint=str(settings.value("mavlink/endpoint",DEFAULT_ENDPOINT));self._baud=int(settings.value("mavlink/baud",115200));self._enabled=str(settings.value("mavlink/enabled","true")).lower() not in ("0","false");self._worker=None;self._error="";self._telemetry={"connected":False,"heartbeat":False,"link":{}};self._generation=0
+  super().__init__();settings=QSettings("FPV-Uhyliant","FPV-Uhyliant");self._endpoint=str(settings.value("mavlink/endpoint",DEFAULT_ENDPOINT));self._baud=int(settings.value("mavlink/baud",115200));self._enabled=str(settings.value("mavlink/enabled","true")).lower() not in ("0","false");self._target_system=int(settings.value("mavlink/system",0));self._target_component=int(settings.value("mavlink/component",0));self._worker=None;self._error="";self._telemetry={"connected":False,"heartbeat":False,"health":"disconnected","link":{}};self._generation=0
   if self._enabled:self.start()
  @Property(str,notify=changed)
  def endpoint(self):return self._endpoint
@@ -122,27 +131,38 @@ class MavlinkRuntime(QObject):
  def baud(self):return self._baud
  @Property(bool,notify=changed)
  def enabled(self):return self._enabled
+ @Property(int,notify=changed)
+ def targetSystem(self):return self._target_system
+ @Property(int,notify=changed)
+ def targetComponent(self):return self._target_component
+ @Property("QVariantList",constant=True)
+ def presets(self):return [{"name":k,"endpoint":v} for k,v in PRESETS.items()]
  @Property(bool,notify=changed)
  def running(self):return self._worker is not None and self._worker.isRunning()
  @Property(str,notify=changed)
  def error(self):return self._error
  @Property("QVariantMap",notify=changed)
  def telemetry(self):return self._telemetry
- @Slot(str,int,bool)
- def configure(self,endpoint,baud,enabled):
+ @Slot(str,int,bool,int,int)
+ def configure(self,endpoint,baud,enabled,target_system=0,target_component=0):
   endpoint=endpoint.strip()
   if not endpoint:self._error="MAVLink endpoint не може бути порожнім";self.changed.emit();return
-  self.stop();self._endpoint=endpoint;self._baud=max(1200,min(int(baud),4000000));self._enabled=bool(enabled);settings=QSettings("FPV-Uhyliant","FPV-Uhyliant");settings.setValue("mavlink/endpoint",self._endpoint);settings.setValue("mavlink/baud",self._baud);settings.setValue("mavlink/enabled",self._enabled);self._error="";self.changed.emit()
+  self.stop();self._endpoint=endpoint;self._baud=max(1200,min(int(baud),4000000));self._enabled=bool(enabled);self._target_system=max(0,min(int(target_system),255));self._target_component=max(0,min(int(target_component),255));settings=QSettings("FPV-Uhyliant","FPV-Uhyliant");settings.setValue("mavlink/endpoint",self._endpoint);settings.setValue("mavlink/baud",self._baud);settings.setValue("mavlink/enabled",self._enabled);settings.setValue("mavlink/system",self._target_system);settings.setValue("mavlink/component",self._target_component);self._error="";self.changed.emit()
   if self._enabled:self.start()
+ @Slot(str,result=str)
+ def applyPreset(self,name):return PRESETS.get(name,self._endpoint)
+ @Slot(result=str)
+ def exportReport(self):
+  DATA.mkdir(parents=True,exist_ok=True);stamp=datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%SZ");path=DATA/f"mavlink-diagnostics-{stamp}.json";safe={"generatedUtc":datetime.now(timezone.utc).isoformat(),"endpoint":self._endpoint,"baud":self._baud,"targetSystem":self._target_system,"targetComponent":self._target_component,"enabled":self._enabled,"backendError":self._error,"telemetry":self._telemetry};path.write_text(json.dumps(safe,ensure_ascii=False,indent=2),encoding="utf-8");self.notice.emit("Звіт MAVLink збережено: "+str(path));return str(path)
  @Slot()
  def start(self):
   if self._worker is not None:return
-  self._generation+=1;generation=self._generation;self._error="";worker=MavlinkWorker(self._endpoint,self._baud);self._worker=worker;worker.telemetry.connect(lambda values,g=generation:self._on_telemetry(g,values));worker.failed.connect(lambda error,g=generation:self._on_error(g,error));worker.finished.connect(lambda g=generation,w=worker:self._on_finished(g,w));worker.start();self.changed.emit()
+  self._generation+=1;generation=self._generation;self._error="";worker=MavlinkWorker(self._endpoint,self._baud,self._target_system,self._target_component);self._worker=worker;worker.telemetry.connect(lambda values,g=generation:self._on_telemetry(g,values));worker.failed.connect(lambda error,g=generation:self._on_error(g,error));worker.finished.connect(lambda g=generation,w=worker:self._on_finished(g,w));worker.start();self.changed.emit()
  @Slot()
  def stop(self):
   self._generation+=1;worker=self._worker;self._worker=None
   if worker is not None:worker.stop();worker.wait(1500)
-  self._telemetry={"connected":False,"heartbeat":False,"link":{}};self.changed.emit()
+  self._telemetry={"connected":False,"heartbeat":False,"health":"disconnected","link":{}};self.changed.emit()
  def _on_telemetry(self,generation,values):
   if generation!=self._generation:return
   self._telemetry=dict(values);self.changed.emit()
