@@ -22,9 +22,12 @@ def main():
  from PySide6 import QtMultimedia
  DATA.mkdir(parents=True,exist_ok=True);qtlog=DATA/'qt-startup.log'
  def qt_message(kind,context,message):
+  line=f'{time.strftime("%Y-%m-%d %H:%M:%S")} {int(kind)} {message}'
   try:
-   with qtlog.open('a',encoding='utf-8') as f:f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S")} {int(kind)} {message}\n')
+   with qtlog.open('a',encoding='utf-8') as f:f.write(line+'\n')
   except Exception:pass
+  # Keep Qt/QML diagnostics visible in GitHub Actions and terminal runs.
+  print(line,file=sys.stderr,flush=True)
  qInstallMessageHandler(qt_message)
  from backend import Station
  from devices import Devices
@@ -40,7 +43,11 @@ def main():
  icon=here/'fpv-uhyliant.ico'
  if icon.exists():app.setWindowIcon(QIcon(str(icon)))
  QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();v=VideoRuntime(d);telemetry=MavlinkProvider(m);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate);e.rootContext().setContextProperty('station',s);e.rootContext().setContextProperty('devicesModel',d);e.rootContext().setContextProperty('videoRuntime',v);e.rootContext().setContextProperty('mavlinkRuntime',m);e.rootContext().setContextProperty('vehicleRuntime',vehicle);e.rootContext().setContextProperty('updater',u);e.rootContext().setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
- if not e.rootObjects():raise RuntimeError('QML root object failed to load')
+ if not e.rootObjects():
+  try:
+   tail='\n'.join(qtlog.read_text(encoding='utf-8',errors='replace').splitlines()[-80:])
+  except Exception:tail='Qt startup log unavailable'
+  raise RuntimeError('QML root object failed to load\n'+tail)
  app.aboutToQuit.connect(m.shutdown);root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized)
  if x.smoke_test:
   marker=x.smoke_marker or str(DATA/'smoke-test-ok.json');signal_smoke(marker);QTimer.singleShot(1500,lambda:os._exit(0))
