@@ -11,20 +11,20 @@ Windows ground station: Python + PySide6 + Qt Quick/QML. Home -> Devices / Quick
 - Camera presets and video profiles are separate; video profiles belong to streams and are not applied by firmware flashing.
 - Generic ONVIF/name hints do not establish OpenIPC.
 - Primary, upgrade and recovery/fullflash are distinct. Recovery/fullflash is only for verified compatible existing custom OpenIPC.
-- Destructive writes require observed hardware/layout compatibility, verified image, recovery path, immutable approval, pre-handoff re-hash, operation lock, reboot/rediscovery and post-operation verification.
+- Destructive writes require observed hardware/layout compatibility, verified image, recovery path, immutable approval, pre-handoff re-hash, operation lock, reboot/rediscovery and observed post-operation verification.
 
 ## Current architecture
-Telemetry provider integration and serial MSP/CRSF foundations exist; hardware validation remains pending.
+Telemetry uses normalized providers behind `TelemetryRouter`; FPV consumes one vehicle contract. Real telemetry validation is `hardware-validation-pending`.
 
-OpenIPC verified identity persistence exists. Video diagnostics are stream-aware and may expose codec/resolution/FPS/latency-mode only from the stream's configured video profile. Endpoint connection timing may be reported as a network/reachability diagnostic but must not be labelled as glass-to-glass video latency.
+OpenIPC identity persistence and stream-aware RTSP diagnostics exist. Stream profile metadata may supply codec/resolution/FPS/latency-mode, while endpoint-connect timing is only a reachability diagnostic.
 
-Firmware Center has SSC30KQ / IMX335 compatibility, SHA-256 verification, immutable approval and guarded executor lifecycle. Hardware executor adapters remain disabled by default. Pure post-flash validation verifies observed rediscovery identity, OpenIPC evidence, platform/sensor, optional expected firmware and identity continuity. Real post-reboot acquisition is `hardware-validation-pending`.
+Firmware Center has SSC30KQ / IMX335 compatibility, SHA-256 verification, immutable approval and guarded executor lifecycle. Hardware adapters remain disabled by default. Executor captures pre-operation identity and verifies a structured observed post-reboot identity through the post-flash verifier before declaring success. Real device observation is `hardware-validation-pending`.
 
 Versioned camera presets are independent of per-stream video profiles.
 
 ## Next work
-1. Connect post-reboot observed identity from future supported adapters to executor verification.
-2. Continue main/sub switching and playback diagnostics; prepare secondary/thermal/PiP without synthesizing metadata.
+1. Add real hardware adapters only for explicitly validated mechanisms; never use generic fullflash fallback.
+2. Continue stream switching/playback diagnostics and secondary/thermal/PiP preparation without synthesizing metadata.
 3. Expand camera presets without coupling them to stream profiles.
 4. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
 5. Add encrypted DB export/import, station pairing and distribution hardening.
