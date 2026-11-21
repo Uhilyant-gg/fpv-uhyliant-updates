@@ -8,4 +8,8 @@ class Tests(unittest.TestCase):
   r=FirmwareRediscovery(lambda host:{'openipc':False,'identity':{}},lambda _:None).wait('192.168.1.50',2,0);self.assertFalse(r['rediscovered']);self.assertFalse(r['identity']['verified'])
  def test_caller_verified_flag_without_fresh_evidence_never_completes(self):
   r=FirmwareRediscovery(lambda host:{'openipc':True,'identity':{'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':[]},lambda _:None).wait('192.168.1.50',1,0);self.assertFalse(r['rediscovered']);self.assertFalse(r['identity']['verified'])
+ def test_unrecognized_majestic_text_is_not_fresh_probe_evidence(self):
+  r=FirmwareRediscovery(lambda host:{'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':['Majestic cached identity']},lambda _:None).wait('192.168.1.50',1,0);self.assertFalse(r['rediscovered']);self.assertFalse(r['identity']['verified'])
+ def test_status_endpoint_is_recognized_as_fresh_probe_evidence(self):
+  r=FirmwareRediscovery(lambda host:{'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':['OpenIPC status.cgi']},lambda _:None).wait('192.168.1.50',1,0);self.assertTrue(r['rediscovered']);self.assertTrue(r['identity']['verified'])
 if __name__=='__main__':unittest.main()

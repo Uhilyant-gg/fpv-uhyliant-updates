@@ -2,6 +2,8 @@
 import time
 from openipc_device import normalize_openipc_identity
 
+_FRESH_OPENIPC_EVIDENCE={'Majestic /api/v1/config.json','OpenIPC status.cgi'}
+
 class FirmwareRediscovery:
  def __init__(self,probe,sleep=time.sleep):self.probe=probe;self.sleep=sleep
  def wait(self,host,attempts=30,interval=2.0):
@@ -9,8 +11,9 @@ class FirmwareRediscovery:
   for index in range(attempts):
    result=self.probe(host)
    if result and result.get('openipc'):
-    payload=dict(result.get('identity') or {});payload['verified']=False
-    identity=normalize_openipc_identity(payload,result.get('evidence',[]))
+    evidence=list(result.get('evidence') or []);fresh_evidence=[item for item in evidence if item in _FRESH_OPENIPC_EVIDENCE]
+    payload=dict(result.get('identity') or {});payload['verified']=bool(fresh_evidence)
+    identity=normalize_openipc_identity(payload,fresh_evidence)
     if identity.get('verified'):return {'rediscovered':True,'attempts':index+1,'identity':identity}
    if index+1<attempts:self.sleep(interval)
   return {'rediscovered':False,'attempts':attempts,'identity':normalize_openipc_identity()}
