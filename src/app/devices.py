@@ -95,4 +95,36 @@ class Devices(QObject):
  def setStreamEnabled(self,sid,enabled):
   with self._connect() as d:d.execute('UPDATE streams SET enabled=? WHERE id=?',(int(bool(enabled)),sid))
   self._load();self.streamsChanged.emit()
+ @Slot(result='QVariantMap')
+ def exportSnapshot(self):
+  devices=[{k:x[k] for k in ('id','name','type','host','port','connection','notes')} for x in self._items]
+  identities=[{'device_id':x['id'],**dict(x.get('openipcIdentity') or {})} for x in self._items if (x.get('openipcIdentity') or {}).get('verified')]
+  return {'devices':devices,'streams':[dict(x) for x in self._streams],'videoProfiles':[],'openipcIdentities':identities,'activeDeviceId':self._active}
+ @Slot('QVariantMap',result=bool)
+ def validateSnapshot(self,value):
+  if not isinstance(value,dict) or set(value)!={'devices','streams','videoProfiles','openipcIdentities','activeDeviceId'}:return False
+  if not all(isinstance(value[k],list) for k in ('devices','streams','videoProfiles','openipcIdentities')) or not isinstance(value['activeDeviceId'],str):return False
+  ids=[]
+  for d in value['devices']:
+   if not isinstance(d,dict) or set(d)!={'id','name','type','host','port','connection','notes'} or not d.get('id') or not d.get('name') or not valid_host(str(d.get('host',''))):return False
+   ids.append(d['id'])
+  if len(ids)!=len(set(ids)) or (value['activeDeviceId'] and value['activeDeviceId'] not in ids):return False
+  stream_ids=[]
+  for s in value['streams']:
+   if not isinstance(s,dict) or s.get('device_id') not in ids or not s.get('id'):return False
+   stream_ids.append(s['id'])
+  if len(stream_ids)!=len(set(stream_ids)):return False
+  return not any(not isinstance(i,dict) or i.get('device_id') not in ids or i.get('verified') is not True for i in value['openipcIdentities'])
+ @Slot('QVariantMap',result=bool)
+ def restoreSnapshot(self,value):
+  if not self.validateSnapshot(value):return False
+  try:
+   with self._connect() as d:
+    d.execute('BEGIN IMMEDIATE');d.execute('DELETE FROM streams');d.execute('DELETE FROM devices')
+    for item in value['devices']:
+     active=int(item['id']==value['activeDeviceId']);identity=next((x for x in value['openipcIdentities'] if x.get('device_id')==item['id']),{})
+     d.execute('INSERT INTO devices(id,name,type,host,port,connection,notes,active,identity_json) VALUES(?,?,?,?,?,?,?,?,?)',(item['id'],item['name'],item['type'],item['host'],int(item['port']),item['connection'],item['notes'],active,json.dumps({k:v for k,v in identity.items() if k!='device_id'},ensure_ascii=False)))
+    for s in value['streams']:d.execute('INSERT INTO streams(id,device_id,name,kind,port,path,protocol,enabled) VALUES(?,?,?,?,?,?,?,?)',(s['id'],s['device_id'],s['name'],s['kind'],int(s['port']),s['path'],s['protocol'],int(bool(s.get('enabled')))))
+  except (sqlite3.Error,KeyError,TypeError,ValueError):return False
+  self._load();self.changed.emit();self.streamsChanged.emit();return True
  def snapshot(self):return {'devices':self._items,'streams':self._streams}
