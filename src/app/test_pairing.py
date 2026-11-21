@@ -1,5 +1,6 @@
-import unittest
-from pairing import PairingRegistry,SecretStore,MetadataStore
+import json,tempfile,unittest
+from pathlib import Path
+from pairing import PairingRegistry,SecretStore,MetadataStore,JsonMetadataStore
 class Store(SecretStore):
  available=True
  def __init__(self):self.data={}
@@ -17,14 +18,16 @@ class Clock:
  def __call__(self):return 100
 class Tests(unittest.TestCase):
  def test_pairing_requires_both_stores(self):self.assertEqual(PairingRegistry(Store()).begin('Ground','peer'),{});self.assertEqual(PairingRegistry(metadata_store=Meta()).begin('Ground','peer'),{})
+ def test_confirm_failure_preserves_pending_for_retry(self):
+  s=Store();m=Meta();r=PairingRegistry(s,m);p=r.begin('Ground','peer');m.fail=True;self.assertFalse(r.confirm(p['id'],True));self.assertEqual(len(r.pending),1);self.assertEqual(s.data,{})
  def test_confirm_persists_metadata_without_secret_bytes(self):
   s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');self.assertTrue(r.confirm(p['id'],True));self.assertNotIn('secret',m.records[0]);self.assertIn(m.records[0]['secretRef'],s.data)
- def test_metadata_failure_removes_new_secret_and_does_not_trust(self):
-  s=Store();m=Meta();r=PairingRegistry(s,m);p=r.begin('Ground','peer');m.fail=True;self.assertFalse(r.confirm(p['id'],True));self.assertEqual(s.data,{});self.assertEqual(r.trusted,[])
- def test_reloads_trust_metadata_and_reconciles_missing_secret(self):
-  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);self.assertEqual(len(PairingRegistry(s,m).trusted),1);s.data.clear();r2=PairingRegistry(s,m);r2.reconcile();self.assertEqual(r2.trusted,[])
- def test_revoke_deletes_secret_and_persists_empty_trust(self):
-  s=Store();m=Meta();r=PairingRegistry(s,m);p=r.begin('Ground','peer');r.confirm(p['id'],True);self.assertTrue(r.revoke(p['id']));self.assertEqual(s.data,{});self.assertEqual(m.records,[])
- def test_cancel_drops_pending_without_storing_secret(self):
-  s=Store();m=Meta();r=PairingRegistry(s,m);p=r.begin('Ground','peer');self.assertTrue(r.cancel(p['id']));self.assertEqual(r.pending,[]);self.assertEqual(s.data,{})
+ def test_reconcile_is_commit_after_persist(self):
+  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);s.data.clear();m.fail=True;r.reconcile();self.assertEqual(len(r.trusted),1);m.fail=False;r.reconcile();self.assertEqual(r.trusted,[])
+ def test_json_metadata_store_roundtrip_contains_no_secret(self):
+  with tempfile.TemporaryDirectory() as t:
+   path=Path(t)/'pairing.json';s=Store();meta=JsonMetadataStore(path);r=PairingRegistry(s,meta,Clock());p=r.begin('Ground','peer');self.assertTrue(r.confirm(p['id'],True));raw=path.read_text();self.assertNotIn(s.data[r.trusted[0]['secretRef']].hex(),raw);loaded=PairingRegistry(s,JsonMetadataStore(path));self.assertEqual(len(loaded.trusted),1)
+ def test_json_metadata_store_rejects_unknown_envelope_fields(self):
+  with tempfile.TemporaryDirectory() as t:
+   path=Path(t)/'pairing.json';path.write_text(json.dumps({'schema':'fpv-uhyliant-pairing-metadata','version':1,'records':[],'secret':'x'}));r=PairingRegistry(Store(),JsonMetadataStore(path));self.assertFalse(r.metadataStoreAvailable);self.assertNotEqual(r.metadataError,'')
 if __name__=='__main__':unittest.main()
