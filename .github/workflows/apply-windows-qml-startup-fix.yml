@@ -12,52 +12,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: fix/windows-qml-startup-null-callback
-      - name: Apply targeted startup fix
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path("src/app/main.py")
-          s = p.read_text(encoding="utf-8")
-          old_import = "from PySide6.QtCore import QUrl,QTimer,qInstallMessageHandler"
-          old_start = "harness.mark('qgui-application-begin');qInstallMessageHandler(qt_message);app=QGuiApplication(sys.argv);app.setApplicationName('FPV-Uhyliant');app.setApplicationVersion(VERSION);harness.mark('qgui-application-complete')"
-          new_start = "harness.mark('qgui-application-begin');app=QGuiApplication(sys.argv);app.setApplicationName('FPV-Uhyliant');app.setApplicationVersion(VERSION);harness.mark('qgui-application-complete')"
-          old_refs = "hardware_e2e=HardwareE2ERuntime(d,diag,credentials);harness.mark('application-objects-complete')"
-          new_refs = "hardware_e2e=HardwareE2ERuntime(d,diag,credentials);app._runtime_refs=(e,s,d,video,v,secondary,streams,fw,acquisition,fwexec,fwsession,credentials,presets,presetexec,links,backup,pairing,telemetry,vehicle,u,diag_events,diag,hardware_e2e,m,msp,crsf,msp_serial,crsf_serial);harness.mark('application-objects-complete')"
-          for pattern in (old_import, old_start, old_refs):
-              if pattern not in s:
-                  raise SystemExit("required startup pattern not found: " + pattern[:80])
-          s = s.replace(old_import, "from PySide6.QtCore import QUrl,QTimer", 1)
-          s = s.replace(old_start, new_start, 1)
-          s = s.replace(old_refs, new_refs, 1)
-          p.write_text(s, encoding="utf-8")
-          test = Path("src/app/test_windows_qml_startup_crash_policy.py")
-          test.write_text("""from pathlib import Path
-
-
-def _source():
-    return Path(__file__).with_name('main.py').read_text(encoding='utf-8')
-
-
-def test_no_python_qt_message_handler_during_qml_load():
-    assert 'qInstallMessageHandler' not in _source()
-
-
-def test_qml_runtime_objects_have_process_lifetime():
-    source = _source()
-    assert 'app._runtime_refs=' in source
-    refs = source.split('app._runtime_refs=', 1)[1]
-    for name in ('video', 'streams', 'telemetry', 'diag', 'hardware_e2e'):
-        assert name in refs
-""", encoding="utf-8")
-          PY
+      - name: Apply startup fix
+        run: python tools/apply_windows_qml_startup_fix.py
       - name: Validate patch
-        shell: bash
         run: |
           python -m py_compile src/app/main.py src/app/test_windows_qml_startup_crash_policy.py
           python -m pytest -q src/app/test_windows_qml_startup_crash_policy.py
       - name: Commit fix
-        shell: bash
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
