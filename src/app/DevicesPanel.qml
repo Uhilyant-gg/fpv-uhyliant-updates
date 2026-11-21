@@ -10,79 +10,40 @@ Item {
  function selectFound(item){selectedFound=item}
  Rectangle{anchors.fill:parent;color:"#08111b"}
  ColumnLayout{anchors.fill:parent;anchors.margins:20;spacing:14
-  RowLayout{Layout.fillWidth:true
-   ColumnLayout{spacing:3;Text{text:"Камери";color:fg;font.pixelSize:26;font.bold:true}Text{text:"Знайдіть і підключіть камеру без ручних мережевих налаштувань";color:muted;font.pixelSize:13}}
-   Item{Layout.fillWidth:true}Button{text:"Закрити";flat:true;onClicked:root.closeRequested();HoverHint{text:"Повернутися до попереднього екрана."}}
-  }
-  Rectangle{Layout.fillWidth:true;height:74;radius:16;color:raised
-   RowLayout{anchors.fill:parent;anchors.margins:12;spacing:10
-    Button{text:devicesModel.scanning?"Скасувати":"Знайти камери";font.bold:true;Layout.preferredHeight:44;onClicked:devicesModel.scanning?devicesModel.cancelDiscovery():devicesModel.discoverOpenIPC();HoverHint{text:devicesModel.scanning?"Зупинити поточний пошук.":"Автоматично перевірити доступні безпечні приватні мережі."}}
-    Button{text:"Вказати IP";flat:true;onClicked:manualPopup.open();HoverHint{text:"Перевірити камеру безпосередньо за IPv4-адресою."}}
-    Item{Layout.fillWidth:true}
-    ColumnLayout{visible:devicesModel.scanning||devicesModel.scanStatus!=="Готово";spacing:3;Text{text:devicesModel.scanStage;color:fg;horizontalAlignment:Text.AlignRight;Layout.fillWidth:true;font.pixelSize:12}ProgressBar{from:0;to:Math.max(1,devicesModel.scanTotal);value:devicesModel.scanDone;Layout.preferredWidth:230}Text{text:devicesModel.foundCount+" знайдено";color:muted;font.pixelSize:11;horizontalAlignment:Text.AlignRight;Layout.fillWidth:true}}
-   }
-  }
+  RowLayout{Layout.fillWidth:true;ColumnLayout{spacing:3;Text{text:"Камери";color:fg;font.pixelSize:26;font.bold:true}Text{text:"Знайдіть і підключіть камеру без ручних мережевих налаштувань";color:muted;font.pixelSize:13}}Item{Layout.fillWidth:true}Button{text:"Закрити";flat:true;onClicked:root.closeRequested()}}
+  Rectangle{Layout.fillWidth:true;height:74;radius:16;color:raised;RowLayout{anchors.fill:parent;anchors.margins:12;spacing:10
+   Button{text:devicesModel.scanning?"Скасувати":"Знайти камери";font.bold:true;Layout.preferredHeight:44;onClicked:devicesModel.scanning?devicesModel.cancelDiscovery():devicesModel.discoverOpenIPC()}
+   Button{text:"Вказати IP";flat:true;onClicked:manualPopup.open()}Item{Layout.fillWidth:true}
+   ColumnLayout{visible:devicesModel.scanning||devicesModel.scanStatus!=="Готово";spacing:3;Text{text:devicesModel.scanStage;color:fg;horizontalAlignment:Text.AlignRight;Layout.fillWidth:true;font.pixelSize:12}ProgressBar{from:0;to:Math.max(1,devicesModel.scanTotal);value:devicesModel.scanDone;Layout.preferredWidth:230}Text{text:devicesModel.foundCount+" знайдено";color:muted;font.pixelSize:11;horizontalAlignment:Text.AlignRight;Layout.fillWidth:true}}}}
   SplitView{Layout.fillWidth:true;Layout.fillHeight:true;orientation:Qt.Horizontal
-   Rectangle{SplitView.preferredWidth:310;SplitView.minimumWidth:250;color:surface;radius:16
-    ColumnLayout{anchors.fill:parent;anchors.margins:12;spacing:10
-     RowLayout{Layout.fillWidth:true;Text{text:"МОЇ КАМЕРИ";color:muted;font.bold:true;font.pixelSize:11;font.letterSpacing:1}Item{Layout.fillWidth:true}Text{text:devicesModel.count;color:muted}}
-     ListView{id:savedList;Layout.fillWidth:true;Layout.fillHeight:true;spacing:7;clip:true;model:devicesModel.items
-      delegate:Rectangle{required property var modelData;width:savedList.width;height:72;radius:12;color:selectedSaved&&selectedSaved.id===modelData.id?raised:"transparent";border.color:modelData.active?accent:"transparent"
-       MouseArea{anchors.fill:parent;onClicked:selectedSaved=modelData}
-       Column{anchors.fill:parent;anchors.margins:10;spacing:4;Text{text:modelData.name;color:fg;font.bold:true}Text{text:modelData.host;color:muted;font.pixelSize:12}Text{text:modelData.openipcIdentity.verified?"● OpenIPC підтверджено":"○ Ідентичність не підтверджена";color:modelData.openipcIdentity.verified?accent:muted;font.pixelSize:11}}
-      }
-     }
-     RowLayout{Layout.fillWidth:true;Button{text:"Зробити активною";Layout.fillWidth:true;enabled:selectedSaved!==null;onClicked:root.activateDevice(selectedSaved.id);HoverHint{text:"Вибрати цю збережену камеру як активну та синхронізувати FPV-потоки."}}Button{text:"⋯";enabled:selectedSaved!==null;onClicked:savedDetails.open();HoverHint{text:"Показати відомості про збережену камеру."}}}
-    }
-   }
+   Rectangle{SplitView.preferredWidth:310;SplitView.minimumWidth:250;color:surface;radius:16;ColumnLayout{anchors.fill:parent;anchors.margins:12;spacing:10
+    RowLayout{Layout.fillWidth:true;Text{text:"МОЇ КАМЕРИ";color:muted;font.bold:true;font.pixelSize:11}Item{Layout.fillWidth:true}Text{text:devicesModel.count;color:muted}}
+    ListView{id:savedList;Layout.fillWidth:true;Layout.fillHeight:true;spacing:7;clip:true;model:devicesModel.items;delegate:Rectangle{required property var modelData;width:savedList.width;height:72;radius:12;color:selectedSaved&&selectedSaved.id===modelData.id?raised:"transparent";border.color:modelData.active?accent:"transparent";MouseArea{anchors.fill:parent;onClicked:selectedSaved=modelData}Column{anchors.fill:parent;anchors.margins:10;spacing:4;Text{text:modelData.name;color:fg;font.bold:true}Text{text:modelData.host;color:muted;font.pixelSize:12}Text{text:modelData.openipcIdentity.verified?"● OpenIPC підтверджено":"○ Ідентичність не підтверджена";color:modelData.openipcIdentity.verified?accent:muted;font.pixelSize:11}}}}
+    RowLayout{Layout.fillWidth:true;Button{text:"Зробити активною";Layout.fillWidth:true;enabled:selectedSaved!==null;onClicked:root.activateDevice(selectedSaved.id)}Button{text:"⋯";enabled:selectedSaved!==null;onClicked:savedDetails.open()}}}}
    Item{SplitView.preferredWidth:12}
-   Rectangle{SplitView.fillWidth:true;color:surface;radius:16
-    ColumnLayout{anchors.fill:parent;anchors.margins:14;spacing:10
-     RowLayout{Layout.fillWidth:true;Text{text:"ЗНАЙДЕНІ";color:muted;font.bold:true;font.pixelSize:11;font.letterSpacing:1}Item{Layout.fillWidth:true}Text{text:devicesModel.discovered.length===0?"":"Оберіть камеру для продовження";color:muted;font.pixelSize:11}}
-     ListView{id:foundList;Layout.fillWidth:true;Layout.fillHeight:true;spacing:8;clip:true;model:devicesModel.discovered
-      delegate:Rectangle{required property var modelData;width:foundList.width;height:78;radius:13;color:selectedFound&&selectedFound.host===modelData.host?raised:"#0a141f";border.color:selectedFound&&selectedFound.host===modelData.host?blue:"transparent"
-       MouseArea{anchors.fill:parent;onClicked:root.selectFound(modelData)}
-       RowLayout{anchors.fill:parent;anchors.margins:12;spacing:12
-        Rectangle{width:39;height:39;radius:12;color:modelData.openipc?"#15392f":"#172334";Text{anchors.centerIn:parent;text:"●";color:modelData.openipc?accent:muted}}
-        ColumnLayout{Layout.fillWidth:true;spacing:3;Text{text:modelData.name;color:fg;font.bold:true;font.pixelSize:15}Text{text:modelData.host;color:muted;font.pixelSize:12}}
-        Rectangle{width:170;height:28;radius:14;color:modelData.openipc?"#15392f":"#202b38";Text{anchors.centerIn:parent;text:modelData.openipc?"OpenIPC підтверджено":(modelData.authRequired?"Потрібен логін":"Кандидат");color:modelData.openipc?accent:muted;font.pixelSize:11}}
-       }
-      }
-     }
-     ColumnLayout{visible:devicesModel.discovered.length===0&&!devicesModel.scanning;Layout.alignment:Qt.AlignHCenter|Qt.AlignVCenter;spacing:8;Text{text:"Нічого не знайдено";color:fg;font.pixelSize:18;font.bold:true;horizontalAlignment:Text.AlignHCenter;Layout.fillWidth:true}Text{text:"Запустіть пошук або вкажіть IP камери";color:muted;horizontalAlignment:Text.AlignHCenter;Layout.fillWidth:true}}
-     RowLayout{Layout.fillWidth:true
-      Button{text:"Додати камеру";font.bold:true;enabled:selectedFound!==null;onClicked:{if(selectedFound.openipc&&selectedFound.identityVerified){devicesModel.addDiscovered(selectedFound.host,selectedFound.name,true);selectedSaved=null}else{root.authHost=selectedFound.host;root.authName=selectedFound.name;authPopup.open()}}HoverHint{text:"Для захищеної камери логін і пароль запитуються лише під час додавання."}}
-      Button{text:"Відомості";flat:true;enabled:selectedFound!==null;onClicked:detailsPopup.open();HoverHint{text:"Показати отримані технічні відомості та підтвердження."}}
-      Item{Layout.fillWidth:true}
-      Text{visible:selectedFound!==null;text:selectedFound&&selectedFound.r2d2?"R2D2 підтверджено":"";color:accent;font.bold:true;font.pixelSize:11}
-     }
-    }
-   }
+   Rectangle{SplitView.fillWidth:true;color:surface;radius:16;ColumnLayout{anchors.fill:parent;anchors.margins:14;spacing:10
+    RowLayout{Layout.fillWidth:true;Text{text:"ЗНАЙДЕНІ";color:muted;font.bold:true;font.pixelSize:11}Item{Layout.fillWidth:true}Text{text:devicesModel.discovered.length===0?"":"Оберіть камеру для продовження";color:muted;font.pixelSize:11}}
+    ListView{id:foundList;Layout.fillWidth:true;Layout.fillHeight:true;spacing:8;clip:true;model:devicesModel.discovered;delegate:Rectangle{required property var modelData;width:foundList.width;height:78;radius:13;color:selectedFound&&selectedFound.host===modelData.host?raised:"#0a141f";MouseArea{anchors.fill:parent;onClicked:root.selectFound(modelData)}RowLayout{anchors.fill:parent;anchors.margins:12;Text{text:modelData.name+"  ·  "+modelData.host;color:fg;Layout.fillWidth:true}Text{text:modelData.openipc?"OpenIPC підтверджено":(modelData.authRequired?"Потрібен логін":"Кандидат");color:modelData.openipc?accent:muted}}}}
+    ColumnLayout{visible:devicesModel.discovered.length===0&&!devicesModel.scanning;Layout.alignment:Qt.AlignHCenter|Qt.AlignVCenter;Text{text:"Нічого не знайдено";color:fg;font.pixelSize:18;font.bold:true}Text{text:"Запустіть пошук або вкажіть IP камери";color:muted}}
+    RowLayout{Layout.fillWidth:true;Button{text:"Додати камеру";font.bold:true;enabled:selectedFound!==null;onClicked:{if(selectedFound.openipc&&selectedFound.identityVerified){var id=devicesModel.addDiscovered(selectedFound.host,selectedFound.name,true);if(id!==""){selectedSaved=null;selectedFound=null}}else{root.authHost=selectedFound.host;root.authName=selectedFound.name;authPopup.open()}}}Button{text:"Відомості";flat:true;enabled:selectedFound!==null;onClicked:detailsPopup.open()}Item{Layout.fillWidth:true}}}}
   }
  }
- Popup{id:manualPopup;anchors.centerIn:parent;width:Math.min(440,root.width-40);modal:true;padding:20;background:Rectangle{color:raised;radius:18;border.color:line}
+ Popup{id:manualPopup;anchors.centerIn:parent;width:Math.min(500,root.width-40);modal:true;padding:20;background:Rectangle{color:raised;radius:18;border.color:line}
   ColumnLayout{width:parent.width;spacing:13
    Text{text:"Вказати IP";color:fg;font.pixelSize:22;font.bold:true}Text{text:"Введіть адресу камери. Решту програма перевірить автоматично.";color:muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-   TextField{id:manualIp;Layout.fillWidth:true;placeholderText:"192.168.1.50";inputMethodHints:Qt.ImhFormattedNumbersOnly;HoverHint{text:"IPv4-адреса камери для прямої перевірки."}}
+   TextField{id:manualIp;Layout.fillWidth:true;placeholderText:"192.168.1.50";inputMethodHints:Qt.ImhFormattedNumbersOnly}
    Text{visible:devicesModel.manualBusy;text:"Перевіряємо камеру…";color:blue}
+   Text{visible:!devicesModel.manualBusy&&devicesModel.manualMessage!=="";text:devicesModel.manualMessage;color:devicesModel.manualStatus==="added"||devicesModel.manualStatus==="verified"?accent:muted;wrapMode:Text.WordWrap;Layout.fillWidth:true;font.bold:true}
    Text{visible:devicesModel.manualError!=="";text:devicesModel.manualError;color:danger;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-   Rectangle{visible:devicesModel.manualResult.openipc===true;Layout.fillWidth:true;height:66;radius:12;color:"#15392f";Column{anchors.fill:parent;anchors.margins:10;spacing:4;Text{text:"OpenIPC підтверджено";color:accent;font.bold:true}Text{text:value(devicesModel.manualResult.identity.platform)+" · "+value(devicesModel.manualResult.identity.sensor);color:fg}}}
-   RowLayout{Layout.fillWidth:true;Button{text:devicesModel.manualBusy?"Перевірка…":"Перевірити";enabled:!devicesModel.manualBusy;onClicked:devicesModel.inspectManualIp(manualIp.text);HoverHint{text:"Перевірити адресу через той самий fingerprint pipeline."}}Button{text:"Додати";enabled:devicesModel.manualResult.camera===true;onClicked:{if(devicesModel.manualResult.openipc&&devicesModel.manualResult.identityVerified){devicesModel.addDiscovered(devicesModel.manualResult.host,"OpenIPC "+devicesModel.manualResult.host,true);manualPopup.close()}else{root.authHost=devicesModel.manualResult.host;root.authName="Камера "+devicesModel.manualResult.host;manualPopup.close();authPopup.open()}}HoverHint{text:"Запросити доступ лише під час додавання захищеної камери."}}Item{Layout.fillWidth:true}Button{text:"Закрити";flat:true;onClicked:manualPopup.close()}}
+   Rectangle{visible:devicesModel.manualResult.openipc===true;Layout.fillWidth:true;height:104;radius:12;color:"#15392f";Column{anchors.fill:parent;anchors.margins:10;spacing:4;Text{text:"OpenIPC підтверджено";color:accent;font.bold:true}Text{text:"Platform / SoC: "+value(devicesModel.manualResult.identity.platform)+" / "+value(devicesModel.manualResult.identity.soc);color:fg}Text{text:"Sensor: "+value(devicesModel.manualResult.identity.sensor);color:fg}Text{text:"Firmware: "+value(devicesModel.manualResult.identity.firmware);color:fg}}}
+   RowLayout{Layout.fillWidth:true
+    Button{text:devicesModel.manualBusy?"Перевірка…":"Перевірити";enabled:!devicesModel.manualBusy;onClicked:devicesModel.inspectManualIp(manualIp.text)}
+    Button{text:devicesModel.manualStatus==="added"?"Додано":"Додати";enabled:!devicesModel.manualBusy&&devicesModel.manualStatus!=="added"&&devicesModel.manualResult.camera===true;onClicked:{if(devicesModel.manualResult.openipc&&devicesModel.manualResult.identityVerified){var id=devicesModel.addDiscovered(devicesModel.manualResult.host,"OpenIPC "+devicesModel.manualResult.host,true);if(id!=="")selectedSaved=null}else{root.authHost=devicesModel.manualResult.host;root.authName="Камера "+devicesModel.manualResult.host;manualPopup.close();authPopup.open()}}}
+    Item{Layout.fillWidth:true}Button{text:"Закрити";flat:true;onClicked:manualPopup.close()}
+   }
   }
  }
- Popup{id:authPopup;anchors.centerIn:parent;width:Math.min(440,root.width-40);modal:true;padding:20;background:Rectangle{color:raised;radius:18;border.color:line}
-  ColumnLayout{width:parent.width;spacing:12
-   Text{text:"Доступ до камери";color:fg;font.pixelSize:22;font.bold:true}Text{text:root.authHost;color:muted}
-   TextField{id:authUser;Layout.fillWidth:true;text:"root";placeholderText:"Логін"}
-   TextField{id:authPassword;Layout.fillWidth:true;placeholderText:"Пароль";echoMode:TextInput.Password}
-   Text{visible:devicesModel.manualError!=="";text:devicesModel.manualError;color:danger;wrapMode:Text.WordWrap;Layout.fillWidth:true}
-   RowLayout{Layout.fillWidth:true;Button{text:"Перевірити й додати";font.bold:true;onClicked:{var added=devicesModel.authenticateAndAdd(root.authHost,root.authName,authUser.text,authPassword.text);if(added!==""){authPassword.text="";authPopup.close();selectedFound=null}}}Item{Layout.fillWidth:true}Button{text:"Скасувати";flat:true;onClicked:{authPassword.text="";authPopup.close()}}}
-  }
- }
- Popup{id:detailsPopup;anchors.centerIn:parent;width:Math.min(540,root.width-40);modal:true;padding:20;background:Rectangle{color:raised;radius:18;border.color:line}
-  ColumnLayout{width:parent.width;spacing:9;Text{text:"Відомості про камеру";color:fg;font.pixelSize:21;font.bold:true}Text{text:"Адреса  "+(selectedFound?selectedFound.host:"");color:fg}Text{text:"OpenIPC  "+(selectedFound&&selectedFound.openipc?"підтверджено":"не підтверджено");color:selectedFound&&selectedFound.openipc?accent:muted}Text{text:"Платформа / SoC  "+value(selectedFound?selectedFound.identity.platform:"")+" / "+value(selectedFound?selectedFound.identity.soc:"");color:fg}Text{text:"Сенсор  "+value(selectedFound?selectedFound.identity.sensor:"");color:fg}Text{text:"Прошивка  "+value(selectedFound?selectedFound.identity.firmware:"");color:fg}Text{text:"Majestic  "+value(selectedFound?selectedFound.identity.majestic:"");color:fg}Text{text:"Підтвердження  "+(selectedFound?selectedFound.evidence.join("; "):"");color:muted;wrapMode:Text.WordWrap;Layout.fillWidth:true}Button{text:"Закрити";Layout.alignment:Qt.AlignRight;onClicked:detailsPopup.close()}}
- }
- Popup{id:savedDetails;anchors.centerIn:parent;width:Math.min(500,root.width-40);modal:true;padding:20;background:Rectangle{color:raised;radius:18;border.color:line}
-  ColumnLayout{width:parent.width;spacing:9;Text{text:selectedSaved?selectedSaved.name:"Камера";color:fg;font.pixelSize:21;font.bold:true}Text{text:selectedSaved?selectedSaved.host:"";color:muted}Text{text:selectedSaved&&selectedSaved.openipcIdentity.verified?"OpenIPC підтверджено":"OpenIPC не підтверджено";color:selectedSaved&&selectedSaved.openipcIdentity.verified?accent:muted}Text{visible:selectedSaved&&selectedSaved.openipcIdentity.verified;text:"Платформа / SoC  "+value(selectedSaved?selectedSaved.openipcIdentity.platform:"")+" / "+value(selectedSaved?selectedSaved.openipcIdentity.soc:"");color:fg}Text{visible:selectedSaved&&selectedSaved.openipcIdentity.verified;text:"Сенсор  "+value(selectedSaved?selectedSaved.openipcIdentity.sensor:"");color:fg}Button{text:"Закрити";Layout.alignment:Qt.AlignRight;onClicked:savedDetails.close()}}
- }
+ Popup{id:authPopup;anchors.centerIn:parent;width:Math.min(440,root.width-40);modal:true;padding:20;background:Rectangle{color:raised;radius:18;border.color:line};ColumnLayout{width:parent.width;spacing:12;Text{text:"Доступ до камери";color:fg;font.pixelSize:22;font.bold:true}Text{text:root.authHost;color:muted}TextField{id:authUser;Layout.fillWidth:true;text:"root";placeholderText:"Логін"}TextField{id:authPassword;Layout.fillWidth:true;placeholderText:"Пароль";echoMode:TextInput.Password}Text{visible:devicesModel.manualError!=="";text:devicesModel.manualError;color:danger;wrapMode:Text.WordWrap;Layout.fillWidth:true}RowLayout{Layout.fillWidth:true;Button{text:"Перевірити й додати";font.bold:true;onClicked:{var added=devicesModel.authenticateAndAdd(root.authHost,root.authName,authUser.text,authPassword.text);authPassword.text="";if(added!=="")authPopup.close()}}Item{Layout.fillWidth:true}Button{text:"Скасувати";flat:true;onClicked:{authPassword.text="";authPopup.close()}}}}}
+ Popup{id:detailsPopup;anchors.centerIn:parent;width:Math.min(540,root.width-40);modal:true;padding:20;background:Rectangle{color:raised;radius:18;border.color:line};ColumnLayout{width:parent.width;spacing:9;Text{text:"Відомості про камеру";color:fg;font.pixelSize:21;font.bold:true}Text{text:"Адреса  "+(selectedFound?selectedFound.host:"");color:fg}Text{text:"OpenIPC  "+(selectedFound&&selectedFound.openipc?"підтверджено":"не підтверджено");color:selectedFound&&selectedFound.openipc?accent:muted}Text{text:"Платформа / SoC  "+value(selectedFound?selectedFound.identity.platform:"")+" / "+value(selectedFound?selectedFound.identity.soc:"");color:fg}Text{text:"Сенсор  "+value(selectedFound?selectedFound.identity.sensor:"");color:fg}Text{text:"Прошивка  "+value(selectedFound?selectedFound.identity.firmware:"");color:fg}Button{text:"Закрити";Layout.alignment:Qt.AlignRight;onClicked:detailsPopup.close()}}}
+ Popup{id:savedDetails;anchors.centerIn:parent;width:Math.min(500,root.width-40);modal:true;padding:20;background:Rectangle{color:raised;radius:18;border.color:line};ColumnLayout{width:parent.width;spacing:9;Text{text:selectedSaved?selectedSaved.name:"Камера";color:fg;font.pixelSize:21;font.bold:true}Text{text:selectedSaved?selectedSaved.host:"";color:muted}Text{text:selectedSaved&&selectedSaved.openipcIdentity.verified?"OpenIPC підтверджено":"OpenIPC не підтверджено";color:selectedSaved&&selectedSaved.openipcIdentity.verified?accent:muted}Text{visible:selectedSaved&&selectedSaved.openipcIdentity.verified;text:"Платформа / SoC  "+value(selectedSaved?selectedSaved.openipcIdentity.platform:"")+" / "+value(selectedSaved?selectedSaved.openipcIdentity.soc:"");color:fg}Text{visible:selectedSaved&&selectedSaved.openipcIdentity.verified;text:"Сенсор  "+value(selectedSaved?selectedSaved.openipcIdentity.sensor:"");color:fg}Button{text:"Закрити";Layout.alignment:Qt.AlignRight;onClicked:savedDetails.close()}}}
 }
