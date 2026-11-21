@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from video import VideoRuntime
+from video import VideoRuntime,VideoWorkspaceRuntime
 class FakeDevices:
  streams=[{'id':'main','device_id':'cam','name':'Main','kind':'main','protocol':'rtsp','port':554,'path':'/stream=0','video_profile_id':'main-profile','enabled':True},{'id':'sub','device_id':'cam','name':'Sub','kind':'sub','protocol':'rtsp','port':554,'path':'/stream=1','video_profile_id':'sub-profile','enabled':True}]
  items=[{'id':'cam','host':'192.168.1.10'}]
@@ -11,4 +11,12 @@ class VideoRuntimeTests(unittest.TestCase):
   connection.return_value.__enter__.return_value=object();r=VideoRuntime(FakeDevices());self.assertTrue(r.prepare('main'));self.assertEqual(r.diagnostics['kind'],'main');self.assertEqual(r.diagnostics['codec'],'h265');self.assertEqual(r.diagnostics['width'],1920);self.assertEqual(r.diagnostics['fps'],60);self.assertIsNotNone(r.diagnostics['endpointCheckMs']);self.assertTrue(r.prepare('sub'));self.assertEqual(r.diagnostics['kind'],'sub');self.assertEqual(r.diagnostics['codec'],'h264')
  def test_missing_stream_is_unavailable_not_invented(self):
   r=VideoRuntime(FakeDevices());self.assertFalse(r.prepare('missing'));self.assertIsNone(r.diagnostics['streamId']);self.assertIsNone(r.diagnostics['codec']);self.assertIsNone(r.diagnostics['endpointCheckMs'])
+ @patch('video.socket.create_connection')
+ def test_primary_secondary_runtime_state_is_isolated(self,connection):
+  connection.return_value.__enter__.return_value=object();w=VideoWorkspaceRuntime(FakeDevices());w.setPipEnabled(True);self.assertTrue(w.preparePrimary('main'));self.assertTrue(w.prepareSecondary('sub'));w.primary.playbackError('primary only');self.assertEqual(w.primary.state,'error');self.assertEqual(w.secondary.state,'ready');self.assertEqual(w.secondary.streamId,'sub')
+ @patch('video.socket.create_connection')
+ def test_pip_off_stops_secondary_only(self,connection):
+  connection.return_value.__enter__.return_value=object();w=VideoWorkspaceRuntime(FakeDevices());w.setPipEnabled(True);w.preparePrimary('main');w.prepareSecondary('sub');w.setPipEnabled(False);self.assertEqual(w.secondary.state,'stopped');self.assertEqual(w.secondary.streamId,'');self.assertEqual(w.primary.streamId,'main')
+ def test_secondary_cannot_prepare_while_pip_off(self):
+  w=VideoWorkspaceRuntime(FakeDevices());self.assertFalse(w.prepareSecondary('sub'));self.assertEqual(w.secondary.state,'stopped')
 if __name__=='__main__':unittest.main()

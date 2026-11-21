@@ -1,6 +1,7 @@
 import socket,time
 from datetime import datetime, timezone
 from PySide6.QtCore import QObject, Property, Signal, Slot
+
 class VideoRuntime(QObject):
  changed=Signal();notice=Signal(str)
  def __init__(self,devices):super().__init__();self.devices=devices;self._state='stopped';self._error='';self._stream_id='';self._url='';self._host='';self._port=0;self._attempts=0;self._last_event='';self._stream={};self._check_ms=None
@@ -23,6 +24,7 @@ class VideoRuntime(QObject):
   p=next((p for p in self.devices.videoProfiles if p.get('id')==self._stream.get('video_profile_id')),{}) if self._stream else {}
   return {'state':self._state,'error':self._error or None,'streamId':self._stream_id or None,'streamName':self._stream.get('name'),'kind':self._stream.get('kind'),'protocol':self._stream.get('protocol'),'host':self._host or None,'port':self._port or None,'path':self._stream.get('path'),'codec':p.get('codec'),'width':p.get('width'),'height':p.get('height'),'fps':p.get('fps'),'latencyMode':p.get('latency_mode'),'endpointCheckMs':self._check_ms,'attempts':self._attempts,'lastEvent':self._last_event or None}
  def _set(self,state,error=''):self._state=state;self._error=error;self._last_event=datetime.now(timezone.utc).isoformat();self.changed.emit()
+ def _clear_selection(self):self._stream_id='';self._url='';self._host='';self._port=0;self._attempts=0;self._stream={};self._check_ms=None
  def _check_endpoint(self):
   start=time.monotonic()
   try:
@@ -32,10 +34,10 @@ class VideoRuntime(QObject):
  @Slot(str,result=bool)
  def prepare(self,stream_id):
   stream=next((s for s in self.devices.streams if s['id']==stream_id and s.get('enabled')),None)
-  if not stream:self._stream={};self._set('error','Відеопотік не знайдено або вимкнений');return False
+  if not stream:self._clear_selection();self._set('error','Відеопотік не знайдено або вимкнений');return False
   device=next((d for d in self.devices.items if d['id']==stream['device_id']),None)
-  if not device:self._stream={};self._set('error','Камеру для відеопотоку не знайдено');return False
-  if stream['protocol'].lower()!='rtsp':self._stream=dict(stream);self._set('error','Поточний runtime підтримує лише RTSP');return False
+  if not device:self._clear_selection();self._set('error','Камеру для відеопотоку не знайдено');return False
+  if stream['protocol'].lower()!='rtsp':self._clear_selection();self._stream=dict(stream);self._set('error','Поточний runtime підтримує лише RTSP');return False
   self._stream=dict(stream);self._host=device['host'];self._port=int(stream['port']);path=stream['path'] if stream['path'].startswith('/') else '/'+stream['path'];self._stream['path']=path;self._stream_id=stream_id;self._url=f'rtsp://{self._host}:{self._port}{path}';self._attempts=1;self._set('checking')
   if not self._check_endpoint():return False
   self._set('ready');return True
@@ -53,4 +55,27 @@ class VideoRuntime(QObject):
  @Slot(str)
  def markStalled(self,message=''):self._set('stalled',message or 'RTSP-потік зупинився або перестав віддавати кадри')
  @Slot()
- def stop(self):self._stream_id='';self._url='';self._host='';self._port=0;self._attempts=0;self._stream={};self._check_ms=None;self._set('stopped')
+ def stop(self):self._clear_selection();self._set('stopped')
+
+class VideoWorkspaceRuntime(QObject):
+ """Owns two isolated runtimes and enforces PiP decoder lifecycle."""
+ changed=Signal()
+ def __init__(self,devices):super().__init__();self.primary=VideoRuntime(devices);self.secondary=VideoRuntime(devices);self._pip=False
+ @Property(bool,notify=changed)
+ def pipEnabled(self):return self._pip
+ @Slot(str,result=bool)
+ def preparePrimary(self,stream_id):return self.primary.prepare(stream_id)
+ @Slot(str,result=bool)
+ def prepareSecondary(self,stream_id):
+  if not self._pip:return False
+  return self.secondary.prepare(stream_id)
+ @Slot(bool)
+ def setPipEnabled(self,enabled):
+  enabled=bool(enabled)
+  if self._pip==enabled:return
+  self._pip=enabled
+  if not enabled:self.secondary.stop()
+  self.changed.emit()
+ @Slot()
+ def stopAll(self):
+  self._pip=False;self.primary.stop();self.secondary.stop();self.changed.emit()

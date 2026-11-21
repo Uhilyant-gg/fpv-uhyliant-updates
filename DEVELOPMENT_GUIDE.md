@@ -17,16 +17,17 @@ Telemetry provider integration and MSP/CRSF serial foundations exist; hardware v
 
 Firmware Center and guarded executor lifecycle reach the real-hardware boundary. No adapter is enabled by default. Post-flash identity can be verified from a structured observation, but acquiring real observations is `hardware-validation-pending`.
 
-Video now has a `StreamWorkspace` above playback. It chooses only real persisted enabled streams, supports primary/secondary selection and swapping, and only reports PiP available with two distinct real streams. Playback remains a single active `VideoRuntime`; secondary simultaneous decoding/rendering is not yet implemented. Stream diagnostics can show associated profile codec/resolution/FPS/latency-mode and endpoint reachability timing.
+Video uses `StreamWorkspace` for real persisted selection and `VideoWorkspaceRuntime` for lifecycle. The runtime owns isolated primary/secondary `VideoRuntime` objects. QML binds them to independent `MediaPlayer`/`VideoOutput` pairs. PiP is permitted only when primary and secondary are distinct real streams. PiP off stops the secondary decoder/runtime; disconnect stops both; swap restarts playback using only the selected persisted stream IDs.
+
+Playback health must remain observational: Qt playing/stopped/error signals plus runtime reconnect/stall transitions, attempts and last-event timestamps are allowed. Do not invent decoded FPS, dropped frames, glass-to-glass latency or other values Qt/runtime did not provide. Profile metadata is configuration metadata, and endpoint check time is reachability only.
 
 Versioned camera presets remain independent from video profiles.
 
 ## Next work
-1. Add a secondary playback runtime/render path and PiP state without compromising main-video workspace priority.
-2. Add playback-health/frame-stall instrumentation supported by Qt observations; do not infer glass-to-glass latency.
-3. Expand camera presets independently.
-4. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
-5. Add encrypted DB export/import, station pairing and distribution hardening.
+1. Validate simultaneous decoder/render and recovery behavior on target Windows hardware (`hardware-validation-pending`).
+2. Expand camera presets independently.
+3. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
+4. Add encrypted DB export/import, station pairing and distribution hardening.
 
 ## Workflow
 Inspect actual `main`, test software paths, mark hardware-only validation `hardware-validation-pending`, synchronize canonical docs after material changes and never claim CI/write success without evidence.
