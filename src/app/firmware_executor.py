@@ -24,11 +24,12 @@ class FirmwareExecutor(QObject):
    return bool(a.get('sha256') and h.hexdigest()==a['sha256'])
   except OSError:return False
  def _approved_handoff(self,device_id,profile,mode):
-  plan=deepcopy(self.center.executionPlan);artifact=deepcopy(self.center.artifact)
+  plan=deepcopy(self.center.executionPlan);artifact=deepcopy(self.center.artifact);approval=deepcopy(self.center.result)
   if not plan.get('ready') or not self.center.approvalMatches(device_id,profile,mode):return None
-  if plan.get('deviceId')!=device_id or plan.get('profile')!=profile or plan.get('mode')!=mode:return None
+  if approval.get('deviceId')!=device_id or approval.get('profile')!=profile or approval.get('mode')!=mode:return None
+  if plan.get('approvalToken')!=approval.get('approvalToken') or not plan.get('approvalToken'):return None
   if not self._rehash():return None
-  return {'deviceId':device_id,'profile':profile,'mode':mode,'artifact':artifact,'plan':plan}
+  return {'deviceId':device_id,'profile':profile,'mode':mode,'artifact':artifact,'plan':plan,'approval':approval}
  @Slot(str,str,str,result=bool)
  def execute(self,device_id,profile,mode):
   if self._locked_device:self._set('blocked',error='Інша firmware operation вже активна');return False
