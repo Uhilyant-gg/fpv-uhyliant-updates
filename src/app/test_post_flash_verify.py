@@ -13,4 +13,8 @@ class PostFlashVerifyTests(unittest.TestCase):
   observed={'verified':True,'platform':'ssc30kq','sensor':'imx335','evidence':['OpenIPC status.cgi']};r=verify_post_flash(self.before,observed,self.profile,'');self.assertFalse(r['ok']);self.assertFalse(next(c for c in r['checks'] if c['name']=='firmware')['ok'])
  def test_missing_before_identity_cannot_establish_continuity(self):
   observed={'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'new','evidence':['OpenIPC status.cgi']};self.assertFalse(verify_post_flash({},observed,self.profile)['ok'])
+ def test_partial_before_identity_cannot_establish_continuity(self):
+  observed={'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'new','evidence':['OpenIPC status.cgi']}
+  for before in ({'platform':'ssc30kq'},{'sensor':'imx335'}):
+   r=verify_post_flash(before,observed,self.profile);self.assertFalse(r['ok']);self.assertFalse(next(c for c in r['checks'] if c['name']=='identity-continuity')['ok'])
 if __name__=='__main__':unittest.main()
