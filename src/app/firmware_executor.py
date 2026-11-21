@@ -5,7 +5,7 @@ from PySide6.QtCore import QObject,Property,Signal,Slot
 from firmware_center import SUPPORTED_PROFILES
 class FirmwareExecutor(QObject):
  changed=Signal()
- def __init__(self,firmware_center):super().__init__();self.center=firmware_center;self._adapter=None;self._locked_device='';self._before={};self._handoff={};self._state=self._idle()
+ def __init__(self,firmware_center):super().__init__();self.center=firmware_center;self._adapter=None;self._locked_device='';self._before={};self._handoff={};self._verification_nonce=None;self._state=self._idle()
  def _idle(self):return {'state':'idle','deviceId':'','profile':'','mode':'','step':'','error':'','verification':{},'hardwareValidation':'hardware-validation-pending'}
  @Property('QVariantMap',notify=changed)
  def status(self):return deepcopy(self._state)
@@ -16,7 +16,7 @@ class FirmwareExecutor(QObject):
   self._adapter=adapter;return True
  def _device(self,did):return next((d for d in self.center.devices.items if d.get('id')==did),None)
  def _set(self,state,**extra):self._state={**self._state,'state':state,**extra};self.changed.emit()
- def _release_lock(self):self._locked_device='';self.changed.emit()
+ def _release_lock(self):self._locked_device='';self._verification_nonce=None;self.changed.emit()
  def _rehash(self,artifact):
   try:
    h=hashlib.sha256();size=0
@@ -60,15 +60,16 @@ class FirmwareExecutor(QObject):
   if not self._locked_device or self._state.get('state')!='reboot-pending' or not self._handoff:return None
   context=self.verificationContext()
   if not context.get('ready'):return None
-  self._set('rediscovering',step='rediscover',error='');return context
- def failRediscovery(self):
+  self._verification_nonce=object();self._set('rediscovering',step='rediscover',error='');return context,self._verification_nonce
+ def failRediscovery(self,nonce=None):
   if not self._locked_device or self._state.get('state') not in ('reboot-pending','rediscovering'):return False
+  if self._state.get('state')=='rediscovering' and nonce is not self._verification_nonce:return False
   self._set('error',step='rediscover',error='Підтверджену OpenIPC не виявлено після перезапуску',verification={});self._release_lock();return False
- def acceptRediscoveredVerification(self,rediscovery,verification):
-  if not self._locked_device or self._state.get('state')!='rediscovering' or not isinstance(rediscovery,dict) or rediscovery.get('rediscovered') is not True or not isinstance(verification,dict):return False
+ def acceptRediscoveredVerification(self,rediscovery,verification,nonce=None):
+  if not self._locked_device or self._state.get('state')!='rediscovering' or nonce is not self._verification_nonce or not isinstance(rediscovery,dict) or rediscovery.get('rediscovered') is not True or not isinstance(verification,dict):return False
   result=deepcopy(verification);result['rediscoveryAttempts']=rediscovery.get('attempts',0)
   ok=result.get('ok') is True;self._set('verified' if ok else 'error',step='verify',verification=result,error='' if ok else 'Перевірка після операції не пройдена');self._release_lock();return ok
  @Slot()
  def reset(self):
   if self._locked_device:return False
-  self._before={};self._handoff={};self._state=self._idle();self.changed.emit();return True
+  self._before={};self._handoff={};self._verification_nonce=None;self._state=self._idle();self.changed.emit();return True
