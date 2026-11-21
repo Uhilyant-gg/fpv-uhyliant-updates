@@ -19,5 +19,8 @@ class DevicesPersistenceTests(unittest.TestCase):
         model=devices_module.Devices();model._discovered=[{"host":"192.168.1.30","name":"OpenIPC camera","openipc":True,"evidence":["Majestic /api/v1/config.json"],"identity":{"platform":"ssc30kq","sensor":"imx335","firmware":"2.4"}}]
         device_id=model.addDiscovered("192.168.1.30","OpenIPC camera",True);self.assertTrue(device_id)
         reloaded=devices_module.Devices();item=next(i for i in reloaded.items if i["id"]==device_id);self.assertTrue(item["openipcIdentity"]["verified"]);self.assertEqual(item["openipcIdentity"]["platform"],"ssc30kq");self.assertEqual(item["openipcIdentity"]["sensor"],"imx335")
+    def test_snapshot_preserves_separate_entities_and_validates_references(self):
+        model=devices_module.Devices();device_id=model.addDevice('Camera','Camera','192.168.1.40',80,'Network','');model.setActive(device_id);snapshot=model.exportSnapshot();self.assertTrue(model.validateSnapshot(snapshot));self.assertEqual(snapshot['activeDeviceId'],device_id);self.assertIn('videoProfiles',snapshot);self.assertIn('openipcIdentities',snapshot)
+        bad=dict(snapshot);bad['activeDeviceId']='missing';self.assertFalse(model.validateSnapshot(bad))
 
 if __name__=="__main__":unittest.main()

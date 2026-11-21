@@ -198,6 +198,24 @@ class Devices(QObject):
  def activeStreams(self):return [s for s in self._streams if s["device_id"]==self._active_id]
  @Property("QVariantList",notify=profilesChanged)
  def videoProfiles(self):return self._profiles
+ @Slot(result='QVariantMap')
+ def exportSnapshot(self):
+  identities=[]
+  for i in self._items:
+   identity=i.get('openipcIdentity') or {}
+   if identity.get('verified'):identities.append({'device_id':i['id'],**identity})
+  devices=[{k:i[k] for k in ('id','name','type','host','port','connection','notes')} for i in self._items]
+  return {'devices':devices,'streams':[dict(s) for s in self._streams],'videoProfiles':[dict(p) for p in self._profiles],'openipcIdentities':identities,'activeDeviceId':self._active_id}
+ @Slot('QVariantMap',result=bool)
+ def validateSnapshot(self,value):
+  if not isinstance(value,dict) or set(value)!={'devices','streams','videoProfiles','openipcIdentities','activeDeviceId'}:return False
+  if not all(isinstance(value[k],list) for k in ('devices','streams','videoProfiles','openipcIdentities')) or not isinstance(value['activeDeviceId'],str):return False
+  ids={d.get('id') for d in value['devices'] if isinstance(d,dict) and d.get('id') and d.get('name') and valid_host(str(d.get('host','')))}
+  if len(ids)!=len(value['devices']):return False
+  if value['activeDeviceId'] and value['activeDeviceId'] not in ids:return False
+  if any(not isinstance(s,dict) or s.get('device_id') not in ids or not s.get('id') for s in value['streams']):return False
+  if any(not isinstance(i,dict) or i.get('device_id') not in ids or i.get('verified') is not True for i in value['openipcIdentities']):return False
+  return all(isinstance(p,dict) and p.get('id') and p.get('name') for p in value['videoProfiles'])
  @Slot(str,str,str,int,str,str,result=str)
  def addStream(self,device_id,name,kind,port,path,protocol):
   if not any(i["id"]==device_id for i in self._items):self.notice.emit("Пристрій для потоку не знайдено");return ""

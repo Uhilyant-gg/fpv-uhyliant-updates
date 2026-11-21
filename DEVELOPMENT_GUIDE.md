@@ -9,22 +9,20 @@ Windows ground station: Python + PySide6 + Qt Quick/QML. Home -> Devices / Quick
 - New telemetry/control backends begin read-only; unknown/stale/missing state is unavailable.
 - Camera presets and stream video profiles are separate. Firmware never applies video profiles.
 - Generic ONVIF/name hints are not OpenIPC evidence.
-- Primary/upgrade/recovery-fullflash are separate; recovery/fullflash is only for verified compatible existing custom OpenIPC.
-- Destructive writes require verified compatibility, immutable approval and observed post-operation verification.
+- Recovery/fullflash is only for verified compatible existing custom OpenIPC.
+- Destructive writes require verified compatibility, explicit approval and observed verification.
 
 ## Current architecture
-Telemetry provider integration and MSP/CRSF serial foundations exist; hardware validation remains pending. Firmware Center and guarded executor lifecycle reach the real-hardware boundary; no adapter is enabled by default.
+Telemetry, firmware, dual-video/PiP, camera-preset and read-only external-navigation/link diagnostic foundations are implemented software-side. Hardware-dependent validation remains pending.
 
-Video uses `StreamWorkspace` plus `VideoWorkspaceRuntime` with isolated primary/secondary `VideoRuntime` objects and independent Qt render paths. PiP requires distinct real streams. Playback health is observational only; do not synthesize decoded FPS, dropped frames or glass-to-glass latency.
+Station backup now has a versioned, integrity-checked export and a non-mutating import inspection path. The snapshot preserves devices, streams, per-stream video profiles, verified OpenIPC identity and active-device selection as distinct entities. Import inspection must validate schema version, SHA-256 and referential integrity before any restore can be considered.
 
-Camera presets are separate versioned device/camera settings requiring verified OpenIPC platform and sensor identity. Hardware application remains pending a verified device-specific executor.
-
-`LinkDiagnostics` is the read-only boundary for external-navigation and data-link observations. External navigation and network state are separate contracts. Unknown fields stay unavailable; observations age to stale; RTT may be shown only if a real observer supplies it. Do not infer StabX health from generic telemetry, do not infer Starlink status from Internet access, and do not call RTT video latency. No control path is introduced here.
+Do not treat backup integrity as confidentiality. Current portable backup JSON is not encrypted. Do not add silent restore: applying imported state requires an explicit user decision and must eventually be transactional. Pairing secrets and private signing keys must never be included in portable station snapshots.
 
 ## Next work
-1. Validate camera-preset execution and simultaneous video paths on real SSC30KQ / IMX335 Windows hardware (`hardware-validation-pending`).
-2. Add verified hardware/protocol observers feeding `LinkDiagnostics` for StabX/external navigation and Starlink/WireGuard when evidence is available.
-3. Add encrypted DB export/import, station pairing and distribution hardening.
+1. Validate hardware-dependent paths on real target devices when hardware is available.
+2. Add encrypted backup envelope and explicit transactional restore.
+3. Add station pairing and distribution hardening without committing private keys.
 
 ## Workflow
 Inspect actual `main`, test software paths, mark hardware-only validation `hardware-validation-pending`, synchronize canonical docs after material changes and never claim CI/write success without evidence.
