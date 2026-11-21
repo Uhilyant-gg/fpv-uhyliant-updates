@@ -17,7 +17,7 @@ on:
       notes:
         description: Release notes
         required: true
-        default: MAVLink read-only OSD
+        default: MAVLink phase 1 diagnostics
         type: string
       prerelease:
         description: Publish as pre-release
@@ -58,9 +58,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r src/requirements.txt
           python -m pip install pyinstaller pillow
-      - name: MAVLink backend startup test
+      - name: MAVLink backend source checks
         shell: pwsh
-        run: python src/app/main.py --mavlink-self-test
+        run: |
+          python -m py_compile src/app/mavlink_runtime.py
+          python src/app/main.py --mavlink-self-test
       - name: Prepare assets
         shell: pwsh
         run: |
@@ -72,7 +74,7 @@ jobs:
       - name: Build binaries
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant --icon assets/fpv-uhyliant.ico --paths src/app --add-data "src/app/Main.qml;." --add-data "src/app/DevicesPanel.qml;." --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --hidden-import PySide6.QtMultimedia --hidden-import pymavlink --hidden-import pymavlink.mavutil --collect-all PySide6.QtMultimedia --collect-all pymavlink --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.QtWebEngineQuick --exclude-module PySide6.QtPdf --exclude-module PySide6.QtBluetooth --exclude-module PySide6.QtNfc --exclude-module PySide6.QtSql --exclude-module PySide6.QtTest src/app/main.py
+          pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant --icon assets/fpv-uhyliant.ico --paths src/app --add-data "src/app/Main.qml;." --add-data "src/app/DevicesPanel.qml;." --add-data "src/app/MavlinkDiagnostics.qml;." --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --hidden-import PySide6.QtMultimedia --hidden-import pymavlink --hidden-import pymavlink.mavutil --collect-all PySide6.QtMultimedia --collect-all pymavlink --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.QtWebEngineQuick --exclude-module PySide6.QtPdf --exclude-module PySide6.QtBluetooth --exclude-module PySide6.QtNfc --exclude-module PySide6.QtSql --exclude-module PySide6.QtTest src/app/main.py
           pyinstaller --noconfirm --clean --onefile --windowed --name FPV-Uhyliant-Launcher --icon assets/fpv-uhyliant.ico src/launcher.py
           pyinstaller --noconfirm --clean --onefile --windowed --name FPV-Uhyliant-Update --icon assets/fpv-uhyliant.ico src/update_helper.py
           Copy-Item dist\FPV-Uhyliant-Launcher.exe bootstrap-output\ -Force
