@@ -6,6 +6,7 @@ from devices import interfaces
 from firmware_update_lifecycle import FirmwareUpdateLifecycle
 from firmware_rediscovery import FirmwareRediscovery
 from openipc_upgrade_transport import OpenIPCUpgradeAdapter
+from authenticated_camera_transport import AuthenticatedCameraTransport
 from route_discovery import fingerprint,plan_targets,system_routes
 
 class FirmwareUpdateSession(QObject):
@@ -20,6 +21,15 @@ class FirmwareUpdateSession(QObject):
   self._enabled=transport is not None
   self.executor.register_adapter(OpenIPCUpgradeAdapter(self.devices,transport) if transport is not None else None)
   self._result={'enabled':True,'state':'ready','reason':'Транспорт підключено для явної апаратної перевірки','observedFirmware':'','verification':{}} if self._enabled else self._empty();self.changed.emit();return True
+ @Slot(QObject,result=bool)
+ def enableAuthenticatedTransport(self,credentials):
+  if self.executor.busy or credentials is None:return False
+  try:snapshot=credentials.snapshot()
+  except Exception:return False
+  if not isinstance(snapshot,dict) or not str(snapshot.get('username','')).strip() or snapshot.get('hasPassword') is not True:return False
+  return self.configure_transport(AuthenticatedCameraTransport(credentials))
+ @Slot(result=bool)
+ def disableTransport(self):return self.configure_transport(None)
  def _probe(self,host):
   if callable(self._probe_provider):return self._probe_provider(host)
   return fingerprint(host,threading.Event())
