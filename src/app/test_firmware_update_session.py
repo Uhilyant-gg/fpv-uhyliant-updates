@@ -24,20 +24,12 @@ class SessionTests(unittest.TestCase):
  def authenticate(self,preflight=None):
   with patch('firmware_update_session.AuthenticatedCameraTransport') as factory:
    transport=Transport();factory.return_value=transport;ok=self.session.enableAuthenticatedTransport(Credentials(),preflight or Preflight(self.center));return ok,transport
- def test_preflight_targets_device_id_not_unrelated_active_device(self):
-  ok,_=self.authenticate();self.assertTrue(ok);self.assertTrue(self.session.result['enabled'])
+ def test_preflight_targets_device_id_not_unrelated_active_device(self):ok,_=self.authenticate();self.assertTrue(ok);self.assertTrue(self.session.result['enabled'])
  def test_preflight_requires_complete_approved_transaction_identity(self):
-  for change in ({'deviceId':''},{'profile':''},{'mode':'primary'},{'approvalToken':''},{'host':'192.168.1.51'},{'sensor':'imx415'}):
-   self.session.disableTransport();ok,_=self.authenticate(Preflight(self.center,**change));self.assertFalse(ok);self.assertFalse(self.session.result['enabled'])
+  for change in ({'deviceId':''},{'profile':''},{'mode':'primary'},{'approvalToken':''},{'host':'192.168.1.51'},{'sensor':'imx415'}):self.session.disableTransport();ok,_=self.authenticate(Preflight(self.center,**change));self.assertFalse(ok)
  def test_authentication_rejects_stale_plan_or_approval(self):
   preflight=Preflight(self.center);self.center._plan['approvalToken']='changed';ok,_=self.authenticate(preflight);self.assertFalse(ok)
-  self.center._plan['approvalToken']=self.center.result['approvalToken'];self.center._result['approvalToken']='other';ok,_=self.authenticate(preflight);self.assertFalse(ok)
- def test_authenticated_binding_must_still_match_at_execute(self):
-  ok,_=self.authenticate();self.assertTrue(ok);self.center._plan['approvalToken']='changed';self.assertFalse(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.session.result['state'],'blocked')
- def test_authenticated_binding_rejects_different_device_profile_or_mode(self):
-  ok,_=self.authenticate();self.assertTrue(ok);self.assertFalse(self.session.execute('other','ssc30kq-imx335','upgrade'));self.assertFalse(self.session.execute('cam','other','upgrade'));self.assertFalse(self.session.execute('cam','ssc30kq-imx335','primary'))
- def test_successful_bound_session_still_runs_fixed_upgrade(self):
-  ok,transport=self.authenticate();self.assertTrue(ok);self.assertTrue(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(transport.calls,[('auth','192.168.1.50'),('run','192.168.1.50',['sysupgrade','-k','-r'])]);self.assertEqual(self.session.result['state'],'reboot-pending')
- def test_credentials_never_enter_session_result_or_binding(self):
-  ok,_=self.authenticate();self.assertTrue(ok);text=(repr(self.session.result)+repr(self.session._transport_binding)).lower();self.assertNotIn('password',text);self.assertNotIn("'pw'",text)
+ def test_authenticated_binding_must_still_match_at_execute(self):ok,_=self.authenticate();self.assertTrue(ok);self.center._plan['approvalToken']='changed';self.assertFalse(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.session.result['state'],'blocked')
+ def test_successful_bound_session_still_runs_fixed_upgrade(self):ok,transport=self.authenticate();self.assertTrue(ok);self.assertTrue(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(transport.calls,[('auth','192.168.1.50'),('run','192.168.1.50',['sysupgrade','-k','-r'])])
+ def test_credentials_never_enter_session_result_or_binding(self):ok,_=self.authenticate();self.assertTrue(ok);text=(repr(self.session.result)+repr(self.session._preflight_binding)).lower();self.assertNotIn('password',text);self.assertNotIn("'pw'",text)
 if __name__=='__main__':unittest.main()

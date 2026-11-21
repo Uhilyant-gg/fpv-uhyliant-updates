@@ -14,7 +14,7 @@ class FirmwareCenter(QObject):
   except Exception:return False
  def _empty(self):return {"ready":False,"deviceId":"","profile":"","mode":"","checks":[],"reason":"Попередню перевірку не виконано","approvalToken":""}
  def _empty_artifact(self):return {"path":"","sha256":"","expectedSha256":"","size":0,"verified":False,"error":"Образ прошивки не вибрано"}
- def _empty_plan(self):return {"ready":False,"steps":[],"reason":"План виконання не підготовлено","approvalToken":"","artifactSha256":"","artifactSize":0}
+ def _empty_plan(self):return {"ready":False,"deviceId":"","profile":"","mode":"","steps":[],"reason":"План виконання не підготовлено","approvalToken":"","artifactSha256":"","artifactSize":0}
  def _device(self,device_id):return next((d for d in self.devices.items if d.get("id")==device_id),None)
  @Property("QVariantMap",notify=changed)
  def result(self):return dict(self._result)
@@ -89,7 +89,7 @@ class FirmwareCenter(QObject):
   elif mode=="upgrade":steps+=["Запустити адаптер штатного OpenIPC sysupgrade","Перезапустити пристрій"]
   else:steps+=["Запустити recovery/fullflash адаптер для підтвердженої кастомної OpenIPC","Перезапустити пристрій"]
   steps+=["Повторно виявити пристрій","Перевірити ідентичність OpenIPC і прошивку","Зняти ексклюзивне блокування операцій із пристроєм"]
-  self._plan={"ready":True,"steps":steps,"reason":"План підготовлено; апаратний виконавець потребує фізичної перевірки","approvalToken":self._result["approvalToken"],"artifactSha256":self._artifact["sha256"],"artifactSize":self._artifact["size"]};self.changed.emit();return True
+  self._plan={"ready":True,"deviceId":device_id,"profile":profile,"mode":mode,"steps":steps,"reason":"План підготовлено; апаратний виконавець потребує фізичної перевірки","approvalToken":self._result["approvalToken"],"artifactSha256":self._artifact["sha256"],"artifactSize":self._artifact["size"]};self.changed.emit();return True
  @Slot()
  def reset(self):
   if not self._can_mutate():return False
