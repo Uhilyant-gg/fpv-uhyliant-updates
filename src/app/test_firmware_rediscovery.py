@@ -1,5 +1,5 @@
 import threading,time,unittest
-from firmware_rediscovery import FirmwareRediscovery
+from firmware_rediscovery import FirmwareRediscovery,_MAX_REDISCOVERY_CANDIDATES
 IDENTITY={'platform':'ssc30kq','sensor':'imx335'}
 class Tests(unittest.TestCase):
  def test_waits_until_verified_openipc_returns(self):
@@ -13,6 +13,10 @@ class Tests(unittest.TestCase):
    if host=='192.168.1.70':return {'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':['OpenIPC status.cgi']}
    return {}
   r=FirmwareRediscovery(probe,lambda _:None,lambda old:['192.168.1.60','192.168.1.70']).wait('192.168.1.50',1,0,IDENTITY);self.assertTrue(r['rediscovered']);self.assertEqual(r['host'],'192.168.1.70');self.assertIn('192.168.1.60',calls)
+ def test_candidate_provider_output_is_private_deduplicated_and_bounded(self):
+  hosts=['8.8.8.8','127.0.0.1','169.254.1.2','192.168.1.50','192.168.1.60','192.168.1.60']+['10.0.%d.%d'%(n//254,n%254+1) for n in range(400)]
+  r=FirmwareRediscovery(lambda host:{},lambda _:None,lambda old:hosts);planned=r._hosts('192.168.1.50')
+  self.assertEqual(planned[0],'192.168.1.50');self.assertIn('192.168.1.60',planned);self.assertNotIn('8.8.8.8',planned);self.assertNotIn('127.0.0.1',planned);self.assertNotIn('169.254.1.2',planned);self.assertEqual(len(planned)-1,_MAX_REDISCOVERY_CANDIDATES);self.assertEqual(len(planned),len(set(planned)))
  def test_dhcp_candidates_are_probed_with_bounded_parallel_fanout(self):
   active=[0];peak=[0];lock=threading.Lock()
   def probe(host):

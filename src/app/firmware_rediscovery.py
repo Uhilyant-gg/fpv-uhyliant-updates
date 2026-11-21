@@ -1,21 +1,30 @@
 """Post-upgrade rediscovery with bounded candidate expansion and identity continuity."""
-import concurrent.futures,time
+import concurrent.futures,ipaddress,time
 from openipc_device import normalize_openipc_identity
 
 _FRESH_OPENIPC_EVIDENCE={'Majestic /api/v1/config.json','OpenIPC status.cgi'}
 _MAX_REDISCOVERY_WORKERS=24
+_MAX_REDISCOVERY_CANDIDATES=254
+
+def _private_candidate(value):
+ try:
+  address=ipaddress.ip_address(str(value).strip())
+  return address.version==4 and address.is_private and not(address.is_loopback or address.is_link_local or address.is_multicast or address.is_unspecified)
+ except ValueError:return False
 
 class FirmwareRediscovery:
  def __init__(self,probe,sleep=time.sleep,candidates=None):self.probe=probe;self.sleep=sleep;self.candidates=candidates
  def _hosts(self,original_host):
-  hosts=[str(original_host).strip()]
+  original=str(original_host).strip();hosts=[original]
   if callable(self.candidates):
    try:extra=self.candidates(original_host)
    except Exception:extra=()
    if isinstance(extra,(list,tuple)):
     for host in extra:
      value=str(host).strip()
-     if value and value not in hosts:hosts.append(value)
+     if value!=original and _private_candidate(value) and value not in hosts:
+      hosts.append(value)
+      if len(hosts)-1>=_MAX_REDISCOVERY_CANDIDATES:break
   return hosts
  def _fresh_identity(self,result):
   if not isinstance(result,dict) or result.get('openipc') is not True:return None

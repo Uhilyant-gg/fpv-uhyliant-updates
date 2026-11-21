@@ -6,6 +6,9 @@ class RouteDiscoveryTests(unittest.TestCase):
   targets=plan_targets([{"name":"Wi-Fi","network":"192.168.0.0/24"}],[{"name":"192.168.0.1","network":"192.168.1.0/24"}]);self.assertIn("192.168.1.50",targets);self.assertIn("192.168.0.12",targets)
  def test_unsafe_and_large_routes_are_not_swept(self):
   routes=[{"name":"Wi-Fi","network":"0.0.0.0/0"},{"name":"Wi-Fi","network":"8.8.8.0/24"},{"name":"Wi-Fi","network":"10.0.0.0/8"},{"name":"vEthernet (WSL)","network":"172.20.0.0/24"}];self.assertEqual(plan_targets([],routes),[]);self.assertFalse(route_is_sweepable("10.0.0.0/8","Wi-Fi"))
+ def test_all_rfc1918_24_routes_are_sweepable_but_public_linklocal_and_virtual_are_not(self):
+  for network in ("10.20.30.0/24","172.16.44.0/24","192.168.77.0/24"):self.assertTrue(route_is_sweepable(network,"Ethernet"),network)
+  for network,name in (("100.64.1.0/24","Ethernet"),("169.254.2.0/24","Ethernet"),("192.168.1.0/24","WireGuard Tunnel")):self.assertFalse(route_is_sweepable(network,name),(network,name))
  def test_known_private_host_is_direct_even_without_sweep(self):self.assertEqual(plan_targets([],[],["192.168.1.50"]),["192.168.1.50"])
  def test_real_endpoint_builder_uses_observed_ipv4_and_fixed_paths(self):
   self.assertTrue(_http_url("192.168.1.50","/api/v1/config.json").endswith("192.168.1.50/api/v1/config.json"));self.assertTrue(_http_url("192.168.1.50","/cgi-bin/status.cgi").endswith("192.168.1.50/cgi-bin/status.cgi"));self.assertNotIn("scrubbed",_http_url("192.168.1.50","/cgi-bin/status.cgi"))
