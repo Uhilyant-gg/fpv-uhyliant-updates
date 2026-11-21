@@ -30,9 +30,8 @@ jobs:
               raise SystemExit('runtime lifetime pattern not found')
           s = s.replace(old, new)
           p.write_text(s, encoding='utf-8')
-
           t = Path('src/app/test_windows_qml_startup_crash_policy.py')
-          t.write_text('''from pathlib import Path\n\n\ndef test_full_startup_does_not_install_python_qt_message_handler():\n    source = Path(__file__).with_name("main.py").read_text(encoding="utf-8")\n    assert "qInstallMessageHandler" not in source\n\n\ndef test_full_startup_keeps_qml_backends_alive():\n    source = Path(__file__).with_name("main.py").read_text(encoding="utf-8")\n    assert "app._runtime_refs=" in source\n    assert "hardware_e2e" in source.split("app._runtime_refs=", 1)[1]\n''', encoding='utf-8')
+          t.write_text('''from pathlib import Path\n\ndef test_full_startup_does_not_install_python_qt_message_handler():\n    source = Path(__file__).with_name("main.py").read_text(encoding="utf-8")\n    assert "qInstallMessageHandler" not in source\n\ndef test_full_startup_keeps_qml_backends_alive():\n    source = Path(__file__).with_name("main.py").read_text(encoding="utf-8")\n    assert "app._runtime_refs=" in source\n    assert "hardware_e2e" in source.split("app._runtime_refs=", 1)[1]\n''', encoding='utf-8')
       - name: Run focused tests
         run: python -m pytest -q src/app/test_windows_qml_startup_crash_policy.py
       - name: Commit fix
@@ -42,3 +41,4 @@ jobs:
           git add src/app/main.py src/app/test_windows_qml_startup_crash_policy.py
           git commit -m "Fix Windows QML startup null callback crash"
           git push
+# trigger: 2
