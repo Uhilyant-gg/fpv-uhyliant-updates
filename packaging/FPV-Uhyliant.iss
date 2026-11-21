@@ -1,6 +1,6 @@
 #define MyAppName "FPV Uhyliant"
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.10"
+  #define MyAppVersion "2.0.11"
 #endif
 #define MyAppPublisher "Uhilyant-gg"
 #define MyLauncher "FPV-Uhyliant-Launcher.exe"
@@ -35,8 +35,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Створити ярлик на робочому столі"; GroupDescription: "Додаткові ярлики:"; Flags: unchecked
 
 [Files]
-Source: "..\bootstrap-output\FPV-Uhyliant-Launcher.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\bootstrap-output\FPV-Uhyliant-Update.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\FPV-Uhyliant-Launcher.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\FPV-Uhyliant-Update.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\FPV-Uhyliant\*"; DestDir: "{app}\app\current"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
