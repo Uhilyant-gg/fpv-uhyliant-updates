@@ -12,6 +12,8 @@ class NavigationUiPolicyTests(unittest.TestCase):
   self.assertIn('model:devicesModel.items',self.home);self.assertIn('devicesModel.streams',self.home);self.assertIn('streams[n].enabled===true',self.home);self.assertIn('root.connectDevice(modelData.id)',self.home)
  def test_devices_activation_uses_unified_fpv_handoff(self):
   self.assertIn('signal activateDevice(string deviceId)',self.devices);self.assertIn('root.activateDevice(selectedSaved.id)',self.devices);self.assertNotIn('onClicked:devicesModel.setActive(selectedSaved.id)',self.devices);self.assertIn('onActivateDevice:function(deviceId){devices.close();connectDevice(deviceId)}',self.main)
+ def test_playback_rebuild_preserves_requested_pip(self):
+  self.assertIn('var keepPip=pipEnabled&&streamWorkspace.state.pipAvailable',self.main);self.assertIn('videoWorkspaceRuntime.setPipEnabled(true);startSecondary()',self.main)
  def test_update_ui_uses_existing_guarded_updater_only(self):
   for call in ('updater.check()','updater.download()','updater.install()'):self.assertIn(call,self.update)
  def test_service_mode_does_not_duplicate_navigation_grid(self):
