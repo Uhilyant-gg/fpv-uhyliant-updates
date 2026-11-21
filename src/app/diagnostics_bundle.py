@@ -1,14 +1,19 @@
-import json,time,uuid
+import json,re,time,uuid
 from copy import deepcopy
 
-SECRET_KEYS={'password','passwd','secret','token','privatekey','private_key','apikey','api_key','authorization','credential','credentials'}
+SECRET_KEYS={'password','passwd','secret','token','privatekey','private_key','apikey','api_key','authorization','credential','credentials','sshkey','ssh_key','signingkey','signing_key'}
+_SECRET_KEY_PARTS=('password','passwd','secret','token','privatekey','apikey','authorization','credential','sshkey','signingkey')
+
+def _secret_key(key):
+    normalized=re.sub(r'[^a-z0-9]','',str(key).lower())
+    return normalized in {re.sub(r'[^a-z0-9]','',k) for k in SECRET_KEYS} or any(part in normalized for part in _SECRET_KEY_PARTS)
 
 def _sanitize(value):
     if isinstance(value,dict):
         out={}
         for key,item in value.items():
             name=str(key)
-            out[name]='[redacted]' if name.lower() in SECRET_KEYS else _sanitize(item)
+            out[name]='[redacted]' if _secret_key(name) else _sanitize(item)
         return out
     if isinstance(value,list):return [_sanitize(v) for v in value]
     if isinstance(value,tuple):return [_sanitize(v) for v in value]
