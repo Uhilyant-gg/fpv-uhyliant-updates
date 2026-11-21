@@ -1,10 +1,8 @@
 import argparse,json,os,sys,time,traceback
 from pathlib import Path
 from version import VERSION, WINDOW_TITLE
-
 DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant'
-def write_json_atomic(path,payload):
- path.parent.mkdir(parents=True,exist_ok=True);tmp=path.with_suffix(path.suffix+'.tmp');tmp.write_text(json.dumps(payload),encoding='utf-8');os.replace(tmp,path)
+def write_json_atomic(path,payload):path.parent.mkdir(parents=True,exist_ok=True);tmp=path.with_suffix(path.suffix+'.tmp');tmp.write_text(json.dumps(payload),encoding='utf-8');os.replace(tmp,path)
 def signal_ok(t):
  if t:write_json_atomic(DATA/'startup-ok.json',{'status':'ok','token':t,'version':VERSION})
 def signal_smoke(path):write_json_atomic(Path(path),{'status':'ok','version':VERSION,'pid':os.getpid(),'timestamp':int(time.time())})
@@ -33,19 +31,21 @@ def main():
  from updater_engine import Updater
  from video import VideoRuntime
  from mavlink_runtime import MavlinkRuntime
- from telemetry_provider import MavlinkProvider
+ from msp_runtime import MspRuntime
+ from crsf_runtime import CrsfRuntime
+ from telemetry_provider import CrsfProvider,MavlinkProvider,MspProvider,TelemetryRouter
  from vehicle import VehicleRuntime
  app=QGuiApplication(sys.argv);app.setApplicationName('FPV-Uhyliant');app.setApplicationVersion(VERSION)
- m=MavlinkRuntime()
+ m=MavlinkRuntime();msp=MspRuntime();crsf=CrsfRuntime()
  if x.mavlink_self_test:
   QTimer.singleShot(350,app.quit);rc=app.exec();m.shutdown();print(json.dumps({'status':'ok','backend':'mavlink','telemetry':'not simulated'}));return rc
  icon=here/'fpv-uhyliant.ico'
  if icon.exists():app.setWindowIcon(QIcon(str(icon)))
- QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();v=VideoRuntime(d);telemetry=MavlinkProvider(m);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate);e.rootContext().setContextProperty('station',s);e.rootContext().setContextProperty('devicesModel',d);e.rootContext().setContextProperty('videoRuntime',v);e.rootContext().setContextProperty('mavlinkRuntime',m);e.rootContext().setContextProperty('vehicleRuntime',vehicle);e.rootContext().setContextProperty('updater',u);e.rootContext().setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
+ QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();v=VideoRuntime(d);telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate)
+ e.rootContext().setContextProperty('station',s);e.rootContext().setContextProperty('devicesModel',d);e.rootContext().setContextProperty('videoRuntime',v);e.rootContext().setContextProperty('mavlinkRuntime',m);e.rootContext().setContextProperty('telemetryRuntime',telemetry);e.rootContext().setContextProperty('vehicleRuntime',vehicle);e.rootContext().setContextProperty('updater',u);e.rootContext().setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
  if not e.rootObjects():
   m.shutdown()
-  try:
-   tail='\n'.join(qtlog.read_text(encoding='utf-8',errors='replace').splitlines()[-80:])
+  try:tail='\n'.join(qtlog.read_text(encoding='utf-8',errors='replace').splitlines()[-80:])
   except Exception:tail='Qt startup log unavailable'
   raise RuntimeError('QML root object failed to load\n'+tail)
  app.aboutToQuit.connect(m.shutdown);root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized)
