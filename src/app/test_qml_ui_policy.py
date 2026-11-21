@@ -20,6 +20,7 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
             set(self.qml),
             {
                 "DevicesPanel.qml",
+                "DiagnosticsPanel.qml",
                 "FirmwareCenter.qml",
                 "HomePanel.qml",
                 "HoverHint.qml",

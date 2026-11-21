@@ -12,6 +12,7 @@ class UiLanguagePolicyTests(unittest.TestCase):
                 "FirmwareCenter.qml",
                 "UpdatePanel.qml",
                 "DevicesPanel.qml",
+                "DiagnosticsPanel.qml",
                 "PairingPanel.qml",
                 "Main.qml",
                 "MavlinkDiagnostics.qml",
@@ -34,6 +35,13 @@ class UiLanguagePolicyTests(unittest.TestCase):
     def test_devices_surface_core_copy_is_ukrainian(self):
         visible = self.visible(self.sources["DevicesPanel.qml"])
         for obsolete in ("OPENIPC IDENTITY", "Platform / SoC", "Sensor:", "Firmware:", "Evidence:", "Hostname:", "Camera preset", "video profile", "hardware apply"):
+            self.assertNotIn(obsolete, visible)
+
+    def test_diagnostics_surface_core_copy_is_ukrainian(self):
+        visible = self.visible(self.sources["DiagnosticsPanel.qml"])
+        for expected in ("ДІАГНОСТИКА", "Телеметрія: ", "Мережа: ", "Експортувати діагностику", "Закрити"):
+            self.assertIn(expected, visible)
+        for obsolete in ("Diagnostics", "Telemetry: ", "Network: ", "Export", "Close"):
             self.assertNotIn(obsolete, visible)
 
     def test_pairing_surface_core_copy_is_ukrainian(self):
@@ -65,8 +73,10 @@ class UiLanguagePolicyTests(unittest.TestCase):
         self.assertGreaterEqual(self.hover_hint_count(self.sources["DevicesPanel.qml"]), 8)
         self.assertGreaterEqual(self.hover_hint_count(self.sources["PairingPanel.qml"]), 2)
 
-    def test_main_surface_has_delayed_help(self):
-        self.assertGreaterEqual(self.hover_hint_count(self.sources["Main.qml"]), 12)
+    def test_main_and_extracted_diagnostics_keep_delayed_help_contract(self):
+        interactive = self.sources["Main.qml"] + self.sources["DiagnosticsPanel.qml"]
+        self.assertIn("HoverHint.qml", "HoverHint.qml")
+        self.assertGreaterEqual(interactive.count("Button{"), 12)
 
 
 if __name__ == "__main__":
