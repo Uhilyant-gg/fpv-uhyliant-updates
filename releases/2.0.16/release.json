@@ -1,0 +1,21 @@
+{
+  "product": "FPV-Uhyliant",
+  "channel": "test",
+  "version": "2.0.16",
+  "build": 2016,
+  "mandatory": false,
+  "minimumUpdaterVersion": "1.5.0",
+  "package": {
+    "file": "FPV-Uhyliant-v2.0.16-test-UA-Windows.zip",
+    "url": "https://<scrubbed-url-domain>/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.16/FPV-Uhyliant-v2.0.16-test-UA-Windows.zip",
+    "sha256": "709950e148db86a4856801bcb8980490caa4dfcbecb38e8eca562ef1482a9e18"
+  },
+  "releaseNotes": [
+    "Windows runtime stability with Python 3.11"
+  ],
+  "signature": {
+    "algorithm": "Ed25519",
+    "keyId": "fpv-uhyliant-production-v1",
+    "value": "4qrB/rVuCStyXu/9XKFifCfjE3opVd+sJKnmtxttJTJpjdSUhXsjVZSIsYnNDvfReavluezXXH92uWfmdvlHBg=="
+  }
+}
