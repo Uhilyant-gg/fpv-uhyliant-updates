@@ -5,7 +5,7 @@ class Tests(unittest.TestCase):
   root=Path(__file__).parent;self.qml=(root/'FirmwareCenter.qml').read_text(encoding='utf-8');self.acquisition=(root/'openipc_firmware_acquisition.py').read_text(encoding='utf-8');self.compact=re.sub(r'\s+','',self.qml)
  def has_call(self,receiver,args):self.assertIn(receiver+'('+','.join(args)+')',self.compact)
  def test_primary_flow_derives_profile_and_keeps_destructive_action_explicit(self):
-  self.has_call('firmwareAcquisition.prepareRecommended',['deviceBox.currentValue']);self.has_call('firmwareCenter.prepareAutomaticUpgrade',['deviceBox.currentValue']);self.has_call('firmwareUpdateSession.execute',['deviceBox.currentValue','automaticProfile','"upgrade"']);self.assertIn('text:"Оновити камеру"',self.compact);self.assertNotIn('execute(deviceBox.currentValue,"ssc30kq-imx335"',self.compact)
+  self.has_call('firmwareAcquisition.prepareRecommended',['deviceBox.currentValue']);self.has_call('firmwareCenter.prepareAutomaticUpgrade',['deviceBox.currentValue']);self.has_call('firmwareUpdateSession.execute',['deviceBox.currentValue','automaticProfile','"upgrade"']);self.assertIn('"Оновити камеру"',self.qml);self.assertNotIn('execute(deviceBox.currentValue,"ssc30kq-imx335"',self.compact)
  def test_selected_camera_is_bound_to_preflight(self):
   self.assertIn('Component.onCompleted:activeDevice()',self.compact);self.has_call('hardwareE2ERuntime.selectDevice',['deviceBox.currentValue||""']);self.assertIn('onCurrentValueChanged:root.bindDevice()',self.compact)
  def test_human_readable_camera_card_preserves_unknowns(self):
