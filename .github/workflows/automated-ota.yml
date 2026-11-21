@@ -2,9 +2,9 @@ name: FPV Uhyliant Release Pipeline
 on:
   workflow_dispatch:
     inputs:
-      version: {description: Release version, required: true, default: 2.0.10, type: string}
+      version: {description: Release version, required: true, default: 2.0.11, type: string}
       channel: {description: OTA channel, required: true, default: test, type: choice, options: [test, stable, development]}
-      notes: {description: Release notes, required: true, default: Release update, type: string}
+      notes: {description: Release notes, required: true, default: UI preview prerelease, type: string}
       prerelease: {description: Publish as pre-release, required: true, default: true, type: boolean}
 permissions: {contents: read}
 env:
