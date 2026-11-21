@@ -8,7 +8,7 @@ class Adapter:
  def __init__(self,result=True):self.calls=[];self.result=result
  def execute(self,*args):self.calls.append(args);return self.result
 class MutatingAdapter(Adapter):
- def execute(self,*args):self.calls.append(args);args[3]['sha256']='adapter-mutated';args[4]['approvalToken']='adapter-mutated';return True
+ def execute(self,*args):self.calls.append(args);args[3]['sha256']='adapter-mutated';args[4]['approvalToken']='adapter-mutated';args[5]['host']='adapter-mutated';return True
 class RaisingAdapter(Adapter):
  def execute(self,*args):self.calls.append(args);raise RuntimeError('flash failed')
 class ExecutorTests(unittest.TestCase):
@@ -30,7 +30,9 @@ class ExecutorTests(unittest.TestCase):
  def test_identity_verification_loss_after_approval_blocks_handoff(self):
   x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.devices.items[0]['openipcIdentity']['verified']=False;self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(a.calls,[])
  def test_adapter_receives_snapshot_not_live_plan_objects(self):
-  artifact_before=self.center.artifact;plan_before=self.center.executionPlan;x=FirmwareExecutor(self.center);a=MutatingAdapter();x.register_adapter(a);self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.center.artifact,artifact_before);self.assertEqual(self.center.executionPlan,plan_before)
+  artifact_before=self.center.artifact;plan_before=self.center.executionPlan;x=FirmwareExecutor(self.center);a=MutatingAdapter();x.register_adapter(a);self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.center.artifact,artifact_before);self.assertEqual(self.center.executionPlan,plan_before);self.assertEqual(x.verificationContext()['host'],'192.168.1.50')
+ def test_handoff_contains_approved_device_identity(self):
+  x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));h=a.calls[0][5];self.assertEqual(h['deviceId'],'cam');self.assertEqual(h['host'],'192.168.1.50');self.assertEqual(h['profile'],'ssc30kq-imx335');self.assertEqual(h['mode'],'upgrade');self.assertTrue(h['verifiedOpenIPC']);self.assertEqual(h['platform'],'ssc30kq');self.assertEqual(h['sensor'],'imx335');self.assertEqual(h['approval']['approvalToken'],h['plan']['approvalToken'])
  def test_raw_observation_cannot_bypass_rediscovery(self):
   x=FirmwareExecutor(self.center);x.register_adapter(Adapter());self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertFalse(hasattr(x,'verifyObserved'));self.assertFalse(hasattr(x,'completeVerification'));self.assertEqual(x.status['state'],'reboot-pending')
  def test_lock_remains_held_through_reboot_pending_and_blocks_repeat_execute(self):

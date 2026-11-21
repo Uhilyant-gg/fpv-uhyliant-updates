@@ -42,9 +42,10 @@ class FirmwareExecutor(QObject):
   expected=SUPPORTED_PROFILES.get(profile,{})
   if identity.get('platform','').lower()!=str(expected.get('platform','')).lower() or identity.get('sensor','').lower()!=str(expected.get('sensor','')).lower():self._set('blocked',error='Апаратна ідентичність змінилася після схвалення');return False
   if self._adapter is None:self._set('hardware-validation-pending',deviceId=device_id,profile=profile,mode=mode,step='executor',error='Апаратний адаптер виконавця не підключений');return False
-  handoff['host']=str(device.get('host','')).strip();self._handoff=handoff;self._locked_device=device_id;self._set('executing',deviceId=device_id,profile=profile,mode=mode,step='flash',error='',verification={})
+  handoff['host']=str(device.get('host','')).strip();handoff['platform']=str(identity.get('platform','')).strip().lower();handoff['sensor']=str(identity.get('sensor','')).strip().lower();handoff['verifiedOpenIPC']=True
+  self._handoff=deepcopy(handoff);self._locked_device=device_id;self._set('executing',deviceId=device_id,profile=profile,mode=mode,step='flash',error='',verification={})
   try:
-   ok=bool(self._adapter.execute(device_id,profile,mode,deepcopy(handoff['artifact']),deepcopy(handoff['plan'])))
+   ok=bool(self._adapter.execute(device_id,profile,mode,deepcopy(handoff['artifact']),deepcopy(handoff['plan']),deepcopy(handoff)))
   except Exception:
    self._set('error',step='flash',error='Виконавець повідомив про помилку');self._release_lock();return False
   if not ok:self._set('error',step='flash',error='Виконавець повідомив про помилку');self._release_lock();return False
