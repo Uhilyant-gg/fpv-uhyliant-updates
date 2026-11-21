@@ -15,19 +15,28 @@ class RouteDiscoveryTests(unittest.TestCase):
  def test_endpoint_builder_rejects_non_private_reconnect_hosts(self):
   for host in ("8.8.8.8","100.64.1.2","127.0.0.1","169.254.2.3","224.0.0.1"):
    with self.assertRaises(ValueError,msg=host):_http_url(host,"/cgi-bin/status.cgi")
+ @patch("route_discovery._tcp_open",return_value=False)
  @patch("route_discovery._fetch")
- def test_generic_onvif_or_reachable_host_is_not_openipc(self,fetch):
-  fetch.return_value=b"<html>generic camera</html>";r=fingerprint("192.168.1.50",threading.Event());self.assertTrue(r["reachable"]);self.assertFalse(r["openipc"]);self.assertFalse(r["camera"])
+ def test_generic_onvif_or_reachable_host_is_not_openipc(self,fetch,tcp_open):
+  fetch.return_value=(b"<html>generic camera</html>",200);r=fingerprint("192.168.1.50",threading.Event());self.assertTrue(r["reachable"]);self.assertFalse(r["openipc"]);self.assertFalse(r["camera"])
+ @patch("route_discovery._tcp_open",return_value=False)
  @patch("route_discovery._fetch")
- def test_status_cgi_observations_are_preserved_without_defaults(self,fetch):
-  fetch.side_effect=lambda url,*args:None if url.endswith("config.json") else b"OpenIPC Majestic Platform: ssc30kq Sensor: imx335 Firmware: v1.48.5.1-st-ultimate";r=fingerprint("192.168.1.50",threading.Event());self.assertTrue(r["openipc"]);self.assertEqual(r["identity"]["platform"],"ssc30kq");self.assertEqual(r["identity"]["sensor"],"imx335");self.assertEqual(r["identity"]["soc"],"")
+ def test_status_cgi_observations_are_preserved_without_defaults(self,fetch,tcp_open):
+  fetch.side_effect=lambda url,*args:(None,0) if url.endswith("config.json") else (b"OpenIPC Majestic Platform: ssc30kq Sensor: imx335 Firmware: v1.48.5.1-st-ultimate",200);r=fingerprint("192.168.1.50",threading.Event());self.assertTrue(r["openipc"]);self.assertEqual(r["identity"]["platform"],"ssc30kq");self.assertEqual(r["identity"]["sensor"],"imx335");self.assertEqual(r["identity"]["soc"],"")
+ @patch("route_discovery._tcp_open",return_value=False)
  @patch("route_discovery._fetch")
- def test_config_does_not_invent_stream_urls(self,fetch):
-  fetch.side_effect=[b'{"video0":{"codec":"h264"},"system":{"platform":"ssc30kq"}}',None];r=fingerprint("192.168.1.50",threading.Event());self.assertTrue(r["openipc"]);self.assertEqual(r["streams"],[])
+ def test_config_does_not_invent_stream_urls(self,fetch,tcp_open):
+  fetch.side_effect=[(b'{"video0":{"codec":"h264"},"system":{"platform":"ssc30kq"}}',200),(None,0)];r=fingerprint("192.168.1.50",threading.Event());self.assertTrue(r["openipc"]);self.assertEqual(r["streams"],[])
+ @patch("route_discovery._tcp_open",return_value=False)
  @patch("route_discovery._fetch")
- def test_nested_generic_version_is_not_majestic_version(self,fetch):
-  fetch.side_effect=[b'{"video0":{"version":"99"},"system":{"platform":"ssc30kq"}}',None];self.assertEqual(fingerprint("192.168.1.50",threading.Event())["identity"]["majestic"],"")
+ def test_nested_generic_version_is_not_majestic_version(self,fetch,tcp_open):
+  fetch.side_effect=[(b'{"video0":{"version":"99"},"system":{"platform":"ssc30kq"}}',200),(None,0)];self.assertEqual(fingerprint("192.168.1.50",threading.Event())["identity"]["majestic"],"")
+ @patch("route_discovery._tcp_open",return_value=False)
  @patch("route_discovery._fetch")
- def test_r2d2_marker_requires_openipc_evidence(self,fetch):
-  fetch.side_effect=[None,b"R2D2 generic page"];r=fingerprint("192.168.1.50",threading.Event());self.assertFalse(r["openipc"]);self.assertFalse(r["r2d2"]);self.assertFalse(r["camera"])
+ def test_r2d2_marker_requires_openipc_evidence(self,fetch,tcp_open):
+  fetch.side_effect=[(None,0),(b"R2D2 generic page",200)];r=fingerprint("192.168.1.50",threading.Event());self.assertFalse(r["openipc"]);self.assertFalse(r["r2d2"]);self.assertFalse(r["camera"])
+ @patch("route_discovery._tcp_open",return_value=False)
+ @patch("route_discovery._fetch")
+ def test_auth_required_is_preserved_without_openipc_claim(self,fetch,tcp_open):
+  fetch.side_effect=[(None,401),(None,403)];r=fingerprint("192.168.1.50",threading.Event());self.assertTrue(r["camera"]);self.assertTrue(r["authRequired"]);self.assertFalse(r["openipc"]);self.assertFalse(r["identity"]["verified"])
 if __name__=="__main__":unittest.main()
