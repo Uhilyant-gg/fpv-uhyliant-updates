@@ -86,6 +86,23 @@ jobs:
           choco install innosetup --no-progress -y
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:VERSION" packaging\FPV-Uhyliant.iss
           if (-not (Test-Path "installer-output\FPV-Uhyliant-Setup-$env:VERSION.exe")) { throw 'Installer not found' }
+      - name: Validate installed launcher layout
+        shell: pwsh
+        run: |
+          $installRoot = Join-Path $env:RUNNER_TEMP 'fpv-installed'
+          $installer = Resolve-Path "installer-output\FPV-Uhyliant-Setup-$env:VERSION.exe"
+          $process = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$installRoot" -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          foreach ($required in @('FPV-Uhyliant-Launcher.exe','FPV-Uhyliant-Update.exe','app\current\FPV-Uhyliant.exe')) {
+            if (-not (Test-Path (Join-Path $installRoot $required) -PathType Leaf)) { throw "Installed layout missing: $required" }
+          }
+          $selfTest = Start-Process -FilePath (Join-Path $installRoot 'app\current\FPV-Uhyliant.exe') -ArgumentList '--self-test' -PassThru -Wait
+          if ($selfTest.ExitCode -ne 0) { throw "Installed application self-test failed: $($selfTest.ExitCode)" }
+          $launchData = Join-Path $env:RUNNER_TEMP 'fpv-installed-launch'; New-Item -ItemType Directory -Force $launchData | Out-Null; $env:LOCALAPPDATA = $launchData
+          $launcher = Start-Process -FilePath (Join-Path $installRoot 'FPV-Uhyliant-Launcher.exe') -PassThru
+          Start-Sleep -Seconds 5
+          if ($launcher.HasExited -and $launcher.ExitCode -ne 0) { throw "Installed launcher failed: $($launcher.ExitCode)" }
+          if (-not $launcher.HasExited) { Stop-Process -Id $launcher.Id -Force }
       - uses: actions/upload-artifact@v4
         with:
           name: windows-build-${{ inputs.version }}-${{ github.sha }}
