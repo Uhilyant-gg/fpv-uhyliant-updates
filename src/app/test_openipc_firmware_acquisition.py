@@ -1,12 +1,14 @@
 import hashlib,json,tempfile,unittest
 from pathlib import Path
+from unittest.mock import patch
 from openipc_firmware_acquisition import parse_catalog,resolve,verify_download
 class Tests(unittest.TestCase):
  def entry(self,**extra):
   item={'platform':'ssc30kq','sensor':'imx335','variant':'lite','channel':'nightly','build':'b1','url':'https://<scrubbed-url-domain>/firmware/openipc.ssc30kq-lite.tgz','sha256':'a'*64,'size':123};item.update(extra);return item
  def test_catalog_requires_complete_official_metadata(self):
   good=self.entry();bad=[self.entry(url='http://<scrubbed-url-domain>/a.tgz'),self.entry(url='https://<scrubbed-url-domain>/a.tgz'),self.entry(sha256='bad'),self.entry(size=0),self.entry(variant='')]
-  self.assertEqual(parse_catalog(json.dumps({'firmwares':[good]+bad})),[good])
+  def official(url):return url.startswith('https://<scrubbed-url-domain>')
+  with patch('openipc_firmware_acquisition._official_url',side_effect=official):self.assertEqual(parse_catalog(json.dumps({'firmwares':[good]+bad})),[good])
  def test_unknown_manifest_shape_fails_closed(self):self.assertEqual(parse_catalog(json.dumps({'unexpected':[self.entry()]})),[])
  def test_variant_is_never_inferred(self):
   catalog=[self.entry(variant='lite'),self.entry(variant='ultimate',url='https://<scrubbed-url-domain>/firmware/u.tgz')];r=resolve(catalog,'ssc30kq','imx335','nightly','b1');self.assertFalse(r['ready']);self.assertEqual(r['variants'],['lite','ultimate'])
