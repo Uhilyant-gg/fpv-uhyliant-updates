@@ -59,8 +59,8 @@ def main():
   except Exception:pass
   print(line,file=sys.stderr,flush=True)
  qInstallMessageHandler(qt_message);app=QGuiApplication(sys.argv);app.setApplicationName('FPV-Uhyliant');app.setApplicationVersion(VERSION)
- m=MavlinkRuntime();msp=MspRuntime();crsf=CrsfRuntime();msp_serial=MspSerialTransport(msp);crsf_serial=CrsfSerialTransport(crsf)
- if x.mavlink_self_test:QTimer.singleShot(350,app.quit);rc=app.exec();m.shutdown();msp_serial.stop();crsf_serial.stop();print(json.dumps({'status':'ok','backend':'mavlink','telemetry':'not simulated'}));return rc
+ m=MavlinkRuntime(auto_start=False);msp=MspRuntime();crsf=CrsfRuntime();msp_serial=MspSerialTransport(msp);crsf_serial=CrsfSerialTransport(crsf)
+ if x.mavlink_self_test:QTimer.singleShot(0,m.start);QTimer.singleShot(350,app.quit);rc=app.exec();m.shutdown();msp_serial.stop();crsf_serial.stop();print(json.dumps({'status':'ok','backend':'mavlink','telemetry':'not simulated'}));return rc
  icon=here/'fpv-uhyliant.ico'
  if icon.exists():app.setWindowIcon(QIcon(str(icon)))
  QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();video=VideoWorkspaceRuntime(d);v=video.primary;secondary=video.secondary;streams=StreamWorkspace(d);fw=FirmwareCenter(d);acquisition=OpenIPCFirmwareAcquisition(fw,DATA/'firmware-cache');fwexec=FirmwareExecutor(fw);fwsession=FirmwareUpdateSession(fwexec,d);credentials=CameraCredentials();presets=CameraPresets(d);presetexec=CameraPresetExecutor(presets);links=LinkDiagnostics();backup=StationBackup(d);pairing=PairingRegistry(metadata_store=JsonMetadataStore(DATA/'pairing-trust.json'));telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate);diag_events=DiagnosticEvents();diag=DiagnosticsRuntime(VERSION,d,links,telemetry,u,diag_events,DATA,video);hardware_e2e=HardwareE2ERuntime(d,diag,credentials)
@@ -69,7 +69,7 @@ def main():
  ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
  def shutdown():hardware_e2e.reset();credentials.clear();video.stopAll();links.clear();pairing.clearPending();m.shutdown();msp_serial.stop();crsf_serial.stop()
  if not e.rootObjects():shutdown();raise RuntimeError('QML root object failed to load')
- app.aboutToQuit.connect(shutdown);root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized);QTimer.singleShot(1200,lambda:signal_ok(x.startup_token))
+ app.aboutToQuit.connect(shutdown);root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized);QTimer.singleShot(0,m.start);QTimer.singleShot(1200,lambda:signal_ok(x.startup_token))
  return app.exec()
 if __name__=='__main__':
  try:raise SystemExit(main())

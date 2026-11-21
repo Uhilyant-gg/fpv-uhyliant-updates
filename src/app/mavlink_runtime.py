@@ -122,9 +122,9 @@ class MavlinkWorker(QThread):
 
 class MavlinkRuntime(QObject):
  changed=Signal();notice=Signal(str)
- def __init__(self):
+ def __init__(self,auto_start=True):
   super().__init__();settings=QSettings("FPV-Uhyliant","FPV-Uhyliant");self._endpoint=str(settings.value("mavlink/endpoint",DEFAULT_ENDPOINT));self._baud=int(settings.value("mavlink/baud",115200));self._enabled=str(settings.value("mavlink/enabled","true")).lower() not in ("0","false");self._target_system=int(settings.value("mavlink/system",0));self._target_component=int(settings.value("mavlink/component",0));self._worker=None;self._error="";self._telemetry={"connected":False,"heartbeat":False,"health":"disconnected","link":{}};self._generation=0
-  if self._enabled:self.start()
+  if auto_start and self._enabled:self.start()
  @Property(str,notify=changed)
  def endpoint(self):return self._endpoint
  @Property(int,notify=changed)
@@ -156,7 +156,7 @@ class MavlinkRuntime(QObject):
   DATA.mkdir(parents=True,exist_ok=True);stamp=datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%SZ");path=DATA/f"mavlink-diagnostics-{stamp}.json";safe={"generatedUtc":datetime.now(timezone.utc).isoformat(),"endpoint":self._endpoint,"baud":self._baud,"targetSystem":self._target_system,"targetComponent":self._target_component,"enabled":self._enabled,"backendError":self._error,"telemetry":self._telemetry};path.write_text(json.dumps(safe,ensure_ascii=False,indent=2),encoding="utf-8");self.notice.emit("Звіт MAVLink збережено: "+str(path));return str(path)
  @Slot()
  def start(self):
-  if self._worker is not None:return
+  if self._worker is not None or not self._enabled:return
   self._generation+=1;generation=self._generation;self._error="";worker=MavlinkWorker(self._endpoint,self._baud,self._target_system,self._target_component);self._worker=worker;worker.telemetry.connect(lambda values,g=generation:self._on_telemetry(g,values));worker.failed.connect(lambda error,g=generation:self._on_error(g,error));worker.finished.connect(lambda g=generation,w=worker:self._on_finished(g,w));worker.start();self.changed.emit()
  @Slot()
  def stop(self):
