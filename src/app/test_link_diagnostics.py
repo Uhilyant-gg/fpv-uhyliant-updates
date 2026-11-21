@@ -1,4 +1,4 @@
-import unittest
+import math,unittest
 from link_diagnostics import LinkDiagnostics
 class Clock:
  def __init__(self):self.now=10.0
@@ -8,10 +8,20 @@ class Tests(unittest.TestCase):
   d=LinkDiagnostics();self.assertFalse(d.network['available']);self.assertIsNone(d.network['rttMs']);self.assertFalse(d.externalNavigation['available']);self.assertIsNone(d.externalNavigation['quality'])
  def test_observations_remain_separate(self):
   d=LinkDiagnostics();d.observeExternalNavigation('StabX','ready','tracking','observed packet');d.observeNetwork('WireGuard','ready','wg0','10.5.0.1',32.5,'observed probe');self.assertEqual(d.externalNavigation['source'],'StabX');self.assertEqual(d.network['transport'],'WireGuard');self.assertEqual(d.network['rttMs'],32.5)
- def test_invalid_network_does_not_invent_rtt(self):
-  d=LinkDiagnostics();d.observeNetwork('Starlink','ready','','',-1,'');self.assertFalse(d.network['available']);self.assertIsNone(d.network['rttMs'])
- def test_observation_becomes_stale(self):
-  c=Clock();d=LinkDiagnostics(c,5);d.observeExternalNavigation('StabX','ready','tracking','');c.now=16;self.assertEqual(d.externalNavigation['state'],'stale');self.assertFalse(d.externalNavigation['available'])
+ def test_network_state_does_not_require_invented_rtt(self):
+  d=LinkDiagnostics();d.observeNetwork('Starlink','ready','','',None,'interface observer');self.assertTrue(d.network['available']);self.assertEqual(d.network['state'],'ready');self.assertIsNone(d.network['rttMs'])
+ def test_invalid_rtt_is_unknown_not_exception_or_zero(self):
+  d=LinkDiagnostics()
+  for value in ('bad',float('nan'),float('inf'),-1,None):
+   d.observeNetwork('WireGuard','degraded','wg0','peer',value,'observed');self.assertTrue(d.network['available']);self.assertIsNone(d.network['rttMs'])
+ def test_invalid_state_discards_untrusted_fields(self):
+  d=LinkDiagnostics();d.observeNetwork('WireGuard','connected','wg0','peer',9,'observed');self.assertFalse(d.network['available']);self.assertEqual(d.network['state'],'unavailable');self.assertIsNone(d.network['rttMs'])
+ def test_external_none_input_is_unavailable(self):
+  d=LinkDiagnostics();d.observeExternalNavigation(None,None,None,None);self.assertFalse(d.externalNavigation['available']);self.assertEqual(d.externalNavigation['state'],'unavailable')
+ def test_observation_becomes_stale_without_zeroing_values(self):
+  c=Clock();d=LinkDiagnostics(c,5);d.observeNetwork('WireGuard','ready','wg0','peer',12.5,'observed');c.now=16;self.assertEqual(d.network['state'],'stale');self.assertFalse(d.network['available']);self.assertEqual(d.network['rttMs'],12.5)
+ def test_invalid_stale_threshold_falls_back_safely(self):
+  c=Clock();d=LinkDiagnostics(c,float('nan'));d.observeExternalNavigation('StabX','ready','tracking','');c.now=16;self.assertEqual(d.externalNavigation['state'],'stale')
  def test_clear_removes_observed_values(self):
   d=LinkDiagnostics();d.observeNetwork('WireGuard','ready','wg0','peer',1,'');d.clear();self.assertIsNone(d.network['rttMs']);self.assertEqual(d.network['state'],'unavailable')
 if __name__=='__main__':unittest.main()
