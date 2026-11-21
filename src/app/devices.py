@@ -23,6 +23,9 @@ class Devices(QObject):
  def _init(self):
   with self._connect() as d:
    d.execute('CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT NOT NULL,host TEXT NOT NULL,port INTEGER NOT NULL,connection TEXT NOT NULL,notes TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 0,identity_json TEXT NOT NULL DEFAULT "{}")')
+   cols={row[1] for row in d.execute('PRAGMA table_info(devices)')}
+   if 'active' not in cols:d.execute('ALTER TABLE devices ADD COLUMN active INTEGER NOT NULL DEFAULT 0')
+   if 'identity_json' not in cols:d.execute('ALTER TABLE devices ADD COLUMN identity_json TEXT NOT NULL DEFAULT "{}"')
    d.execute('CREATE TABLE IF NOT EXISTS streams(id TEXT PRIMARY KEY,device_id TEXT NOT NULL,name TEXT NOT NULL,kind TEXT NOT NULL,port INTEGER NOT NULL,path TEXT NOT NULL,protocol TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 1)')
  def _load(self):
   with self._connect() as d:
