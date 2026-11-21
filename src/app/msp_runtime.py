@@ -47,7 +47,11 @@ class MspParser:
    marker=bytes(self._buffer[:2])
    parsed=self._parse_v1() if marker==b'$M' else self._parse_v2() if marker==b'$X' else False
    if parsed is None:break
-   if parsed is False:del self._buffer[0];continue
+   if parsed is False:
+    # A parser may already have consumed a complete invalid frame. Only
+    # discard one byte when data remains, avoiding an empty-buffer delete.
+    if self._buffer:del self._buffer[0]
+    continue
    result.append(parsed);self.frames+=1
   return result
  def _parse_v1(self):
