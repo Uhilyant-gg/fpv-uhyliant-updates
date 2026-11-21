@@ -32,10 +32,10 @@ class Tests(unittest.TestCase):
  def test_device_identity_change_invalidates_approved_execution(self):
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
    acquisition=self.acquisition(td);acquisition.selectForDevice('cam','nightly','b1','lite');self.assertTrue(acquisition.downloadSelected('cam'));self.assertTrue(self.center.precheck('cam','ssc30kq-imx335','upgrade',True,True));self.assertTrue(self.center.prepareExecution('cam','ssc30kq-imx335','upgrade'))
-   self.devices.items[0]['host']='192.168.1.99';self.assertFalse(self.center.approvalMatches('cam','ssc30kq-imx335','upgrade'));self.assertFalse(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.executor.status['state'],'blocked');self.assertFalse(self.executor.busy)
+   self.devices.items[0]['host']='192.168.1.99';self.assertFalse(self.center.approvalMatches('cam','ssc30kq-imx335','upgrade'));self.assertFalse(self.executor.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.executor.status['state'],'blocked');self.assertFalse(self.executor.busy)
  def test_tampered_downloaded_image_is_blocked_before_transport(self):
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
    acquisition=self.acquisition(td);acquisition.selectForDevice('cam','nightly','b1','lite');self.assertTrue(acquisition.downloadSelected('cam'));self.assertTrue(self.center.precheck('cam','ssc30kq-imx335','upgrade',True,True));self.assertTrue(self.center.prepareExecution('cam','ssc30kq-imx335','upgrade'));Path(self.center.artifact['path']).write_bytes(b'tampered')
-   self.assertFalse(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.executor.status['state'],'blocked');self.assertFalse(self.executor.busy)
+   self.assertFalse(self.executor.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.executor.status['state'],'blocked');self.assertFalse(self.executor.busy)
 
 if __name__=='__main__':unittest.main()
