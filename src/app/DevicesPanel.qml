@@ -26,7 +26,7 @@ Item {
                 Text { text: "Автоматичний безпечний пошук у доступних мережах"; color: muted; font.pixelSize: 13 }
             }
             Item { Layout.fillWidth: true }
-            Button { text: "Закрити"; flat: true; onClicked: root.closeRequested() }
+            Button { text: "Закрити"; flat: true; onClicked: root.closeRequested(); HoverHint { text: "Повернутися до попереднього екрана." } }
         }
         Rectangle {
             Layout.fillWidth: true; Layout.preferredHeight: 88; radius: 16; color: surfaceHi
@@ -36,8 +36,9 @@ Item {
                     text: devicesModel.scanning ? "Скасувати пошук" : "Знайти камери"
                     font.bold: true
                     onClicked: devicesModel.scanning ? devicesModel.cancelDiscovery() : devicesModel.discoverOpenIPC()
+                    HoverHint { text: devicesModel.scanning ? "Зупинити поточний пошук камер." : "Знайти камери в доступних безпечних приватних мережах." }
                 }
-                Button { text: "Вказати IP"; flat: true; onClicked: manualPopup.open() }
+                Button { text: "Вказати IP"; flat: true; onClicked: manualPopup.open(); HoverHint { text: "Перевірити камеру за відомою IPv4-адресою." } }
                 Item { Layout.fillWidth: true }
                 ColumnLayout {
                     visible: devicesModel.scanning || devicesModel.scanStatus !== "Готово"; spacing: 3
@@ -68,7 +69,7 @@ Item {
                             }
                         }
                     }
-                    Button { text: "Підключити"; Layout.fillWidth: true; enabled: selectedSaved !== null; onClicked: devicesModel.setActive(selectedSaved.id) }
+                    Button { text: "Підключити"; Layout.fillWidth: true; enabled: selectedSaved !== null; onClicked: devicesModel.setActive(selectedSaved.id); HoverHint { text: "Зробити вибрану збережену камеру активною." } }
                 }
             }
             Rectangle {
@@ -98,8 +99,8 @@ Item {
                         }
                     }
                     RowLayout { Layout.fillWidth: true
-                        Button { text: "Додати камеру"; enabled: selectedFound && selectedFound.openipc; onClicked: devicesModel.addDiscovered(selectedFound.host, selectedFound.name, true) }
-                        Button { text: "Деталі"; flat: true; enabled: selectedFound !== null; onClicked: detailsPopup.open() }
+                        Button { text: "Додати камеру"; enabled: selectedFound && selectedFound.openipc; onClicked: devicesModel.addDiscovered(selectedFound.host, selectedFound.name, true); HoverHint { text: "Зберегти вибрану камеру з підтвердженою OpenIPC-ідентичністю." } }
+                        Button { text: "Деталі"; flat: true; enabled: selectedFound !== null; onClicked: detailsPopup.open(); HoverHint { text: "Показати отриману ідентичність та джерела підтвердження." } }
                         Item { Layout.fillWidth: true }
                     }
                 }
@@ -111,12 +112,12 @@ Item {
         background: Rectangle { color: surfaceHi; radius: 16; border.color: line }
         ColumnLayout { width: parent.width; spacing: 12
             Text { text: "Вказати IP камери"; color: fg; font.pixelSize: 20; font.bold: true }
-            TextField { id: manualIp; Layout.fillWidth: true; placeholderText: "192.168.1.50"; inputMethodHints: Qt.ImhFormattedNumbersOnly }
+            TextField { id: manualIp; Layout.fillWidth: true; placeholderText: "192.168.1.50"; inputMethodHints: Qt.ImhFormattedNumbersOnly; HoverHint { text: "IPv4-адреса камери, яку потрібно перевірити напряму." } }
             Text { visible: devicesModel.manualError !== ""; text: devicesModel.manualError; color: "#ff8d8d"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             Text { visible: devicesModel.manualResult.openipc === true; text: "OpenIPC підтверджено · " + value(devicesModel.manualResult.identity.platform) + " · " + value(devicesModel.manualResult.identity.sensor); color: accent; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             RowLayout { Layout.fillWidth: true
-                Button { text: devicesModel.manualBusy ? "Перевірка…" : "Перевірити"; enabled: !devicesModel.manualBusy; onClicked: devicesModel.inspectManualIp(manualIp.text) }
-                Button { text: "Додати"; enabled: devicesModel.manualResult.openipc === true; onClicked: { devicesModel.addDiscovered(devicesModel.manualResult.host, "OpenIPC " + devicesModel.manualResult.host, true); manualPopup.close() } }
+                Button { text: devicesModel.manualBusy ? "Перевірка…" : "Перевірити"; enabled: !devicesModel.manualBusy; onClicked: devicesModel.inspectManualIp(manualIp.text); HoverHint { text: "Запустити для цієї адреси той самий безпечний fingerprint pipeline." } }
+                Button { text: "Додати"; enabled: devicesModel.manualResult.openipc === true; onClicked: { devicesModel.addDiscovered(devicesModel.manualResult.host, "OpenIPC " + devicesModel.manualResult.host, true); manualPopup.close() }; HoverHint { text: "Зберегти камеру після підтвердження OpenIPC." } }
                 Item { Layout.fillWidth: true }
                 Button { text: "Закрити"; flat: true; onClicked: manualPopup.close() }
             }
