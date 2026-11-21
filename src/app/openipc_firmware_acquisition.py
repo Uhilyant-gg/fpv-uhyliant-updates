@@ -1,4 +1,4 @@
-"""Fail-closed OpenIPC firmware catalog, resolver and verified download boundary."""
+"""Fail-closed OpenIPC firmware catalog, selection binding and verified download boundary."""
 import hashlib,json,os,tempfile,urllib.error,urllib.request
 from copy import deepcopy
 from pathlib import Path
@@ -78,7 +78,7 @@ def _read_response(response,limit):
  return data
 class OpenIPCFirmwareAcquisition(QObject):
  changed=Signal()
- def __init__(self,firmware_center,cache_dir,opener=None):super().__init__();self.center=firmware_center;self.cache=Path(cache_dir);self.opener=opener or urllib.request.urlopen;self._catalog=[];self._status={'state':'idle','reason':'','count':0,'selection':{}}
+ def __init__(self,firmware_center,cache_dir,opener=None):super().__init__();self.center=firmware_center;self.cache=Path(cache_dir);self.opener=opener or urllib.request.urlopen;self._catalog=[];self._generation=0;self._status={'state':'idle','reason':'','count':0,'selection':{}}
  @Property('QVariantMap',notify=changed)
  def status(self):return deepcopy(self._status)
  @Property('QVariantList',notify=changed)
@@ -92,38 +92,58 @@ class OpenIPCFirmwareAcquisition(QObject):
  def _set(self,state,reason='',selection=None,**extra):
   if selection is None:selection={}
   self._status={'state':state,'reason':reason,'count':len(self._catalog),'selection':deepcopy(selection),**extra};self.changed.emit()
+ def _device_snapshot(self,device_id):
+  device=next((d for d in self.center.devices.items if d.get('id')==device_id),None);identity=(device or {}).get('openipcIdentity') or {}
+  if not device or identity.get('verified') is not True:return None
+  platform=_text(identity.get('platform')).lower();sensor=_text(identity.get('sensor')).lower();host=_text(device.get('host'))
+  if not platform or not sensor or not host:return None
+  return {'deviceId':device_id,'host':host,'platform':platform,'sensor':sensor}
+ def _selection_current(self,selection):return isinstance(selection,dict) and selection.get('catalogGeneration')==self._generation and self._device_snapshot(selection.get('deviceId',''))==selection.get('device') and selection.get('artifact') in self._catalog
  @Slot(result=bool)
  def refresh(self):
-  self._set('loading')
+  self._generation+=1;self._catalog=[];self._set('loading')
   try:
    request=urllib.request.Request(OFFICIAL_MANIFEST_URL,headers={'Accept':'application/json','User-Agent':'FPV-Uhyliant/firmware-acquisition'})
    with self.opener(request,timeout=NETWORK_TIMEOUT) as response:raw=_read_response(response,MAX_MANIFEST_BYTES)
    catalog=parse_catalog(raw)
    if not catalog:raise ValueError('Каталог OpenIPC не містить придатних образів')
-  except (OSError,urllib.error.URLError,ValueError,TypeError) as exc:self._catalog=[];self._set('error',str(exc));return False
+  except (OSError,urllib.error.URLError,ValueError,TypeError) as exc:self._set('error',str(exc));return False
   self._catalog=catalog;self._set('ready');return True
- @Slot(str,str,str,str,str,result='QVariantMap')
- def select(self,platform,sensor,channel,build,variant):
-  result=resolve(self._catalog,platform,sensor,channel,build,variant);self._status={**self._status,'selection':deepcopy(result)};self.changed.emit();return result
- @Slot('QVariantMap',result=bool)
- def download(self,artifact):
-  if not isinstance(artifact,dict) or not _official_url(artifact.get('url')):self._set('error','Невалідне джерело прошивки');return False
-  expected=_sha(artifact.get('sha256'))
+ @Slot(str,str,str,str,result='QVariantMap')
+ def selectForDevice(self,device_id,channel,build,variant):
+  device=self._device_snapshot(device_id)
+  if not device:
+   result={'ready':False,'reason':'Пристрій або підтверджену апаратну ідентичність втрачено'};self._status={**self._status,'selection':result};self.changed.emit();return result
+  result=resolve(self._catalog,device['platform'],device['sensor'],channel,build,variant)
+  if result.get('ready'):result={**result,'deviceId':device_id,'device':device,'catalogGeneration':self._generation,'source':'official-openipc-catalog'}
+  self._status={**self._status,'selection':deepcopy(result)};self.changed.emit();return result
+ @Slot(str,result=bool)
+ def downloadSelected(self,device_id):
+  selection=deepcopy(self._status.get('selection') or {})
+  if selection.get('deviceId')!=device_id or not self._selection_current(selection):self._set('stale','Вибір прошивки застарів; повторіть перевірку сумісності',selection=selection);return False
+  artifact=selection['artifact'];expected=_sha(artifact.get('sha256'))
   try:size=int(artifact.get('size'))
   except (TypeError,ValueError):size=0
-  if not expected or size<=0 or size>MAX_FIRMWARE_BYTES:self._set('error','Невалідні метадані прошивки');return False
-  selection={'ready':True,'artifact':deepcopy(artifact)};self._set('downloading',selection=selection);self.cache.mkdir(parents=True,exist_ok=True);fd,tmp=tempfile.mkstemp(prefix='openipc-',suffix='.part',dir=self.cache);os.close(fd);target=self.cache/('openipc-'+expected[:16]+'.tgz')
+  if not _official_url(artifact.get('url')) or not expected or size<=0 or size>MAX_FIRMWARE_BYTES:self._set('error','Невалідні метадані прошивки',selection=selection);return False
+  self._set('downloading',selection=selection);self.cache.mkdir(parents=True,exist_ok=True);target=self.cache/('openipc-'+expected[:16]+'.tgz')
+  if target.is_file() and verify_download(target,artifact):
+   if self._selection_current(selection) and self.center.verifyImage(str(target),expected):selection['path']=str(target);self._set('verified',selection=selection);return True
+   self._set('stale','Ідентичність пристрою змінилася під час перевірки кешу',selection=selection);return False
+  try:target.unlink(missing_ok=True)
+  except OSError:pass
+  fd,tmp=tempfile.mkstemp(prefix='openipc-',suffix='.part',dir=self.cache);os.close(fd)
   try:
    request=urllib.request.Request(artifact['url'],headers={'Accept':'application/octet-stream','User-Agent':'FPV-Uhyliant/firmware-acquisition'})
    with self.opener(request,timeout=NETWORK_TIMEOUT) as response:data=_read_response(response,size)
    Path(tmp).write_bytes(data)
    if not verify_download(tmp,artifact):raise ValueError('SHA-256 або розмір завантаження не збігається')
+   if not self._selection_current(selection):raise ValueError('Ідентичність пристрою або каталог змінилися під час завантаження')
    os.replace(tmp,target)
-   if not self.center.verifyImage(str(target),expected):raise ValueError('FirmwareCenter відхилив завантажений образ')
+   if not self.center.verifyImage(str(target),expected):raise ValueError('Центр прошивки відхилив завантажений образ')
   except (OSError,urllib.error.URLError,ValueError,TypeError) as exc:
    try:Path(tmp).unlink(missing_ok=True)
    except OSError:pass
    self._set('error',str(exc),selection=selection);return False
   selection['path']=str(target);self._set('verified',selection=selection);return True
  @Slot()
- def reset(self):self._catalog=[];self._set('idle')
+ def reset(self):self._generation+=1;self._catalog=[];self._set('idle')
