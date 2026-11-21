@@ -14,7 +14,10 @@ class DiagnosticsRuntime(QObject):
   v=self.video
   if v is None:return {}
   return {'primary':{'state':getattr(getattr(v,'primary',None),'state',None)},'secondary':{'state':getattr(getattr(v,'secondary',None),'state',None)}}
- def _network_evidence(self,devices):return collect_network_evidence(interfaces(),system_routes(),devices,getattr(self.devices,'_discovered',[]) or [])
+ def _network_evidence(self,devices):
+  discovered=list(getattr(self.devices,'_discovered',[]) or []);manual=getattr(self.devices,'_manual_result',{}) or {}
+  if isinstance(manual,dict) and manual:discovered.append(manual)
+  return collect_network_evidence(interfaces(),system_routes(),devices,discovered)
  def _network_health(self,network,video,devices,evidence):
   finding=classify_network(network,(video.get('primary') or {}).get('state'),bool(devices));finding['remediation']=remediation(finding.get('action'));finding['evidenceSummary']=deepcopy(evidence.get('summary',{}));return finding
  def build(self):
