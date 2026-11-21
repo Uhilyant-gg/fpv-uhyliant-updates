@@ -1,0 +1,21 @@
+{
+  "product": "FPV-Uhyliant",
+  "channel": "test",
+  "version": "2.0.14",
+  "build": 2014,
+  "mandatory": false,
+  "minimumUpdaterVersion": "1.5.0",
+  "package": {
+    "file": "FPV-Uhyliant-v2.0.14-test-UA-Windows.zip",
+    "url": "https://<scrubbed-url-domain>/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.14/FPV-Uhyliant-v2.0.14-test-UA-Windows.zip",
+    "sha256": "b197b9cc4ba6578b490c2573e366c9dc5aa31d977410429f81744f5cc7d76c3a"
+  },
+  "releaseNotes": [
+    "Windows startup stability and diagnostics hardening"
+  ],
+  "signature": {
+    "algorithm": "Ed25519",
+    "keyId": "fpv-uhyliant-production-v1",
+    "value": "kw8CzeA5yrCQPEtdxVEJW9pT9PKTZjt1hMASvBd7A8awD4IFlVawx4F6xqS6fxrq+FhpWd2QBJbi7mjLyYTBAA=="
+  }
+}

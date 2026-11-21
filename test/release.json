@@ -1,21 +1,21 @@
 {
   "product": "FPV-Uhyliant",
   "channel": "test",
-  "version": "2.0.13",
-  "build": 2013,
+  "version": "2.0.14",
+  "build": 2014,
   "mandatory": false,
   "minimumUpdaterVersion": "1.5.0",
   "package": {
-    "file": "FPV-Uhyliant-v2.0.13-test-UA-Windows.zip",
-    "url": "https://<scrubbed-url-domain>/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.13/FPV-Uhyliant-v2.0.13-test-UA-Windows.zip",
-    "sha256": "16331b8a0f31916bbe22cfa6be571984bd3252723407f48f6646e004f90dc9de"
+    "file": "FPV-Uhyliant-v2.0.14-test-UA-Windows.zip",
+    "url": "https://<scrubbed-url-domain>/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.14/FPV-Uhyliant-v2.0.14-test-UA-Windows.zip",
+    "sha256": "b197b9cc4ba6578b490c2573e366c9dc5aa31d977410429f81744f5cc7d76c3a"
   },
   "releaseNotes": [
-    "Authenticated guarded OpenIPC update pipeline"
+    "Windows startup stability and diagnostics hardening"
   ],
   "signature": {
     "algorithm": "Ed25519",
     "keyId": "fpv-uhyliant-production-v1",
-    "value": "suZn7sYHKEaa4VWF6DmZFMeQEzqKhhJsIU06n9dRLtMK6KmhLdddmF5ZOT3uC8qdQ5JGtW/5eacPdqkavWUwDQ=="
+    "value": "kw8CzeA5yrCQPEtdxVEJW9pT9PKTZjt1hMASvBd7A8awD4IFlVawx4F6xqS6fxrq+FhpWd2QBJbi7mjLyYTBAA=="
   }
 }
