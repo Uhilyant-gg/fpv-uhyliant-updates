@@ -1,5 +1,6 @@
 name: verify-update-repository
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths-ignore:
