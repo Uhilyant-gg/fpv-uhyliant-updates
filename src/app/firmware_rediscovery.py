@@ -15,7 +15,7 @@ def _private_candidate(value):
 class FirmwareRediscovery:
  def __init__(self,probe,sleep=time.sleep,candidates=None):self.probe=probe;self.sleep=sleep;self.candidates=candidates
  def _hosts(self,original_host):
-  original=str(original_host).strip();hosts=[original]
+  original=str(original_host).strip();hosts=[original] if _private_candidate(original) else []
   if callable(self.candidates):
    try:extra=self.candidates(original_host)
    except Exception:extra=()
@@ -24,7 +24,7 @@ class FirmwareRediscovery:
      value=str(host).strip()
      if value!=original and _private_candidate(value) and value not in hosts:
       hosts.append(value)
-      if len(hosts)-1>=_MAX_REDISCOVERY_CANDIDATES:break
+      if len(hosts)-(1 if original in hosts else 0)>=_MAX_REDISCOVERY_CANDIDATES:break
   return hosts
  def _fresh_identity(self,result):
   if not isinstance(result,dict) or result.get('openipc') is not True:return None
@@ -37,17 +37,16 @@ class FirmwareRediscovery:
  def _matches(self,candidate,result,original,platform,sensor):
   identity=self._fresh_identity(result)
   if identity is None:return None
-  if platform and sensor:
-   if str(identity.get('platform','')).strip().lower()!=platform or str(identity.get('sensor','')).strip().lower()!=sensor:return None
-  elif candidate!=original:return None
+  if not platform or not sensor:return None
+  if str(identity.get('platform','')).strip().lower()!=platform or str(identity.get('sensor','')).strip().lower()!=sensor:return None
   return identity
  def _probe_one(self,candidate):
   try:return self.probe(candidate)
   except Exception:return None
  def _probe_candidates(self,candidates,original,platform,sensor):
+  if not candidates:return None,None
   pool=concurrent.futures.ThreadPoolExecutor(max_workers=min(_MAX_REDISCOVERY_WORKERS,len(candidates)))
-  futures={pool.submit(self._probe_one,candidate):candidate for candidate in candidates}
-  detached=False
+  futures={pool.submit(self._probe_one,candidate):candidate for candidate in candidates};detached=False
   try:
    for future in concurrent.futures.as_completed(futures):
     candidate=futures[future]
@@ -63,12 +62,14 @@ class FirmwareRediscovery:
    if not detached:pool.shutdown(wait=True,cancel_futures=True)
   return None,None
  def wait(self,host,attempts=30,interval=2.0,expected_identity=None):
-  attempts=max(1,min(int(attempts),120));interval=max(0.0,min(float(interval),10.0));expected=expected_identity if isinstance(expected_identity,dict) else {};platform=str(expected.get('platform','')).strip().lower();sensor=str(expected.get('sensor','')).strip().lower();hosts=self._hosts(host);original=str(host).strip()
+  attempts=max(1,min(int(attempts),120));interval=max(0.0,min(float(interval),10.0));expected=expected_identity if isinstance(expected_identity,dict) else {};platform=str(expected.get('platform','')).strip().lower();sensor=str(expected.get('sensor','')).strip().lower();original=str(host).strip()
+  if not _private_candidate(original) or not platform or not sensor:return {'rediscovered':False,'attempts':0,'host':'','identity':normalize_openipc_identity()}
+  hosts=self._hosts(original)
   for index in range(attempts):
    direct=self._probe_one(original);identity=self._matches(original,direct,original,platform,sensor)
    if identity is not None:return {'rediscovered':True,'attempts':index+1,'host':original,'identity':identity}
    candidates=[candidate for candidate in hosts if candidate!=original]
-   if platform and sensor and candidates:
+   if candidates:
     candidate,identity=self._probe_candidates(candidates,original,platform,sensor)
     if identity is not None:return {'rediscovered':True,'attempts':index+1,'host':candidate,'identity':identity}
    if index+1<attempts:self.sleep(interval)
