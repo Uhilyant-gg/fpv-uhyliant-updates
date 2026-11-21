@@ -35,7 +35,7 @@ class FirmwareUpdateSession(QObject):
   try:address=ipaddress.ip_address(context.get('host',''))
   except ValueError:return self._sync(self.executor.failRediscovery())
   if address.version!=4 or address.is_unspecified or address.is_loopback or address.is_multicast:return self._sync(self.executor.failRediscovery())
-  lifecycle=FirmwareUpdateLifecycle(self.executor,FirmwareRediscovery(self._probe));return self._sync(lifecycle.verify_after_reboot())
+  lifecycle=FirmwareUpdateLifecycle(self.executor,FirmwareRediscovery(self._probe));ok=lifecycle.verify_after_reboot();return self._sync(ok)
  @Slot()
  def reset(self):
   if self.executor.busy:return False

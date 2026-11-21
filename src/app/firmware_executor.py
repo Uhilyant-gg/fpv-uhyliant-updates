@@ -56,11 +56,16 @@ class FirmwareExecutor(QObject):
   if self._state.get('state')!='reboot-pending' or not self._handoff:return {'ready':False}
   host=str(self._handoff.get('host','')).strip()
   return {'ready':bool(host),'host':host,'profile':self._handoff.get('profile',''),'before':deepcopy(self._before)}
+ def beginRediscovery(self):
+  if not self._locked_device or self._state.get('state')!='reboot-pending' or not self._handoff:return None
+  context=self.verificationContext()
+  if not context.get('ready'):return None
+  self._set('rediscovering',step='rediscover',error='');return context
  def failRediscovery(self):
-  if not self._locked_device or self._state.get('state')!='reboot-pending':return False
+  if not self._locked_device or self._state.get('state') not in ('reboot-pending','rediscovering'):return False
   self._set('error',step='rediscover',error='Підтверджену OpenIPC не виявлено після перезапуску',verification={});self._release_lock();return False
  def acceptRediscoveredVerification(self,rediscovery,verification):
-  if not self._locked_device or self._state.get('state')!='reboot-pending' or not isinstance(rediscovery,dict) or rediscovery.get('rediscovered') is not True or not isinstance(verification,dict):return False
+  if not self._locked_device or self._state.get('state')!='rediscovering' or not isinstance(rediscovery,dict) or rediscovery.get('rediscovered') is not True or not isinstance(verification,dict):return False
   result=deepcopy(verification);result['rediscoveryAttempts']=rediscovery.get('attempts',0)
   ok=result.get('ok') is True;self._set('verified' if ok else 'error',step='verify',verification=result,error='' if ok else 'Перевірка після операції не пройдена');self._release_lock();return ok
  @Slot()

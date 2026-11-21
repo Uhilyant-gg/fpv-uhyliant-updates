@@ -8,6 +8,8 @@ class Devices:
  def __init__(self):self.items=[{'id':'cam','host':'192.168.1.50','openipcIdentity':{'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'old','evidence':['Majestic /api/v1/config.json']}}]
 class Adapter:
  def execute(self,*args):return True
+class RaisingRediscovery:
+ def wait(self,*args):raise RuntimeError('rediscovery failed')
 class Tests(unittest.TestCase):
  def make(self,probe):
   td=tempfile.TemporaryDirectory();image=Path(td.name)/'fw.bin';image.write_bytes(b'x');devices=Devices();center=FirmwareCenter(devices);center.verifyImage(str(image),hashlib.sha256(b'x').hexdigest());center.precheck('cam','ssc30kq-imx335','upgrade',True,True);center.prepareExecution('cam','ssc30kq-imx335','upgrade');executor=FirmwareExecutor(center);executor.register_adapter(Adapter());self.assertTrue(executor.execute('cam','ssc30kq-imx335','upgrade'));return td,executor,FirmwareUpdateLifecycle(executor,FirmwareRediscovery(probe,sleep=lambda _:None))
@@ -35,5 +37,15 @@ class Tests(unittest.TestCase):
  def test_sysupgrade_dispatch_remains_reboot_pending_until_rediscovery(self):
   td,x,l=self.make(lambda host:None)
   try:self.assertEqual(x.status['state'],'reboot-pending')
+  finally:td.cleanup()
+ def test_verification_is_single_flight(self):
+  calls=[]
+  def probe(host):calls.append(host);return {'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':['OpenIPC status.cgi']}
+  td,x,l=self.make(probe)
+  try:self.assertTrue(l.verify_after_reboot(1,0));self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(len(calls),1);self.assertEqual(x.status['state'],'verified')
+  finally:td.cleanup()
+ def test_unexpected_rediscovery_exception_is_terminal_failure(self):
+  td,x,l=self.make(lambda host:None);l.rediscovery=RaisingRediscovery()
+  try:self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(x.status['state'],'error');self.assertFalse(x.busy)
   finally:td.cleanup()
 if __name__=='__main__':unittest.main()
