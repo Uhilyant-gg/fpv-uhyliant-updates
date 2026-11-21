@@ -92,8 +92,7 @@ class PairingRegistry(QObject):
   if not record or self._recovery_error:return False
   ok,secret=self._secret_call('get',record['secretRef'])
   if not ok:self.changed.emit();return False
-  if secret is None:
-   self._recovery_error='trusted metadata references a missing protected secret';self.changed.emit();return False
+  if secret is None:self._recovery_error='trusted metadata references a missing protected secret';self.changed.emit();return False
   ok,_=self._secret_call('delete',record['secretRef'])
   if not ok:self.changed.emit();return False
   candidate=dict(self._records);candidate.pop(pairing_id,None)
@@ -109,16 +108,19 @@ class PairingRegistry(QObject):
   return existed
  @Slot()
  def clearPending(self):self._pending.clear();self.changed.emit()
- @Slot()
+ @Slot(result=bool)
  def reconcile(self):
-  if not self.secretStoreAvailable or not self.metadataStoreAvailable:return
+  if not self.secretStoreAvailable or not self.metadataStoreAvailable:
+   self._recovery_error='reconciliation requires both protected secret and metadata stores';self.changed.emit();return False
+  if self._metadata_error:
+   self._load()
+   if self._metadata_error:self._recovery_error='metadata reload failed; reconciliation incomplete';self.changed.emit();return False
   candidate=dict(self._records);changed=False
   for pid,record in list(candidate.items()):
    ok,present=self._secret_call('contains',record['secretRef'])
-   if not ok:self.changed.emit();return
+   if not ok:self._recovery_error='protected secret verification failed; reconciliation incomplete';self.changed.emit();return False
    if not present:candidate.pop(pid,None);changed=True
-  if changed:
-   if self._persist(candidate):self._records=candidate;self._recovery_error=''
-   self.changed.emit()
-  elif self._recovery_error:
-   self._recovery_error='';self.changed.emit()
+  if changed and not self._persist(candidate):
+   self._recovery_error='metadata persistence failed; reconciliation incomplete';self.changed.emit();return False
+  if changed:self._records=candidate
+  self._recovery_error='';self.changed.emit();return True

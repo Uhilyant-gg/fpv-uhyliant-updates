@@ -18,8 +18,10 @@ class Store(SecretStore):
   return key in self.data
 class Meta(MetadataStore):
  available=True
- def __init__(self):self.records=[];self.fail=False
- def load(self):return [dict(r) for r in self.records]
+ def __init__(self):self.records=[];self.fail=False;self.load_fail=False
+ def load(self):
+  if self.load_fail:raise OSError('load fail')
+  return [dict(r) for r in self.records]
  def save(self,records):
   if self.fail:raise OSError('fail')
   self.records=[dict(r) for r in records]
@@ -32,7 +34,7 @@ class Tests(unittest.TestCase):
  def test_confirm_failure_preserves_pending_for_retry(self):
   s=Store();m=Meta();r=PairingRegistry(s,m);p=r.begin('Ground','peer');m.fail=True;self.assertFalse(r.confirm(p['id'],True));self.assertEqual(len(r.pending),1);self.assertEqual(s.data,{})
  def test_confirm_rollback_failure_blocks_new_pairing_until_reconcile(self):
-  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');m.fail=True;s.fail='delete';self.assertFalse(r.confirm(p['id'],True));self.assertNotEqual(r.recoveryError,'');self.assertEqual(r.begin('Other','peer2'),{});s.fail=None;m.fail=False;r.reconcile();self.assertEqual(r.recoveryError,'')
+  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');m.fail=True;s.fail='delete';self.assertFalse(r.confirm(p['id'],True));self.assertNotEqual(r.recoveryError,'');self.assertEqual(r.begin('Other','peer2'),{});s.fail=None;m.fail=False;self.assertTrue(r.reconcile());self.assertEqual(r.recoveryError,'')
  def test_confirm_persists_metadata_without_secret_bytes(self):
   s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');self.assertTrue(r.confirm(p['id'],True));self.assertNotIn('secret',m.records[0]);self.assertIn(m.records[0]['secretRef'],s.data)
  def test_revoke_rolls_secret_back_when_metadata_write_fails(self):
@@ -43,13 +45,15 @@ class Tests(unittest.TestCase):
   def fail_save(records):s.fail='put';original_save(records)
   m.save=fail_save;self.assertFalse(r.revoke(p['id']));self.assertNotEqual(r.recoveryError,'');self.assertEqual(len(r.trusted),1);self.assertFalse(r.revoke(p['id']))
  def test_revoke_missing_secret_requires_reconcile(self):
-  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);s.data.clear();self.assertFalse(r.revoke(p['id']));self.assertNotEqual(r.recoveryError,'');r.reconcile();self.assertEqual(r.trusted,[]);self.assertEqual(r.recoveryError,'')
+  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);s.data.clear();self.assertFalse(r.revoke(p['id']));self.assertNotEqual(r.recoveryError,'');self.assertTrue(r.reconcile());self.assertEqual(r.trusted,[]);self.assertEqual(r.recoveryError,'')
  def test_revoke_removes_secret_and_metadata(self):
   s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);self.assertTrue(r.revoke(p['id']));self.assertEqual(s.data,{});self.assertEqual(m.records,[]);self.assertEqual(r.trusted,[])
  def test_secret_failure_is_reported_without_fabricating_absence(self):
-  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);s.fail='contains';r.reconcile();self.assertEqual(len(r.trusted),1);self.assertIn('contains fail',r.secretStoreError)
- def test_reconcile_is_commit_after_persist_and_retries_after_transient_error(self):
-  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);s.data.clear();m.fail=True;r.reconcile();self.assertEqual(len(r.trusted),1);self.assertNotEqual(r.metadataError,'');m.fail=False;r.reconcile();self.assertEqual(r.trusted,[]);self.assertEqual(r.metadataError,'')
+  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);s.fail='contains';self.assertFalse(r.reconcile());self.assertEqual(len(r.trusted),1);self.assertIn('contains fail',r.secretStoreError);self.assertNotEqual(r.recoveryError,'')
+ def test_reconcile_metadata_write_failure_stays_blocking(self):
+  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);s.data.clear();m.fail=True;self.assertFalse(r.reconcile());self.assertEqual(len(r.trusted),1);self.assertNotEqual(r.metadataError,'');self.assertNotEqual(r.recoveryError,'');self.assertEqual(r.begin('Other','peer2'),{});m.fail=False;self.assertTrue(r.reconcile());self.assertEqual(r.trusted,[]);self.assertEqual(r.recoveryError,'')
+ def test_reconcile_reloads_after_transient_metadata_load_error(self):
+  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);m.load_fail=True;restarted=PairingRegistry(s,m,Clock());self.assertNotEqual(restarted.metadataError,'');self.assertFalse(restarted.reconcile());m.load_fail=False;self.assertTrue(restarted.reconcile());self.assertEqual(len(restarted.trusted),1);self.assertEqual(restarted.metadataError,'')
  def test_json_metadata_store_roundtrip_contains_no_secret(self):
   with tempfile.TemporaryDirectory() as t:
    path=Path(t)/'pairing.json';s=Store();r=PairingRegistry(s,JsonMetadataStore(path),Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);self.assertNotIn(s.data[r.trusted[0]['secretRef']].hex(),path.read_text());self.assertEqual(len(PairingRegistry(s,JsonMetadataStore(path)).trusted),1)

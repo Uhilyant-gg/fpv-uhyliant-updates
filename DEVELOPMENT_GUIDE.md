@@ -11,9 +11,9 @@ Non-secret trust metadata is persisted at `LocalAppData/FPV-Uhyliant/pairing-tru
 `WindowsCredentialSecretStore` stores opaque bytes as Windows generic credentials under the `FPV-Uhyliant/pairing/` target namespace. The real Windows Credential Manager CI path has passed for write/read/overwrite/delete and registry confirm, restart/reconcile and revoke.
 
 ## Recovery invariants
-Confirmation persists secret then metadata. If metadata persistence fails, secret cleanup must succeed before the registry may accept another pairing mutation. Cleanup failure sets `recoveryError`; never hide it as a normal failure. Reconciliation is the supported retry path.
+Confirmation persists secret then metadata. If metadata persistence fails, secret cleanup must succeed before the registry may accept another pairing mutation. Cleanup failure sets `recoveryError`; never hide it as a normal failure.
 
-Revoke first requires the referenced protected secret to exist. It deletes the secret and then persists candidate metadata. If metadata persistence fails, secret restoration is mandatory; restoration failure sets `recoveryError` and blocks further pairing mutation until reconciliation establishes consistency. Never report a missing secret as successful revoke.
+Revoke requires the referenced protected secret to exist. If metadata persistence fails, restoration is mandatory; restoration failure sets `recoveryError`. `reconcile()` is the only recovery retry path and returns `true` only after both stores are available, any prior metadata load error has been successfully reloaded, every referenced protected secret has been checked, and required metadata changes have persisted. A failed secret check, metadata reload or metadata save keeps recovery state blocking.
 
 ## Pairing UI boundary
 `PairingPanel.qml` may display store availability, non-secret trusted metadata, errors and reconciliation controls, and may revoke existing trust only while recovery state is clean. It must not expose `secretRef`, secret bytes, `begin`, `confirm`, peer discovery, proof or exchange. Do not enable new pairing until a verified peer protocol contract exists.
