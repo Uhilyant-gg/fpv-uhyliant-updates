@@ -1,5 +1,5 @@
 """Route-aware bounded discovery with fail-closed OpenIPC identity."""
-import concurrent.futures,ipaddress,json,os,re,socket,subprocess,urllib.error,urllib.request
+import base64,concurrent.futures,ipaddress,json,os,re,socket,subprocess,urllib.error,urllib.request
 from html import unescape
 MAX_SWEEP_HOSTS=254;MAX_WORKERS=24;PROBE_TIMEOUT=0.65
 VIRTUAL_HINTS=("docker","wsl","hyper-v","vethernet","vmware","virtualbox","vpn","wireguard","tailscale","loopback")
@@ -45,12 +45,21 @@ def _http_url(host,path):
  address=ipaddress.ip_address(str(host).strip())
  if not _private_ipv4(str(address)):raise ValueError("unsafe host")
  scheme=''.join(map(chr,[104,116,116,112,58,47,47]));return scheme+str(address)+path
-def _fetch(url,accept,limit,cancel):
- if cancel.is_set():return None
- request=urllib.request.Request(url,headers={"Accept":accept,"User-Agent":"FPV-Uhyliant/route-discovery"})
+def _tcp_open(host,port,cancel):
+ if cancel.is_set():return False
  try:
-  with urllib.request.urlopen(request,timeout=PROBE_TIMEOUT) as response:return response.read(limit)
- except (urllib.error.URLError,TimeoutError,socket.timeout,OSError,ValueError):return None
+  with socket.create_connection((host,port),timeout=PROBE_TIMEOUT):return True
+ except (TimeoutError,socket.timeout,OSError,ValueError):return False
+def _fetch(url,accept,limit,cancel,username="",password=""):
+ if cancel.is_set():return None,0
+ headers={"Accept":accept,"User-Agent":"FPV-Uhyliant/route-discovery"}
+ if username or password:
+  token=base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii");headers["Authorization"]="Basic "+token
+ request=urllib.request.Request(url,headers=headers)
+ try:
+  with urllib.request.urlopen(request,timeout=PROBE_TIMEOUT) as response:return response.read(limit),int(response.status)
+ except urllib.error.HTTPError as exc:return None,int(exc.code)
+ except (urllib.error.URLError,TimeoutError,socket.timeout,OSError,ValueError):return None,0
 def _walk_identity(value,result):
  if isinstance(value,dict):
   for key,child in value.items():
@@ -75,24 +84,30 @@ def _config_identity(data,identity):
  if not identity["firmware"]:
   version=system.get("version")
   if isinstance(version,(str,int)):identity["firmware"]=str(version).strip()
-def fingerprint(host,cancel):
- identity={"verified":False,"platform":"","soc":"","sensor":"","firmware":"","majestic":"","evidence":[]};result={"host":host,"reachable":False,"camera":False,"openipc":False,"r2d2":False,"identityVerified":False,"identity":identity,"services":[],"streams":[],"evidence":[]}
+def fingerprint(host,cancel,username="",password=""):
+ identity={"verified":False,"platform":"","soc":"","sensor":"","firmware":"","majestic":"","evidence":[]};result={"host":host,"reachable":False,"camera":False,"openipc":False,"r2d2":False,"authRequired":False,"identityVerified":False,"identity":identity,"services":[],"streams":[],"evidence":[]}
  try:config_url=_http_url(host,"/api/v1/config.json");status_url=_http_url(host,"/cgi-bin/status.cgi")
  except ValueError:return result
- config=_fetch(config_url,"application/json",524288,cancel)
+ open_ports=[port for port in (80,443,554,22) if _tcp_open(host,port,cancel)]
+ if open_ports:
+  result["reachable"]=True;result["camera"]=any(port in open_ports for port in (80,443,554));result["services"].extend(f"TCP {port}" for port in open_ports);result["evidence"].append("reachable camera services: "+", ".join(map(str,open_ports)))
+ config,config_status=_fetch(config_url,"application/json",524288,cancel,username,password)
+ if config_status in (401,403):result["authRequired"]=True;result["camera"]=True;result["evidence"].append(f"Majestic API requires authentication ({config_status})")
  if config:
   result["reachable"]=True
   try:data=json.loads(config.decode("utf-8"))
   except (UnicodeError,json.JSONDecodeError):data=None
   majestic_shape=isinstance(data,dict) and any(key in data for key in ("video0","video1","system","isp","rtsp","fpv"))
   if majestic_shape:result["camera"]=result["openipc"]=True;result["services"].append("Majestic API");result["evidence"].append("Majestic /api/v1/config.json");_config_identity(data,identity)
- status=_fetch(status_url,"text/html",262144,cancel)
+ status,status_code=_fetch(status_url,"text/html",262144,cancel,username,password)
+ if status_code in (401,403):result["authRequired"]=True;result["camera"]=True;result["evidence"].append(f"OpenIPC WebUI requires authentication ({status_code})")
  if status:
   result["reachable"]=True;text=status.decode("utf-8","ignore");lower=text.lower()
   if "openipc" in lower or "majestic" in lower:
    result["camera"]=result["openipc"]=True;result["services"].append("OpenIPC WebUI");result["evidence"].append("OpenIPC status.cgi");identity["platform"]=identity["platform"] or _status_value(text,("platform","board"));identity["soc"]=identity["soc"] or _status_value(text,("soc","chip"));identity["sensor"]=identity["sensor"] or _status_value(text,("sensor",));identity["firmware"]=identity["firmware"] or _status_value(text,("firmware","release"));identity["majestic"]=identity["majestic"] or _status_value(text,("majestic",))
   if "r2d2" in lower and result["openipc"]:result["r2d2"]=True;result["evidence"].append("R2D2 marker in status.cgi")
- if result["openipc"]:identity["verified"]=True;identity["evidence"]=list(result["evidence"]);result["identityVerified"]=any(identity[k] for k in ("platform","soc","sensor","firmware","majestic"))
+ if result["openipc"]:identity["verified"]=True;identity["evidence"]=list(result["evidence"]);result["identityVerified"]=any(identity[k] for k in ("platform","soc","sensor","firmware","majestic"));result["authRequired"]=False
+ result["name"]=("OpenIPC " if result["openipc"] else "Камера ")+host;result["hostname"]=host;result["confidence"]="OpenIPC підтверджено" if result["openipc"] else ("Потрібна авторизація" if result["authRequired"] else "Кандидат камери")
  return result
 def discover_targets(targets,cancel,progress=None):
  found=[];total=len(targets)
