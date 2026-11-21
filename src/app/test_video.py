@@ -34,6 +34,9 @@ class VideoRuntimeTests(unittest.TestCase):
   c.return_value.__enter__.return_value=object();w=VideoWorkspaceRuntime(FakeDevices());w.setPipEnabled(True);w.preparePrimary('main');w.prepareSecondary('sub');w.setPipEnabled(False);self.assertEqual(w.secondary.state,'stopped');self.assertEqual(w.primary.streamId,'main')
  def test_secondary_cannot_prepare_while_pip_off(self):
   w=VideoWorkspaceRuntime(FakeDevices());self.assertFalse(w.prepareSecondary('sub'));self.assertEqual(w.secondary.state,'stopped')
+ @patch('video.socket.create_connection',side_effect=OSError('offline'))
+ def test_failed_secondary_prepare_disables_pip(self,c):
+  w=VideoWorkspaceRuntime(FakeDevices());w.setPipEnabled(True);self.assertFalse(w.prepareSecondary('sub'));self.assertFalse(w.pipEnabled);self.assertEqual(w.secondary.state,'error')
  @patch('video.socket.create_connection')
  def test_reconnect_fails_closed_if_stream_was_removed(self,c):
   c.return_value.__enter__.return_value=object();d=FakeDevices();r=VideoRuntime(d);self.assertTrue(r.prepare('main'));d.streams=[];self.assertFalse(r.reconnect());self.assertEqual(r.state,'error');self.assertEqual(r.streamId,'');self.assertIsNone(r.diagnostics['endpointCheckMs'])
