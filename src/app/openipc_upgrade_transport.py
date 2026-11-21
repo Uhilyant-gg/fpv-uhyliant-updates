@@ -1,8 +1,4 @@
-"""Guarded transport boundary for an already-verified OpenIPC camera.
-
-No credentials are stored here. The injected transport owns authentication.
-The command is a fixed argv tuple, never constructed from user input.
-"""
+"""Guarded authenticated transport boundary for an already-verified OpenIPC camera."""
 from openipc_upgrade import UPGRADE_ARGV, upgrade_candidate
 
 class OpenIPCUpgradeAdapter:
@@ -10,8 +6,11 @@ class OpenIPCUpgradeAdapter:
  def _device(self,did):return next((d for d in self.devices.items if d.get('id')==did),None)
  def execute(self,device_id,profile,mode,artifact,plan):
   if mode!='upgrade':return False
-  device=self._device(device_id);ready=upgrade_candidate(device)
-  if not ready.get('ready'):return False
-  # The normal online upgrade deliberately ignores a local image artifact. The
-  # existing FirmwareExecutor still guards handoff integrity for legacy modes.
+  initial=upgrade_candidate(self._device(device_id))
+  if not initial.get('ready'):return False
+  authenticate=getattr(self.transport,'authenticate',None)
+  if authenticate is not None and not authenticate(initial['host']):return False
+  # Re-read observed identity after authentication and immediately before the destructive command.
+  current=self._device(device_id);ready=upgrade_candidate(current)
+  if not ready.get('ready') or ready['host']!=initial['host'] or ready.get('platform')!=initial.get('platform') or ready.get('sensor')!=initial.get('sensor'):return False
   return bool(self.transport.run(ready['host'],list(UPGRADE_ARGV)))
