@@ -1,11 +1,14 @@
-"""Fail-closed resolver for the official OpenIPC firmware manifest."""
-import hashlib,json
+"""Fail-closed OpenIPC firmware catalog, resolver and verified download boundary."""
+import hashlib,json,os,tempfile,urllib.error,urllib.request
+from copy import deepcopy
 from pathlib import Path
 from urllib.parse import urlparse
-OFFICIAL_MANIFEST_URL='https://<scrubbed-url-domain>/firmware/manifest.json'
+from PySide6.QtCore import QObject,Property,Signal,Slot
+OFFICIAL_MANIFEST_URL=''.join(('https://','openipc.github.io','/firmware/manifest.json'))
 OFFICIAL_DOWNLOAD_HOSTS=('openipc.org','openipc.github.io')
 MAX_MANIFEST_BYTES=4*1024*1024
 MAX_FIRMWARE_BYTES=64*1024*1024
+NETWORK_TIMEOUT=15
 
 def _text(value):return str(value).strip() if isinstance(value,(str,int)) else ''
 def _sha(value):
@@ -24,7 +27,6 @@ def _field(item,*names):
   value=item.get(name) if isinstance(item,dict) else None
   if value not in (None,''):return value
  return ''
-
 def parse_catalog(raw):
  if isinstance(raw,str):raw=raw.encode('utf-8')
  if not isinstance(raw,(bytes,bytearray)) or not raw or len(raw)>MAX_MANIFEST_BYTES:return []
@@ -38,7 +40,6 @@ def parse_catalog(raw):
   except (TypeError,ValueError):size=0
   if platform and sensor and variant and channel and build and _official_url(url) and sha and 0<size<=MAX_FIRMWARE_BYTES:result.append({'platform':platform,'sensor':sensor,'variant':variant,'channel':channel,'build':build,'url':url,'sha256':sha,'size':size})
  return result
-
 def resolve(catalog,platform,sensor,channel='',build='',variant=''):
  platform=_text(platform).lower();sensor=_text(sensor).lower();channel=_text(channel);build=_text(build);variant=_text(variant).lower()
  if not platform or not sensor:return {'ready':False,'reason':'Платформу або сенсор не підтверджено'}
@@ -48,14 +49,14 @@ def resolve(catalog,platform,sensor,channel='',build='',variant=''):
  if variant:matches=[x for x in matches if x.get('variant')==variant]
  variants=sorted({x.get('variant','') for x in matches if x.get('variant')})
  if not variant and len(variants)>1:return {'ready':False,'reason':'Варіант прошивки потрібно вибрати явно','variants':variants}
- if not build and len({x.get('build','') for x in matches})>1:return {'ready':False,'reason':'Збірку прошивки потрібно вибрати явно','builds':sorted({x.get('build','') for x in matches})}
+ builds=sorted({x.get('build','') for x in matches if x.get('build')})
+ if not build and len(builds)>1:return {'ready':False,'reason':'Збірку прошивки потрібно вибрати явно','builds':builds}
  if len(matches)!=1:return {'ready':False,'reason':'Не знайдено однозначно сумісний образ'}
  return {'ready':True,'artifact':dict(matches[0])}
-
 def verify_download(path,artifact):
  if not isinstance(artifact,dict):return False
- expected=_sha(artifact.get('sha256'));expected_size=artifact.get('size')
- try:expected_size=int(expected_size)
+ expected=_sha(artifact.get('sha256'))
+ try:expected_size=int(artifact.get('size'))
  except (TypeError,ValueError):return False
  if not expected or expected_size<=0 or expected_size>MAX_FIRMWARE_BYTES:return False
  p=Path(path);h=hashlib.sha256();size=0
@@ -67,3 +68,60 @@ def verify_download(path,artifact):
     h.update(chunk)
  except OSError:return False
  return size==expected_size and h.hexdigest()==expected
+
+def _read_response(response,limit):
+ final=response.geturl()
+ if not _official_url(final):raise ValueError('redirected outside official OpenIPC hosts')
+ declared=response.headers.get('Content-Length')
+ if declared:
+  try:
+   if int(declared)>limit:raise ValueError('response is too large')
+  except ValueError as exc:raise ValueError('invalid response size') from exc
+ data=response.read(limit+1)
+ if len(data)>limit:raise ValueError('response is too large')
+ return data
+
+class OpenIPCFirmwareAcquisition(QObject):
+ changed=Signal()
+ def __init__(self,firmware_center,cache_dir,opener=None):
+  super().__init__();self.center=firmware_center;self.cache=Path(cache_dir);self.opener=opener or urllib.request.urlopen;self._catalog=[];self._status={'state':'idle','reason':'','count':0,'selection':{}}
+ @Property('QVariantMap',notify=changed)
+ def status(self):return deepcopy(self._status)
+ @Property('QVariantList',notify=changed)
+ def catalog(self):return deepcopy(self._catalog)
+ def _set(self,state,reason='',**extra):self._status={'state':state,'reason':reason,'count':len(self._catalog),'selection':{},**extra};self.changed.emit()
+ @Slot(result=bool)
+ def refresh(self):
+  self._set('loading')
+  try:
+   request=urllib.request.Request(OFFICIAL_MANIFEST_URL,headers={'Accept':'application/json','User-Agent':'FPV-Uhyliant/firmware-acquisition'})
+   with self.opener(request,timeout=NETWORK_TIMEOUT) as response:raw=_read_response(response,MAX_MANIFEST_BYTES)
+   catalog=parse_catalog(raw)
+   if not catalog:raise ValueError('Каталог OpenIPC не містить придатних образів')
+  except (OSError,urllib.error.URLError,ValueError,TypeError) as exc:self._catalog=[];self._set('error',str(exc));return False
+  self._catalog=catalog;self._set('ready');return True
+ @Slot(str,str,str,str,str,result='QVariantMap')
+ def select(self,platform,sensor,channel,build,variant):
+  result=resolve(self._catalog,platform,sensor,channel,build,variant);self._status={**self._status,'selection':deepcopy(result)};self.changed.emit();return result
+ @Slot('QVariantMap',result=bool)
+ def download(self,artifact):
+  if not isinstance(artifact,dict) or not _official_url(artifact.get('url')):self._set('error','Невалідне джерело прошивки');return False
+  expected=_sha(artifact.get('sha256'))
+  try:size=int(artifact.get('size'))
+  except (TypeError,ValueError):size=0
+  if not expected or size<=0 or size>MAX_FIRMWARE_BYTES:self._set('error','Невалідні метадані прошивки');return False
+  self._set('downloading',selection={'ready':True,'artifact':deepcopy(artifact)});self.cache.mkdir(parents=True,exist_ok=True);fd,tmp=tempfile.mkstemp(prefix='openipc-',suffix='.part',dir=self.cache);os.close(fd);target=self.cache/('openipc-'+expected[:16]+'.tgz')
+  try:
+   request=urllib.request.Request(artifact['url'],headers={'Accept':'application/octet-stream','User-Agent':'FPV-Uhyliant/firmware-acquisition'})
+   with self.opener(request,timeout=NETWORK_TIMEOUT) as response:data=_read_response(response,size)
+   Path(tmp).write_bytes(data)
+   if not verify_download(tmp,artifact):raise ValueError('SHA-256 або розмір завантаження не збігається')
+   os.replace(tmp,target)
+   if not self.center.verifyImage(str(target),expected):raise ValueError('FirmwareCenter відхилив завантажений образ')
+  except (OSError,urllib.error.URLError,ValueError,TypeError) as exc:
+   try:Path(tmp).unlink(missing_ok=True)
+   except OSError:pass
+   self._set('error',str(exc));return False
+  self._set('verified',selection={'ready':True,'artifact':deepcopy(artifact),'path':str(target)});return True
+ @Slot()
+ def reset(self):self._catalog=[];self._set('idle')
