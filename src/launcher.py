@@ -1,5 +1,6 @@
 import json,os,subprocess,sys,time,shutil,re
 from pathlib import Path
+from startup_ack import pending_ack
 R=Path(sys.executable).resolve().parent if getattr(sys,'frozen',False) else Path(__file__).resolve().parent
 A=R/'app';C=A/'current';B=A/'rollback'/'previous';S=A/'launcher-state.json';D=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';OK=D/'startup-ok.json';LOG=D/'updater.log';SHA_RE=re.compile(r'^[0-9a-f]{64}$')
 def note(msg):
@@ -38,7 +39,7 @@ def main():
   while time.time()<end and p.poll() is None:
    try:
     ack=json.loads(OK.read_text(encoding='utf-8')) if OK.exists() else {}
-    if isinstance(ack,dict) and set(ack)=={'status','token','version'} and ack.get('status')=='ok' and ack.get('token')==token and ack.get('version')==st.get('current'):
+    if pending_ack(ack,token,st.get('current')):
      st['pendingStartup']=False;st['lastGood']=st.get('current');st['lastGoodPackageSha256']=st.get('packageSha256');save_state(st);note('startup OK '+str(st.get('current')));return p.wait()
    except (OSError,ValueError,TypeError):pass
    time.sleep(.25)
