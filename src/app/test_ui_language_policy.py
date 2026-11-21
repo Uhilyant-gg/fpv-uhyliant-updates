@@ -22,9 +22,11 @@ class UiLanguagePolicyTests(unittest.TestCase):
         return len(re.findall(r"\bHoverHint\s*\{", source))
 
     def test_firmware_surface_is_ukrainian(self):
-        visible = self.visible(self.sources["FirmwareCenter.qml"])
-        for text in ("ЦЕНТР ПРОШИВКИ", "Перевірити оновлення", "Оновити камеру", "Додатково"):
+        source = self.sources["FirmwareCenter.qml"]
+        visible = self.visible(source)
+        for text in ("ЦЕНТР ПРОШИВКИ", "Перевірити оновлення", "Оновити камеру"):
             self.assertIn(text, visible)
+        self.assertIn('advanced?"Сховати додатково":"Додатково"', source)
         for obsolete in ("FIRMWARE CENTER", "IMAGE VERIFIED", "PRE-CHECK APPROVED", "EXECUTION PLAN READY", "Expected SHA-256", "Flash layout verified", "Recovery path verified"):
             self.assertNotIn(obsolete, visible)
 
