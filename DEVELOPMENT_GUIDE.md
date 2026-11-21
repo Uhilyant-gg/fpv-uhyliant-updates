@@ -8,27 +8,25 @@ Windows ground station using Python + PySide6 + Qt Quick/QML. Core flow: Home ->
 ## Non-negotiable rules
 - Target flight stacks: ArduPilot, Betaflight, INAV; protocols: MAVLink, MSP, CRSF.
 - New telemetry/control backends begin read-only; unknown/stale/missing telemetry is unavailable.
-- Camera preset and video profile are separate entities. Video profile belongs to a stream and must never be silently applied by firmware flashing.
-- Generic ONVIF/name hints are not OpenIPC evidence. OpenIPC hardware fields are populated only from observed verified evidence.
-- Primary installation, upgrade and recovery/fullflash are separate paths. Recovery/fullflash is only for verified compatible existing custom OpenIPC and is not a generic primary installer.
-- Before destructive firmware writes: identify hardware and flash layout, validate profile compatibility, verify image integrity, preserve a recovery path, bind the approval to immutable inputs, re-hash before write, reboot/rediscover and verify after operation.
-- Never commit private signing keys; release metadata is immutable and signed.
+- Camera preset and video profile are separate. Video profile belongs to a stream and is never silently applied by firmware flashing.
+- Generic ONVIF/name hints are not OpenIPC evidence. Hardware fields come only from observed verified evidence.
+- Primary, upgrade and recovery/fullflash are separate paths. Recovery/fullflash is only for verified compatible existing custom OpenIPC and is not a generic primary installer.
+- Before destructive writes: identify hardware/layout, validate compatibility, verify image, preserve recovery, bind immutable approval, re-hash directly before executor handoff, lock the operation, reboot/rediscover and verify afterward.
 
 ## Current architecture
-Telemetry uses normalized providers behind `TelemetryRouter`; FPV consumes one vehicle-level contract. MSP serial polling is read-only and CRSF serial receive is passive. Real telemetry hardware validation remains `hardware-validation-pending`.
+Telemetry uses normalized providers behind `TelemetryRouter`; FPV consumes one vehicle contract. Real telemetry validation is `hardware-validation-pending`.
 
-OpenIPC discovery persists verified identity separately in SQLite. Video runtime carries stream-aware RTSP diagnostics. Firmware Center supports SSC30KQ / IMX335 compatibility checks, SHA-256 artifact verification, immutable pre-check approval and non-destructive per-mode execution-plan generation. No destructive hardware executor is attached yet.
+OpenIPC identity persistence and stream-aware RTSP diagnostics exist. Firmware Center supports SSC30KQ / IMX335 compatibility, SHA-256 verification, immutable approval and per-mode execution plans. `FirmwareExecutor` is a guarded boundary: it re-hashes immediately before handoff, prevents concurrent firmware operations and requires post-operation verification. No hardware adapter is registered by default, therefore destructive writing is disabled and explicitly `hardware-validation-pending`.
 
-Versioned camera presets have a compatibility boundary and are explicitly separate from per-stream video profiles.
+Versioned camera presets have a hardware compatibility boundary and remain independent from video profiles.
 
 ## Next work
-1. Define executor interfaces and operation-state/locking contracts for primary, upgrade and recovery/fullflash without enabling generic destructive flashing.
-2. Re-verify artifact SHA-256 immediately before any future executor handoff.
-3. Define rediscovery/post-operation verification contract.
-4. Improve stream metadata and diagnostics (main/sub, codec, resolution, FPS, latency/playback state) and prepare secondary/thermal/PiP.
-5. Expand camera presets separately from video profiles.
-6. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
-7. Add encrypted DB export/import, station pairing and continue updater/installer/frozen-build hardening.
+1. Add supported hardware adapters only where the actual installation/upgrade/recovery mechanism is known; never fall back to generic fullflash.
+2. Implement rediscovery plus observed post-operation firmware/identity verification.
+3. Improve main/sub stream metadata, codec/resolution/FPS and latency/playback diagnostics; prepare secondary/thermal/PiP.
+4. Expand camera presets separately from video profiles.
+5. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
+6. Add encrypted DB export/import, station pairing and distribution hardening.
 
 ## Development workflow
-Inspect current `main` before changes. Keep software tests moving while marking hardware-only validation `hardware-validation-pending`. Update both canonical docs after material architecture changes. Do not claim CI/write success without confirmation. Preserve failure diagnostics and release/update security behavior.
+Inspect current `main` before changes. Continue software-testable work while hardware-only validation remains `hardware-validation-pending`. Keep canonical docs synchronized after material architecture changes. Never claim CI/write success without confirmation.
