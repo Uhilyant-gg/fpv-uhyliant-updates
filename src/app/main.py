@@ -38,10 +38,7 @@ def main():
  root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized)
  if x.smoke_test:
   marker=x.smoke_marker or str(DATA/'smoke-test-ok.json');signal_smoke(marker)
-  def finish_smoke():
-   try:root.close()
-   finally:app.exit(0)
-  QTimer.singleShot(1500,finish_smoke)
+  QTimer.singleShot(1500,lambda:os._exit(0))
  else:QTimer.singleShot(1200,lambda:signal_ok(x.startup_token))
  return app.exec()
 if __name__=='__main__':
