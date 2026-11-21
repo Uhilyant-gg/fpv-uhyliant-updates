@@ -5,6 +5,9 @@ Read this file and `PROJECT_STATE.md` from current `main` before development. `m
 ## Invariants
 Windows ground station: Python + PySide6 + Qt Quick/QML. FPV remains video-first. Unknown telemetry stays unavailable. Camera presets, video profiles and firmware remain separate. Generic ONVIF is not verified OpenIPC. Recovery/fullflash is not a generic install path. Secrets/private signing keys are not repository data.
 
+## UI language and help
+All user-facing UI copy is Ukrainian when a natural Ukrainian equivalent exists. Preserve technical/protocol/product identifiers such as FPV, RTSP, OpenIPC, MAVLink, MSP, CRSF, StabX, Starlink and WireGuard. Interactive controls should use the shared `HoverHint` where explanatory help is useful. Hints appear only after 5000 ms of continuous mouse/touchpad hover, disappear when hover ends, and must describe the actual control behavior without claiming unobserved capability or state.
+
 ## UI navigation
 Keep the product route explicit: Home exposes Devices, Quick Connect, Firmware, Update and Diagnostics; connecting a saved device enters FPV. Quick Connect may enable only saved devices with an actual enabled video stream, but configured stream existence is not evidence of network availability; FPV entry must still use the runtime endpoint check. Service Mode is a separate route for existing management and diagnostic surfaces. Quick Connect must not imply discovery, identity, trust or connectivity that was not observed. Service Mode must not add placeholder StabX, Starlink/WireGuard, pairing peer or hardware-adapter observations. Update UI must delegate to the existing guarded updater instead of bypassing its signature/hash/install gates. UI transitions that stop a decoder must also clear its `MediaPlayer.source`; do not leave a stopped runtime paired with a stale displayed/source binding.
 
