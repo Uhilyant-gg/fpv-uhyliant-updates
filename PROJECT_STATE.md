@@ -37,14 +37,14 @@ The destructive operation remains an explicit user action. A successful command 
 ## Reboot and post-update verification
 Post-reboot verification uses the host bound at destructive dispatch and bounded route-aware rediscovery. A changed DHCP address may be accepted only from fresh OpenIPC evidence with matching pre-update platform and sensor. Unrelated OpenIPC devices are skipped.
 
-Update success requires fresh verified OpenIPC evidence, hardware continuity and a non-empty actually observed post-update firmware version. Missing authoritative firmware remains unknown and cannot be interpreted as success.
+Update success requires fresh verified OpenIPC evidence, hardware continuity and a non-empty actually observed post-update firmware version. For catalog-backed firmware, the selected build is carried through executor handoff as the expected firmware target. Unknown authoritative firmware remains unknown and cannot be interpreted as success.
 
 ## Diagnostics and observability
-Diagnostics is now part of the hardware-validation path, not a separate future feature. The local diagnostics boundary should remain deterministic and sanitized, preserving unknown values rather than inventing health data. Diagnostic export is the evidence capture mechanism for physical E2E failures.
+Diagnostics is part of the hardware-validation path. The local diagnostics boundary remains deterministic and sanitized, preserving unknown values rather than inventing health data. Diagnostic export is the evidence capture mechanism for physical E2E failures.
 
-Continue improving lifecycle observability where real-hardware debugging needs it: correlate camera/device identity, firmware acquisition state, preflight/auth state, executor phase, rediscovery result and bounded errors/warnings. Secrets, credentials and private signing material must never be exported.
+Firmware session lifecycle events are now emitted into the shared bounded diagnostic event stream. One generated correlation id connects dispatch, reboot rediscovery and terminal verification for a single explicit update attempt. Events contain device/profile/mode and bounded state/evidence needed for debugging, but no credentials or secret material. The application runtime injects this shared event stream into the firmware update session, so exported diagnostics include the same lifecycle evidence used during a real hardware run.
 
-AI-assisted diagnosis, if added later, consumes the same sanitized evidence and never becomes an authority for destructive actions.
+Continue improving lifecycle observability only where real-hardware debugging demonstrates a missing signal. AI-assisted diagnosis, if added later, consumes the same sanitized evidence and never becomes an authority for destructive actions.
 
 ## Application updater
 The packaged Windows updater remains a parallel release-readiness track. Signed manifest validation and package SHA-256 remain mandatory. Installation is offered only for a complete installed launcher layout. Helper staging, payload self-test, atomic current/rollback switching and startup acknowledgement remain fail-closed.
@@ -52,12 +52,11 @@ The packaged Windows updater remains a parallel release-readiness track. Signed 
 Do not let application-updater polish block the next OpenIPC hardware E2E unless a packaging defect prevents producing/running the test build.
 
 ## Next execution order
-1. Complete the remaining cross-boundary audit of the automatic Firmware Center journey, especially invalidation between camera selection, catalog selection, preflight/auth, execution plan and executor handoff.
-2. Add only the diagnostics/structured lifecycle evidence needed to make a real-camera failure reproducible and diagnosable.
-3. Produce a testable build and run real OpenIPC hardware E2E with actual session credentials and explicit SSH host-key acceptance.
-4. Fix failures from real hardware evidence immediately and repeat the E2E until the guarded lifecycle completes or a genuine hardware/external blocker is identified.
-5. Validate the complete user journey including discovery, manual-IP fallback, identity/add/active-camera state, automatic firmware selection, authentication, guarded update, reboot, rediscovery and observed firmware.
-6. Perform the larger video-first UI/UX and release-readiness pass after the integrated hardware journey is stable.
+1. Run software CI against the integrated lifecycle-evidence wiring and fix any regression before accumulating more changes.
+2. Produce a testable build and run real OpenIPC hardware E2E with actual session credentials and explicit SSH host-key acceptance.
+3. Use the correlated diagnostic export to identify the exact failing stage when hardware validation fails, then fix and repeat.
+4. Validate the complete user journey including discovery, manual-IP fallback, identity/add/active-camera state, automatic firmware selection, authentication, guarded update, reboot, rediscovery and observed firmware.
+5. Perform the larger video-first UI/UX and release-readiness pass after the integrated hardware journey is stable.
 
 ## Hardware E2E success contract
 Software-only CI does not prove physical update success. A hardware E2E pass requires observed evidence for the same logical camera across the lifecycle:
