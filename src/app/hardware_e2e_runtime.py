@@ -4,7 +4,7 @@ from hardware_e2e import hardware_e2e_readiness
 class HardwareE2ERuntime(QObject):
  changed=Signal()
  def __init__(self,devices,diagnostics,credentials,firmware=None):
-  super().__init__();self.devices=devices;self.diagnostics=diagnostics;self.credentials=credentials;self.firmware=firmware;self._host_key_accepted=False;self._accepted_identity=None;self._selected_device_id=''
+  super().__init__();self.devices=devices;self.diagnostics=diagnostics;self.credentials=credentials;self.firmware=firmware;self._host_key_accepted=False;self._accepted_identity=None;self._selected_device_id='';self._captures={}
   for obj in (devices,diagnostics,credentials,firmware):
    signal=getattr(obj,'changed',None) if obj is not None else None
    if signal is not None:signal.connect(self._source_changed)
@@ -25,14 +25,21 @@ class HardwareE2ERuntime(QObject):
  def readiness(self):return hardware_e2e_readiness(self._selected(),self._network(),bool(self.credentials.snapshot().get('hasPassword')),self._host_key_accepted and self._identity_key()==self._accepted_identity,self._firmware())
  @Property(bool,notify=changed)
  def hostKeyAccepted(self):return self._host_key_accepted and self._identity_key()==self._accepted_identity
+ @Property('QVariantMap',notify=changed)
+ def captures(self):return deepcopy(self._captures)
  @Slot(str)
  def selectDevice(self,device_id):
   device_id=str(device_id or '')
   if device_id==self._selected_device_id:return
-  self._selected_device_id=device_id;self._host_key_accepted=False;self._accepted_identity=None;self.changed.emit()
+  self._selected_device_id=device_id;self._host_key_accepted=False;self._accepted_identity=None;self._captures={};self.changed.emit()
  @Slot(bool)
  def setHostKeyAccepted(self,value):self._host_key_accepted=bool(value);self._accepted_identity=self._identity_key() if self._host_key_accepted else None;self.changed.emit()
  @Slot()
- def reset(self):self._host_key_accepted=False;self._accepted_identity=None;self._selected_device_id='';self.changed.emit()
+ def reset(self):self._host_key_accepted=False;self._accepted_identity=None;self._selected_device_id='';self._captures={};self.changed.emit()
  @Slot(result=str)
- def exportPreflight(self):return self.diagnostics.export()
+ def exportPreflight(self):return self.capture('preflight')
+ @Slot(str,result=str)
+ def capture(self,stage):
+  stage=str(stage or '').strip().lower()
+  if stage not in ('preflight','post-update','failure'):return ''
+  path=self.diagnostics.exportStage('hardware-e2e-'+stage);self._captures[stage]=path;self.changed.emit();return path

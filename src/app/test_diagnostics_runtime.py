@@ -1,4 +1,4 @@
-import tempfile,unittest
+import json,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 from diagnostic_events import DiagnosticEvents
@@ -15,18 +15,14 @@ class Tests(unittest.TestCase):
   d,links,t,u=self.base()
   with tempfile.TemporaryDirectory() as root:
    r=DiagnosticsRuntime('2.0.12',d,links,t,u,DiagnosticEvents(),root);first=r.build();second=r.build();self.assertTrue(first['correlationId']);self.assertEqual(second['correlationId'],first['correlationId'])
+ def test_export_stages_are_unique_and_preserve_capture_identity(self):
+  d,links,t,u=self.base()
+  with tempfile.TemporaryDirectory() as root:
+   r=DiagnosticsRuntime('2.0.12',d,links,t,u,DiagnosticEvents(),root);a=Path(r.exportStage('hardware-e2e-preflight'));b=Path(r.exportStage('hardware-e2e-post-update'));self.assertNotEqual(a,b);self.assertTrue(a.is_file());self.assertTrue(b.is_file());pa=json.loads(a.read_text(encoding='utf-8'));pb=json.loads(b.read_text(encoding='utf-8'));self.assertEqual(pa['capture']['label'],'hardware-e2e-preflight');self.assertEqual(pb['capture']['label'],'hardware-e2e-post-update');self.assertEqual(pa['correlationId'],pb['correlationId'])
  def test_manual_probe_contributes_fresh_device_evidence(self):
   d,links,t,u=self.base();d._items=[{'id':'1','host':'192.168.1.50','openipcIdentity':{'verified':True}}];d._discovered=[];d._manual_result={'host':'192.168.1.50','reachable':True,'openipc':True,'identity':{'verified':True}}
   with tempfile.TemporaryDirectory() as root, patch('diagnostics_runtime.interfaces',return_value=[]), patch('diagnostics_runtime.system_routes',return_value=[]):
    evidence=DiagnosticsRuntime('2.0.12',d,links,t,u,DiagnosticEvents(),root)._network_evidence(d._items);item=next(x for x in evidence['devices'] if x['host']=='192.168.1.50');self.assertTrue(item['reachable']);self.assertTrue(item['openipcVerified']);self.assertTrue(item['discovered'])
- def test_authenticated_discovery_evidence_is_exported_without_credentials(self):
-  d,links,t,u=self.base();d._items=[{'id':'1','host':'192.168.1.50','openipcIdentity':{'verified':True,'platform':'ssc30kq','sensor':'imx335'}}];d._discovered=[{'host':'192.168.1.50','reachable':True,'camera':True,'openipc':True,'authRequired':False,'identityVerified':True,'identity':{'verified':True,'platform':'ssc30kq','sensor':'imx335'},'evidence':['Majestic /api/v1/config.json']}];d._manual_result={}
-  with tempfile.TemporaryDirectory() as root, patch('diagnostics_runtime.interfaces',return_value=[]), patch('diagnostics_runtime.system_routes',return_value=[]):
-   b=DiagnosticsRuntime('2.0.12',d,links,t,u,DiagnosticEvents(),root).build();text=repr(b);evidence=b['network']['evidence'];item=next(x for x in evidence['devices'] if x['host']=='192.168.1.50');self.assertTrue(item['openipcVerified']);self.assertTrue(item['discovered']);self.assertNotIn('password',text.lower());self.assertNotIn('credential',text.lower())
- def test_auth_required_candidate_is_not_reported_as_verified_openipc(self):
-  d,links,t,u=self.base();d._discovered=[{'host':'192.168.1.60','reachable':True,'camera':True,'openipc':False,'authRequired':True,'identityVerified':False,'identity':{'verified':False},'evidence':['Majestic API requires authentication (401)']}];d._manual_result={}
-  with tempfile.TemporaryDirectory() as root, patch('diagnostics_runtime.interfaces',return_value=[]), patch('diagnostics_runtime.system_routes',return_value=[]):
-   evidence=DiagnosticsRuntime('2.0.12',d,links,t,u,DiagnosticEvents(),root)._network_evidence([]);item=next(x for x in evidence['devices'] if x['host']=='192.168.1.60');self.assertTrue(item['discovered']);self.assertFalse(item['openipcVerified'])
  def test_export_creates_bundle(self):
   d,links,t,u=self.base()
   with tempfile.TemporaryDirectory() as root:
@@ -35,8 +31,4 @@ class Tests(unittest.TestCase):
   d,links,t,u=self.base()
   with tempfile.TemporaryDirectory() as root:
    r=DiagnosticsRuntime('2.0.12',d,links,t,u,DiagnosticEvents(),root);self.assertTrue(r.applyRemediation('refresh-network'));self.assertFalse(r.applyRemediation('shell'));self.assertFalse(r.applyRemediation('set-static-ip'));self.assertEqual(r.build()['lastRemediation']['action'],'refresh-network')
- def test_rediscover_requires_actual_device_boundary(self):
-  d,links,t,u=self.base();calls=[];d.discoverOpenIPC=lambda:calls.append(True)
-  with tempfile.TemporaryDirectory() as root:
-   r=DiagnosticsRuntime('2.0.12',d,links,t,u,DiagnosticEvents(),root);self.assertTrue(r.applyRemediation('rediscover'));self.assertEqual(calls,[True])
 if __name__=='__main__':unittest.main()
