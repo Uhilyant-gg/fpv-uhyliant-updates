@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 from openipc_firmware_acquisition import OpenIPCFirmwareAcquisition
 class Response:
- def __init__(self,data,url='official'):self.data=data;self.url=url;self.headers={'Content-Length':str(len(data))}
+ def __init__(self,data,url='official-response'):self.data=data;self.url=url;self.headers={'Content-Length':str(len(data))}
  def __enter__(self):return self
  def __exit__(self,*args):pass
  def geturl(self):return self.url
@@ -15,7 +15,7 @@ class Tests(unittest.TestCase):
  def entry(self,data):return {'platform':'ssc30kq','sensor':'imx335','variant':'lite','channel':'nightly','build':'b1','url':'official-artifact','sha256':hashlib.sha256(data).hexdigest(),'size':len(data)}
  def test_refresh_select_download_and_center_handoff(self):
   data=b'firmware';entry=self.entry(data);responses=[Response(json.dumps({'firmwares':[entry]}).encode()),Response(data)]
-  with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',side_effect=lambda url:str(url).startswith('official')):
+  with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',side_effect=lambda url:str(url) in ('official-response','official-artifact')):
    service=OpenIPCFirmwareAcquisition(Center(),td,opener=lambda *a,**k:responses.pop(0));self.assertTrue(service.refresh());selected=service.select('ssc30kq','imx335','nightly','b1','lite');self.assertTrue(selected['ready']);self.assertTrue(service.download(selected['artifact']));self.assertEqual(service.status['state'],'verified');self.assertTrue(Path(service.status['selection']['path']).is_file());self.assertEqual(len(service.center.calls),1)
  def test_redirect_outside_policy_is_rejected(self):
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=False):
