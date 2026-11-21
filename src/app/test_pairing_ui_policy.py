@@ -7,5 +7,7 @@ class PairingUiPolicyTests(unittest.TestCase):
  def test_ui_does_not_expose_secret_reference(self):self.assertNotIn('secretRef',self.source)
  def test_ui_only_exposes_existing_trust_management(self):
   self.assertIn('pairingRegistry.trusted',self.source);self.assertIn('pairingRegistry.revoke(modelData.id)',self.source)
- def test_ui_states_peer_protocol_boundary(self):self.assertIn('Peer proof/exchange protocol ще не реалізований',self.source)
+ def test_ui_states_peer_protocol_boundary(self):
+  self.assertIn('Протокол доказу та обміну з вузлом ще не реалізований',self.source)
+  self.assertIn('Цей екран не створює нових сеансів парування',self.source)
 if __name__=='__main__':unittest.main()
