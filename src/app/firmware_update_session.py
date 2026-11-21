@@ -1,6 +1,6 @@
 """Safe orchestration boundary for a complete OpenIPC update session."""
 from copy import deepcopy
-import threading,time
+import threading,time,uuid
 from PySide6.QtCore import QObject,Property,Signal,Slot
 from devices import interfaces
 from firmware_update_lifecycle import FirmwareUpdateLifecycle
@@ -11,9 +11,13 @@ from route_discovery import fingerprint,plan_targets,system_routes
 
 class FirmwareUpdateSession(QObject):
  changed=Signal()
- def __init__(self,executor,devices,probe=None,candidates=None,sleep=time.sleep,rediscovery_attempts=30,rediscovery_interval=2.0):
-  super().__init__();self.executor=executor;self.devices=devices;self._enabled=False;self._result=self._empty();self._probe_provider=probe;self._candidate_provider=candidates;self._sleep=sleep;self._rediscovery_attempts=max(1,min(int(rediscovery_attempts),120));self._rediscovery_interval=max(0.0,min(float(rediscovery_interval),10.0))
+ def __init__(self,executor,devices,probe=None,candidates=None,sleep=time.sleep,rediscovery_attempts=30,rediscovery_interval=2.0,events=None):
+  super().__init__();self.executor=executor;self.devices=devices;self._enabled=False;self._result=self._empty();self._probe_provider=probe;self._candidate_provider=candidates;self._sleep=sleep;self._rediscovery_attempts=max(1,min(int(rediscovery_attempts),120));self._rediscovery_interval=max(0.0,min(float(rediscovery_interval),10.0));self._events=events;self._correlation_id=''
  def _empty(self):return {'enabled':False,'state':'hardware-validation-pending','reason':'Апаратний транспорт оновлення не підключено','observedFirmware':'','verification':{}}
+ def _event(self,level,message,detail=None):
+  if self._events is None:return
+  try:self._events.record('firmware',level,message,self._correlation_id or None,detail)
+  except Exception:pass
  @Property('QVariantMap',notify=changed)
  def result(self):return deepcopy(self._result)
  def configure_transport(self,transport):
@@ -35,7 +39,9 @@ class FirmwareUpdateSession(QObject):
   identity=dict(device.get('openipcIdentity') or {})
   current=(device.get('host'),identity.get('platform'),identity.get('sensor'))
   if current!=expected or identity.get('verified') is not True:return False
-  return self.configure_transport(AuthenticatedCameraTransport(credentials))
+  ok=self.configure_transport(AuthenticatedCameraTransport(credentials))
+  if ok:self._event('info','authenticated transport ready',{'deviceId':device.get('id'),'host':current[0],'platform':current[1],'sensor':current[2]})
+  return ok
  @Slot(result=bool)
  def disableTransport(self):return self.configure_transport(None)
  def _probe(self,host):
@@ -50,19 +56,24 @@ class FirmwareUpdateSession(QObject):
  @Slot(str,str,str,result=bool)
  def execute(self,device_id,profile,mode):
   if not self._enabled:self._result=self._empty();self.changed.emit();return False
-  return self._sync(self.executor.execute(device_id,profile,mode))
+  self._correlation_id=uuid.uuid4().hex;self._event('info','firmware update requested',{'deviceId':device_id,'profile':profile,'mode':mode})
+  ok=self.executor.execute(device_id,profile,mode);self._sync(ok);state=self._result.get('state','')
+  self._event('info' if ok else 'error','firmware dispatch accepted' if ok else 'firmware dispatch blocked',{'deviceId':device_id,'profile':profile,'mode':mode,'state':state,'reason':self._result.get('reason','')})
+  return bool(ok)
  @Slot(result=bool)
  def verifyAfterReboot(self):
   if not self._enabled:return False
   context=self.executor.verificationContext()
-  if not context.get('ready'):return self._sync(False)
-  if not _private_candidate(context.get('host','')):return self._sync(self.executor.failRediscovery())
+  if not context.get('ready'):self._event('error','post-update verification unavailable',{'state':self.executor.status.get('state','')});return self._sync(False)
+  detail={'host':context.get('host',''),'profile':context.get('profile',''),'expectedFirmware':context.get('expectedFirmware','')};self._event('info','post-update rediscovery started',detail)
+  if not _private_candidate(context.get('host','')):return self._verification_failed(detail,self.executor.failRediscovery())
   before=context.get('before') or {}
-  if not str(before.get('platform','')).strip() or not str(before.get('sensor','')).strip():return self._sync(self.executor.failRediscovery())
-  rediscovery=FirmwareRediscovery(self._probe,sleep=self._sleep,candidates=self._rediscovery_candidates)
-  lifecycle=FirmwareUpdateLifecycle(self.executor,rediscovery)
-  ok=lifecycle.verify_after_reboot(self._rediscovery_attempts,self._rediscovery_interval);return self._sync(ok)
+  if not str(before.get('platform','')).strip() or not str(before.get('sensor','')).strip():return self._verification_failed(detail,self.executor.failRediscovery())
+  rediscovery=FirmwareRediscovery(self._probe,sleep=self._sleep,candidates=self._rediscovery_candidates);lifecycle=FirmwareUpdateLifecycle(self.executor,rediscovery)
+  ok=lifecycle.verify_after_reboot(self._rediscovery_attempts,self._rediscovery_interval);self._sync(ok);verification=self._result.get('verification') or {};identity=verification.get('identity') or {};detail.update({'state':self._result.get('state',''),'rediscoveredHost':verification.get('rediscoveredHost',''),'observedFirmware':identity.get('firmware','')});self._event('info' if ok else 'error','post-update verification passed' if ok else 'post-update verification failed',detail);return bool(ok)
+ def _verification_failed(self,detail,ok):
+  self._sync(ok);detail=dict(detail);detail['state']=self._result.get('state','');self._event('error','post-update verification failed',detail);return False
  @Slot()
  def reset(self):
   if self.executor.busy:return False
-  self.executor.reset();self._result={'enabled':self._enabled,'state':'ready' if self._enabled else 'hardware-validation-pending','reason':'' if self._enabled else 'Апаратний транспорт оновлення не підключено','observedFirmware':'','verification':{}};self.changed.emit();return True
+  self.executor.reset();self._result={'enabled':self._enabled,'state':'ready' if self._enabled else 'hardware-validation-pending','reason':'' if self._enabled else 'Апаратний транспорт оновлення не підключено','observedFirmware':'','verification':{}};self._correlation_id='';self.changed.emit();return True
