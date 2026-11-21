@@ -24,9 +24,17 @@ Item {
    }
   }
   RowLayout{Layout.fillWidth:true
-   Button{text:"Експортувати діагностику";onClicked:{exportPath.text=diagnosticsRuntime.export()};HoverHint{text:"Зберегти очищений від секретів діагностичний пакет."}}
+   Button{
+    text:"Експортувати діагностику"
+    onClicked: exportPath.text=diagnosticsRuntime.export()
+    HoverHint{text:"Зберегти очищений від секретів діагностичний пакет."}
+   }
    Text{id:exportPath;Layout.fillWidth:true;color:"#27d59a";elide:Text.ElideMiddle}
-   Button{text:"Закрити";onClicked:closeRequested();HoverHint{text:"Закрити діагностику."}}
+   Button{
+    text:"Закрити"
+    onClicked: closeRequested()
+    HoverHint{text:"Закрити діагностику."}
+   }
   }
  }
 }
