@@ -1,5 +1,6 @@
 import hashlib,tempfile,unittest
 from pathlib import Path
+from unittest.mock import patch
 from firmware_center import FirmwareCenter
 from firmware_executor import FirmwareExecutor
 from firmware_update_session import FirmwareUpdateSession
@@ -9,6 +10,10 @@ class Transport:
  def __init__(self,auth=True):self.auth=auth;self.calls=[]
  def authenticate(self,host):self.calls.append(('auth',host));return self.auth
  def run(self,host,argv):self.calls.append(('run',host,list(argv)));return True
+class Credentials:
+ def __init__(self,username='root',password='pw'):self.username=username;self.password=password
+ def secret(self):return self.password
+ def snapshot(self):return {'username':self.username,'hasPassword':bool(self.password)}
 class SessionTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();image=Path(self.tmp.name)/'fw.bin';image.write_bytes(b'x');self.devices=Devices();center=FirmwareCenter(self.devices);center.verifyImage(str(image),hashlib.sha256(b'x').hexdigest());center.precheck('cam','ssc30kq-imx335','upgrade',True,True);center.prepareExecution('cam','ssc30kq-imx335','upgrade');self.executor=FirmwareExecutor(center);self.probe_calls=[];self.candidate_calls=[]
@@ -17,6 +22,12 @@ class SessionTests(unittest.TestCase):
   self.session=FirmwareUpdateSession(self.executor,self.devices,probe=probe,candidates=candidates,sleep=lambda _:None,rediscovery_attempts=1,rediscovery_interval=0)
  def tearDown(self):self.tmp.cleanup()
  def test_disabled_session_cannot_execute(self):self.assertFalse(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.session.result['state'],'hardware-validation-pending')
+ def test_authenticated_activation_requires_session_credentials(self):
+  self.assertFalse(self.session.enableAuthenticatedTransport(Credentials(password='')));self.assertFalse(self.session.result['enabled'])
+  with patch('firmware_update_session.AuthenticatedCameraTransport') as factory:
+   transport=Transport();factory.return_value=transport;credentials=Credentials();self.assertTrue(self.session.enableAuthenticatedTransport(credentials));factory.assert_called_once_with(credentials);self.assertTrue(self.session.result['enabled']);self.assertNotIn('password',repr(self.session.result).lower())
+ def test_disable_transport_returns_to_hardware_pending(self):
+  self.assertTrue(self.session.configure_transport(Transport()));self.assertTrue(self.session.disableTransport());self.assertFalse(self.session.result['enabled']);self.assertEqual(self.session.result['state'],'hardware-validation-pending')
  def test_opt_in_transport_authenticates_then_fixed_upgrade(self):
   t=Transport();self.assertTrue(self.session.configure_transport(t));self.assertTrue(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(t.calls,[('auth','192.168.1.50'),('run','192.168.1.50',['sysupgrade','-k','-r'])]);self.assertEqual(self.session.result['state'],'reboot-pending')
  def test_auth_failure_never_runs_sysupgrade(self):
