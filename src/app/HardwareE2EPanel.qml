@@ -2,10 +2,14 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 Item {
+ signal closeRequested()
  property var ready: hardwareE2ERuntime.readiness
  function mark(v){return v?"✓":"○"}
  ColumnLayout{anchors.fill:parent;spacing:8
-  Text{text:"ПЕРЕВІРКА OPENIPC НА ОБЛАДНАННІ";color:"#f4f7fb";font.pixelSize:18;font.bold:true}
+  RowLayout{Layout.fillWidth:true
+   Text{text:"ПЕРЕВІРКА OPENIPC НА ОБЛАДНАННІ";color:"#f4f7fb";font.pixelSize:18;font.bold:true;Layout.fillWidth:true}
+   Button{text:"Закрити";onClicked:closeRequested()}
+  }
   Text{text:ready.ready?"Передумови підтверджені":"Потрібно підтвердити всі передумови";color:ready.ready?"#27d59a":"#ffb84d";font.bold:true}
   Text{text:mark(ready.checks.deviceSelected)+" Вибрано пристрій";color:"#8fa1b7"}
   Text{text:mark(ready.checks.openipcVerified)+" OpenIPC підтверджено";color:"#8fa1b7"}
@@ -18,6 +22,7 @@ Item {
    Button{text:"Зберегти preflight";onClicked:preflightPath.text=hardwareE2ERuntime.exportPreflight();HoverHint{text:"Експортувати очищений diagnostic bundle перед фізичною перевіркою."}}
    Text{id:preflightPath;Layout.fillWidth:true;color:"#27d59a";elide:Text.ElideMiddle}
   }
+  Item{Layout.fillHeight:true}
   Text{text:"Цей екран не запускає destructive update. Прошивка залишається в окремому контрольованому workflow.";color:"#ffb84d";wrapMode:Text.Wrap;Layout.fillWidth:true}
  }
 }
