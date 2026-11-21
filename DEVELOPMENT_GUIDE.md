@@ -1,6 +1,6 @@
 # FPV Uhyliant development guide
 
-Read this file, `PROJECT_STATE.md` and `PRODUCT_UX.md` from current `main` before development. `main` is the single source of truth.
+Read this file, `PROJECT_STATE.md`, `PRODUCT_UX.md`, `DELIVERY_ROADMAP.md` and `AUTONOMOUS_DEVELOPMENT.md` from current `main` before development. `main` is the single source of truth.
 
 ## Invariants
 Windows ground station: Python + PySide6 + Qt Quick/QML. FPV remains video-first. Unknown telemetry stays unavailable. Cameras, vehicles/flight controllers and operator RC controllers are distinct physical identities composed in the FPV workspace. Camera presets, video profiles and firmware remain separate. Generic ONVIF is not verified OpenIPC. Recovery/fullflash is not a generic install path. Secrets/private signing keys are not repository data. Cloud metadata is not fresh local hardware evidence. AI output is advisory rather than operational authority.
@@ -41,6 +41,8 @@ A completed SSH/sysupgrade invocation is only `reboot-pending`. Success requires
 Normalized telemetry is tri-state and fallback synthesizes no values. Video runtimes remain isolated and prepared snapshots fail closed after input changes. Pairing secrets and metadata remain separated. Camera presets remain separate from video profiles and require post-apply observation.
 
 ## Workflow
-Inspect actual `main` and all three canonical documents before material product work. Test software/tooling paths and synchronize canonical docs after requirement changes.
+Inspect actual `main` and all canonical documents before material product work. `DELIVERY_ROADMAP.md` defines delivery order, dependencies, stories and acceptance criteria. `AUTONOMOUS_DEVELOPMENT.md` defines autonomous work selection, stop conditions, branch/PR behavior, CI repair and the Project Doctor interface.
 
 Work in one substantial, logically complete batch at a time. After each batch, stop for CI evidence. If CI fails, repair that batch before accumulating further product work. Never claim CI or physical hardware success without evidence. Hardware-dependent validation remains explicit.
+
+Autonomous development should proceed without intermediate questions when the answer is derivable from current main, canonical contracts, tests, CI or sanitized evidence. Human intervention is reserved for physical actions, secrets/credentials/keys and genuine product decisions.
