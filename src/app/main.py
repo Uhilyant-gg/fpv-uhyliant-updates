@@ -31,6 +31,7 @@ def main():
  from updater_engine import Updater
  from video import VideoRuntime
  from mavlink_runtime import MavlinkRuntime
+ from telemetry_provider import MavlinkProvider
  from vehicle import VehicleRuntime
  app=QGuiApplication(sys.argv);app.setApplicationName('FPV-Uhyliant');app.setApplicationVersion(VERSION)
  m=MavlinkRuntime()
@@ -38,7 +39,7 @@ def main():
   QTimer.singleShot(350,app.quit);rc=app.exec();m.shutdown();print(json.dumps({'status':'ok','backend':'mavlink','telemetry':'not simulated'}));return rc
  icon=here/'fpv-uhyliant.ico'
  if icon.exists():app.setWindowIcon(QIcon(str(icon)))
- QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();v=VideoRuntime(d);vehicle=VehicleRuntime(m,v);u=Updater(x.install_root,s.canInstallUpdate);e.rootContext().setContextProperty('station',s);e.rootContext().setContextProperty('devicesModel',d);e.rootContext().setContextProperty('videoRuntime',v);e.rootContext().setContextProperty('mavlinkRuntime',m);e.rootContext().setContextProperty('vehicleRuntime',vehicle);e.rootContext().setContextProperty('updater',u);e.rootContext().setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
+ QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();v=VideoRuntime(d);telemetry=MavlinkProvider(m);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate);e.rootContext().setContextProperty('station',s);e.rootContext().setContextProperty('devicesModel',d);e.rootContext().setContextProperty('videoRuntime',v);e.rootContext().setContextProperty('mavlinkRuntime',m);e.rootContext().setContextProperty('vehicleRuntime',vehicle);e.rootContext().setContextProperty('updater',u);e.rootContext().setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
  if not e.rootObjects():raise RuntimeError('QML root object failed to load')
  app.aboutToQuit.connect(m.shutdown);root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized)
  if x.smoke_test:
