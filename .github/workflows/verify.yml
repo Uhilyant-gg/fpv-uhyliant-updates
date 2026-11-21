@@ -28,9 +28,9 @@ jobs:
         run: pip install -r src/requirements.txt
       - name: Compile all Python sources
         run: python -m compileall -q -f src tools
-      - name: Run telemetry protocol tests
+      - name: Run application unit tests
         working-directory: src/app
-        run: python -m unittest -v test_telemetry_provider.py test_msp_runtime.py test_crsf_runtime.py
+        run: python -m unittest -v test_telemetry_provider.py test_msp_runtime.py test_crsf_runtime.py test_devices.py
       - name: Run application self-test
         working-directory: src/app
         run: python main.py --self-test

@@ -156,7 +156,8 @@ class Devices(QObject):
   try:
    with self._connect() as db:
     cols="id,name,type,host,port,connection,notes";self._items=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM devices ORDER BY name COLLATE NOCASE")]
-   self._active_id=""
+    row=db.execute("SELECT value FROM settings WHERE key='activeDeviceId'").fetchone();saved=row[0] if row else ""
+   self._active_id=saved if any(i["id"]==saved for i in self._items) else ""
    self._load_streams();self._load_profiles()
   except sqlite3.Error as e:self._items=[];self._streams=[];self._profiles=[];self._active_id="";self.notice.emit("Помилка бази пристроїв: "+str(e))
  def _load_streams(self):
@@ -288,5 +289,5 @@ class Devices(QObject):
  @Slot(str)
  def removeDevice(self,did):
   with self._connect() as db:db.execute("DELETE FROM devices WHERE id=?",(did,))
-  if self._active_id==did:self._active_id=""
+  if self._active_id==did:self._active_id="";self._save_active()
   self._load();self.changed.emit()
