@@ -5,24 +5,23 @@
 ## Product direction
 Windows FPV ground station using Python + PySide6 + Qt Quick/QML. ArduPilot, Betaflight and INAV are target stacks; MAVLink, MSP and CRSF are target telemetry protocols. FPV remains video-first.
 
-## Telemetry / OpenIPC / video
-Normalized read-only telemetry providers preserve unknown/stale state. Verified OpenIPC identity stays distinct from generic ONVIF. Firmware remains guarded with no destructive hardware adapter enabled by default. Independent primary/secondary video runtimes and real-stream-only PiP are implemented; hardware validation remains pending where documented.
+## Runtime architecture
+Normalized telemetry preserves unknown/stale state. Verified OpenIPC identity stays distinct from generic ONVIF. Firmware remains guarded with no destructive hardware adapter enabled by default. Independent primary/secondary video runtimes, real-stream-only PiP, camera presets, link diagnostics, and AES-GCM station backup/transactional restore are implemented software-side. Hardware-dependent validation remains pending where documented.
 
-## Station backup and restore
-Station backup v3 now uses the repository's existing `cryptography` dependency: scrypt derives an AES-256 key and AES-GCM provides authenticated encryption. Envelope schema/version, KDF/cipher identifiers, KDF parameters, salt and nonce are authenticated as associated data. Wrong passwords or modified ciphertext/metadata are rejected before a snapshot can become pending restore state.
+## Distribution hardening
+The unified release pipeline now builds from the immutable workflow-trigger SHA instead of re-reading a moving `main`. Release input policy is validated in shared tooling, and non-stable channels must remain prereleases. Windows build artifacts carry a SHA-256 sidecar that is verified again after artifact download before release signing/publishing. Artifact names include the source SHA and retention is bounded.
 
-Portable snapshots are strictly allow-listed and type/range/reference validated before restore. They contain devices, streams, per-stream video profiles, verified OpenIPC identities and active-device selection only. Pairing secrets and signing keys are excluded.
+Release publishing keeps signing material in the GitHub secret boundary, writes the temporary private key only under the runner temp directory, and removes it through an EXIT trap. The release tag is explicitly anchored to the immutable source SHA rather than the later metadata commit. Legacy release/installer workflows remain disabled entry points; the unified pipeline is authoritative.
 
-Restore stays two-phase and explicit. Inspection never changes live SQLite state; confirmed restore performs the replacement in one transaction, so validation or write failures preserve the prior database.
+CI now runs tooling unit tests in addition to application tests and rejects common private-key/certificate artifact extensions. This hardening does not claim Windows Authenticode signing; executable code-signing remains a separate future capability requiring an appropriate certificate/secret.
 
-## External navigation / link diagnostics
-`LinkDiagnostics` remains a read-only observation boundary. Real StabX and Starlink/WireGuard adapters remain `hardware-validation-pending`.
+## External/hardware boundaries
+Real StabX, Starlink/WireGuard observers, target-camera firmware/preset execution and real dual-decoder validation remain `hardware-validation-pending`.
 
 ## Next implementation order
-1. Hardware-only firmware/preset and real target-device validation when physical hardware is available.
-2. Validate dual-decoder and RTSP recovery on target Windows hardware.
-3. Connect verified read-only external-navigation/network observers when protocol evidence is available.
-4. Add station pairing with OS-protected secrets and explicit trust/revocation lifecycle, then continue distribution hardening.
+1. Hardware validation when target devices become available.
+2. Station pairing with OS-protected secrets and explicit trust/revocation lifecycle.
+3. Add executable signing/provenance hardening when the required certificate/secret is available.
 
 ## Acceptance rule
-No invented telemetry, hardware state, stream metadata or latency. Hardware-dependent validation is `hardware-validation-pending`.
+No invented telemetry, hardware state, stream metadata or latency. Hardware-dependent validation stays explicit.

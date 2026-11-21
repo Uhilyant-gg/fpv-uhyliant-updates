@@ -31,6 +31,9 @@ jobs:
       - name: Run application unit tests
         working-directory: src/app
         run: python -m unittest -v test_*.py
+      - name: Run tooling unit tests
+        working-directory: tools
+        run: python -m unittest -v test_*.py
       - name: Run application self-test
         working-directory: src/app
         run: python main.py --self-test
@@ -50,34 +53,26 @@ jobs:
           python main.py --smoke-test --smoke-marker "$marker"
           python - "$marker" <<'PY'
           import json, pathlib, sys
-          path = pathlib.Path(sys.argv[1])
-          payload = json.loads(path.read_text(encoding='utf-8'))
-          if payload.get('status') != 'ok':
-              raise SystemExit(f'invalid smoke marker: {payload}')
+          payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
+          if payload.get('status') != 'ok': raise SystemExit(f'invalid smoke marker: {payload}')
           print('QML smoke test: OK')
           PY
       - name: Check project version consistency
         shell: python
         run: |
-          import json
-          import runpy
+          import json, runpy
           from pathlib import Path
           version = runpy.run_path('src/app/version.py')['VERSION']
           root_version = json.loads(Path('VERSION.json').read_text(encoding='utf-8'))['version']
-          if version != root_version:
-              raise SystemExit(f'version mismatch: src/app/version.py={version}, VERSION.json={root_version}')
+          if version != root_version: raise SystemExit(f'version mismatch: {version} != {root_version}')
       - name: Verify signed test channel when present
         shell: bash
         run: |
-          if [ -f test/release.json ]; then
-            python tools/verify_repository.py --channel test
-          else
-            echo "No signed test release yet"
-          fi
-      - name: Reject committed private keys
+          if [ -f test/release.json ]; then python tools/verify_repository.py --channel test; else echo "No signed test release yet"; fi
+      - name: Reject committed private keys and obvious secret artifacts
         shell: bash
         run: |
-          if find . -type f \( -iname '*private*key*' -o -iname '*private*.pem' \) | grep -q .; then
-            echo 'Private signing key detected in repository.' >&2
-            exit 1
+          set -euo pipefail
+          if find . -type f \( -iname '*private*key*' -o -iname '*private*.pem' -o -iname '*.pfx' -o -iname '*.p12' \) | grep -q .; then
+            echo 'Private key/certificate artifact detected in repository.' >&2; exit 1
           fi

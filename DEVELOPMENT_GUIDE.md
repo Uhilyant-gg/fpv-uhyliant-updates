@@ -2,30 +2,25 @@
 
 Read this file and `PROJECT_STATE.md` from current `main` before development. `main` is the single source of truth.
 
-## Baseline
+## Baseline and invariants
 Windows ground station: Python + PySide6 + Qt Quick/QML. FPV remains video-first. Target stacks: ArduPilot, Betaflight, INAV. Target protocols: MAVLink, MSP, CRSF.
 
-## Core rules
-- Unknown/stale/missing telemetry and diagnostics remain unavailable.
-- Camera presets, stream video profiles and firmware are separate entities.
-- Generic ONVIF/name hints are not verified OpenIPC evidence.
-- Recovery/fullflash is not a generic install path.
-- Private signing keys and pairing secrets are never committed or exported in station snapshots.
+Unknown/stale/missing telemetry stays unavailable. Camera presets, video profiles and firmware remain separate. Generic ONVIF is not verified OpenIPC. Recovery/fullflash is not a generic install path. Private signing keys and pairing secrets must never be committed or exported in station snapshots.
 
-## Backup/restore security boundary
-Portable station backup v3 uses `cryptography` AES-256-GCM with a password-derived scrypt key. The envelope metadata required to interpret the ciphertext is authenticated as AES-GCM associated data. Do not add unauthenticated envelope fields that affect decryption/restore semantics.
+## Release pipeline
+`.github/workflows/automated-ota.yml` is the authoritative unified Windows build/sign/publish path; legacy release and Windows-installer workflows are disabled. A release must build and publish against the workflow event SHA. Do not change release checkout back to a moving branch after build start.
 
-Snapshot validation is strict and allow-listed: exact entity fields, scalar types/ranges, unique IDs/names/device-kind pairs, host/port uniqueness, active-device membership, stream-to-device/profile references and verified OpenIPC identity references must pass before restore. Unknown fields are rejected so future secret-bearing state is not silently imported.
+Validate version/channel/prerelease policy before building. Test/development releases must remain prereleases. Carry a SHA-256 digest with the Windows artifact and verify it again after GitHub artifact transport, before manifest signing. Release tags must point to the immutable source SHA; metadata commits are distribution metadata, not the source that produced the binary.
 
-Import remains two-phase. Inspection decrypts/authenticates and validates, but does not mutate live state. Restore requires explicit confirmation and uses a single SQLite transaction. Never add silent restore, partial replacement, signing keys or pairing secrets to portable snapshots.
+Signing private keys stay in GitHub Secrets and temporary runner storage only. Cleanup must be trap/finally style so a failed command cannot leave the temporary key in later workflow steps. Never commit certificate private keys. Current pipeline signs the OTA release manifest but does not claim Authenticode signing of Windows executables.
 
-## Current architecture
-Telemetry, guarded firmware lifecycle, dual-video/PiP, camera presets, read-only link diagnostics, authenticated encrypted backup and transactional restore are implemented software-side. Hardware validation remains pending where noted in `PROJECT_STATE.md`.
+## Application security
+Portable backups use AES-256-GCM with scrypt and strict allow-listed snapshot validation. Restore is explicit and transactional. Pairing secrets/signing keys are excluded from backup.
 
 ## Next work
-1. Hardware validation when target devices are available.
-2. Station pairing with OS-protected secret storage and explicit trust/revocation lifecycle.
-3. Continue installer/update distribution hardening without committing private keys.
+1. Hardware validation when equipment is available.
+2. Station pairing with OS-protected secret storage and explicit trust/revocation.
+3. Executable signing when a real code-signing certificate/secret is available.
 
 ## Workflow
-Inspect actual `main`, test software paths, synchronize canonical docs after material changes, and never claim CI/write success without evidence.
+Inspect actual `main`, test software/tooling paths, synchronize canonical docs after material changes, and never claim CI success without evidence.
