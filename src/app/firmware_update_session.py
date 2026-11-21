@@ -58,11 +58,19 @@ class FirmwareUpdateSession(QObject):
  def _rediscovery_candidates(self,original_host):return self._candidate_provider(original_host) if callable(self._candidate_provider) else plan_targets(interfaces(),system_routes(),[original_host])
  def _sync(self,ok=None):
   status=self.executor.status;verification=status.get('verification') or {};identity=verification.get('identity') or {};self._result={'enabled':self._enabled,'state':status.get('state',''),'reason':status.get('error',''),'observedFirmware':identity.get('firmware',''),'verification':verification};self.changed.emit();return bool(ok) if ok is not None else True
+ def _binding_is_current(self,device_id,profile,mode):
+  binding=self._preflight_binding;center=self.executor.center;plan=center.executionPlan;approval=center.result
+  if not binding or plan.get('ready') is not True or approval.get('ready') is not True:return False
+  expected={'deviceId':device_id,'profile':profile,'mode':mode,'approvalToken':binding.get('approvalToken')}
+  if any(plan.get(k)!=v or approval.get(k)!=v for k,v in expected.items()):return False
+  device=next((dict(d) for d in self.devices.items if d.get('id')==device_id),None)
+  if device is None:return False
+  identity=dict(device.get('openipcIdentity') or {})
+  return identity.get('verified') is True and device.get('host')==binding.get('host') and identity.get('platform')==binding.get('platform') and identity.get('sensor')==binding.get('sensor')
  @Slot(str,str,str,result=bool)
  def execute(self,device_id,profile,mode):
   if not self._enabled:self._result=self._empty();self.changed.emit();return False
-  plan=self.executor.center.executionPlan;binding=self._preflight_binding
-  if not binding or binding.get('deviceId')!=device_id or binding.get('profile')!=profile or binding.get('mode')!=mode or binding.get('approvalToken')!=plan.get('approvalToken'):
+  if not self._binding_is_current(device_id,profile,mode):
    self._result={'enabled':True,'state':'blocked','reason':'Автентифікований preflight більше не відповідає схваленому оновленню','observedFirmware':'','verification':{}};self.changed.emit();return False
   self._correlation_id=uuid.uuid4().hex;self._event('info','firmware update requested',{'deviceId':device_id,'profile':profile,'mode':mode});ok=self.executor.execute(device_id,profile,mode);self._sync(ok);self._event('info' if ok else 'error','firmware dispatch accepted' if ok else 'firmware dispatch blocked',{'deviceId':device_id,'profile':profile,'mode':mode,'state':self._result.get('state',''),'reason':self._result.get('reason','')});return bool(ok)
  @Slot(result=bool)
