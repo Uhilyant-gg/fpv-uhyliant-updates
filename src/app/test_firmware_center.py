@@ -17,6 +17,9 @@ class FirmwareCenterTests(unittest.TestCase):
         bad=self.center({"verified":False,"platform":"ssc30kq","sensor":""});self.assertFalse(bad.precheck("cam","ssc30kq-imx335","primary",True,True))
     def test_hash_mismatch_blocks_all_modes(self):
         f=FirmwareCenter(Devices({"verified":True,"platform":"ssc30kq","sensor":"imx335"}));self.assertFalse(f.verifyImage(str(self.image),"0"*64));self.assertFalse(f.precheck("cam","ssc30kq-imx335","upgrade",True,True))
-    def test_mode_policy_keeps_fullflash_non_primary(self):
-        f=FirmwareCenter(Devices({}));self.assertFalse(f.modePolicy("primary")["requiresExistingOpenIPC"]);self.assertTrue(f.modePolicy("recovery-fullflash")["requiresExistingOpenIPC"])
+    def test_approval_is_bound_to_device_profile_mode_and_artifact(self):
+        f=self.center({"verified":True,"platform":"ssc30kq","sensor":"imx335"});self.assertTrue(f.precheck("cam","ssc30kq-imx335","upgrade",True,True));self.assertTrue(f.approvalMatches("cam","ssc30kq-imx335","upgrade"));self.assertFalse(f.approvalMatches("cam","ssc30kq-imx335","primary"));token=f.result["approvalToken"];self.assertTrue(token)
+        self.assertFalse(f.verifyImage(str(self.image),"0"*64));self.assertFalse(f.result["ready"]);self.assertEqual(f.result["approvalToken"],"")
+    def test_identity_change_invalidates_approval_match(self):
+        devices=Devices({"verified":True,"platform":"ssc30kq","sensor":"imx335"});f=FirmwareCenter(devices);f.verifyImage(str(self.image),self.sha);self.assertTrue(f.precheck("cam","ssc30kq-imx335","upgrade",True,True));devices.items[0]["openipcIdentity"]["sensor"]="imx415";self.assertFalse(f.approvalMatches("cam","ssc30kq-imx335","upgrade"))
 if __name__=="__main__":unittest.main()
