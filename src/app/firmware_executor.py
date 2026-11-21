@@ -5,7 +5,8 @@ from PySide6.QtCore import QObject,Property,Signal,Slot
 from firmware_center import SUPPORTED_PROFILES
 class FirmwareExecutor(QObject):
  changed=Signal()
- def __init__(self,firmware_center):super().__init__();self.center=firmware_center;self._adapter=None;self._locked_device='';self._before={};self._handoff={};self._verification_nonce=None;self._state=self._idle()
+ def __init__(self,firmware_center):
+  super().__init__();self.center=firmware_center;self._adapter=None;self._locked_device='';self._before={};self._handoff={};self._verification_nonce=None;self._state=self._idle();self.center.setMutationGuard(lambda:not self.busy)
  def _idle(self):return {'state':'idle','deviceId':'','profile':'','mode':'','step':'','error':'','verification':{},'hardwareValidation':'hardware-validation-pending'}
  @Property('QVariantMap',notify=changed)
  def status(self):return deepcopy(self._state)

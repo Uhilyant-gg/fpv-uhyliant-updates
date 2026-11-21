@@ -7,7 +7,11 @@ SUPPORTED_PROFILES={"ssc30kq-imx335":{"platform":"ssc30kq","sensor":"imx335","mo
 MODES=("primary","upgrade","recovery-fullflash")
 class FirmwareCenter(QObject):
  changed=Signal()
- def __init__(self,devices):super().__init__();self.devices=devices;self._artifact=self._empty_artifact();self._result=self._empty();self._plan=self._empty_plan()
+ def __init__(self,devices):super().__init__();self.devices=devices;self._artifact=self._empty_artifact();self._result=self._empty();self._plan=self._empty_plan();self._mutation_guard=lambda:True
+ def setMutationGuard(self,guard):self._mutation_guard=guard if callable(guard) else (lambda:True)
+ def _can_mutate(self):
+  try:return bool(self._mutation_guard())
+  except Exception:return False
  def _empty(self):return {"ready":False,"deviceId":"","profile":"","mode":"","checks":[],"reason":"Попередню перевірку не виконано","approvalToken":""}
  def _empty_artifact(self):return {"path":"","sha256":"","expectedSha256":"","size":0,"verified":False,"error":"Образ прошивки не вибрано"}
  def _empty_plan(self):return {"ready":False,"steps":[],"reason":"План виконання не підготовлено","approvalToken":"","artifactSha256":"","artifactSize":0}
@@ -34,6 +38,7 @@ class FirmwareCenter(QObject):
   if self._result.get("ready") or self._result.get("approvalToken"):self._result={**self._result,"ready":False,"reason":reason,"approvalToken":""}
  @Slot(str,str,result=bool)
  def verifyImage(self,path,expected_sha256):
+  if not self._can_mutate():return False
   self._invalidate();expected=expected_sha256.strip().lower();p=Path(path.strip())
   if not p.is_file():self._artifact={"path":str(p),"sha256":"","expectedSha256":expected,"size":0,"verified":False,"error":"Образ прошивки не знайдено"};self.changed.emit();return False
   h=hashlib.sha256();size=0
@@ -46,6 +51,7 @@ class FirmwareCenter(QObject):
   material="|".join((device_id,str((device or {}).get("host","")).strip(),profile,mode,self._artifact["sha256"],str(self._artifact["size"]),str(identity.get("platform","")).lower(),str(identity.get("sensor","")).lower(),str(bool(identity.get("verified")))));return hashlib.sha256(material.encode()).hexdigest()
  @Slot(str,str,str,bool,bool,result=bool)
  def precheck(self,device_id,profile,mode,recovery_ready,layout_verified):
+  if not self._can_mutate():return False
   device=next((d for d in self.devices.items if d.get("id")==device_id),None);identity=(device or {}).get("openipcIdentity") or {};target=SUPPORTED_PROFILES.get(profile);checks=[];policy=self.modePolicy(mode)
   def add(name,ok,detail):checks.append({"name":name,"ok":bool(ok),"detail":detail})
   add("device",device is not None,"Пристрій знайдено" if device else "Пристрій не знайдено");add("profile",target is not None,"Профіль прошивки відомий" if target else "Невідомий профіль прошивки");compatible=bool(target and identity.get("platform") and identity.get("sensor") and identity.get("platform","").lower()==target["platform"] and identity.get("sensor","").lower()==target["sensor"]);add("hardware",compatible,"Платформа та сенсор відповідають профілю" if compatible else "Платформа та сенсор не підтверджують сумісність");required=bool(policy.get("requiresExistingOpenIPC",True));openipc_ok=bool(identity.get("verified")) if required else True;add("existing-openipc",openipc_ok,"Наявну OpenIPC підтверджено" if required and openipc_ok else ("Наявна OpenIPC не є вимогою первинного встановлення" if not required else "Наявну OpenIPC не підтверджено"));add("layout",layout_verified,"Розмітку флеш-пам'яті перевірено" if layout_verified else "Розмітку флеш-пам'яті не перевірено");add("image",self._artifact["verified"],"SHA-256 образу прошивки перевірено" if self._artifact["verified"] else (self._artifact["error"] or "Образ прошивки не перевірено"));add("recovery",recovery_ready,"Шлях відновлення готовий" if recovery_ready else "Шлях відновлення не підтверджено");mode_ok=mode in MODES and bool(target and mode in target["modes"]);add("mode",mode_ok,policy["description"] if mode_ok else "Невідомий або непідтримуваний режим")
@@ -56,6 +62,7 @@ class FirmwareCenter(QObject):
   device=next((d for d in self.devices.items if d.get("id")==device_id),None);identity=(device or {}).get("openipcIdentity") or {};return self._result.get("deviceId")==device_id and self._result.get("profile")==profile and self._result.get("mode")==mode and self._result.get("approvalToken")==self._approval_token(device_id,profile,mode,device,identity)
  @Slot(str,str,str,result=bool)
  def prepareExecution(self,device_id,profile,mode):
+  if not self._can_mutate():return False
   if not self.approvalMatches(device_id,profile,mode):self._plan=self._empty_plan();self._plan["reason"]="Схвалення попередньої перевірки не відповідає поточним вхідним даним";self.changed.emit();return False
   steps=["Повторно перевірити SHA-256 прошивки безпосередньо перед записом","Отримати ексклюзивне блокування операцій із пристроєм"]
   if mode=="primary":steps+=["Запустити адаптер первинного встановлення","Перезапустити пристрій"]
@@ -64,4 +71,6 @@ class FirmwareCenter(QObject):
   steps+=["Повторно виявити пристрій","Перевірити ідентичність OpenIPC і прошивку","Зняти ексклюзивне блокування операцій із пристроєм"]
   self._plan={"ready":True,"steps":steps,"reason":"План підготовлено; апаратний виконавець потребує фізичної перевірки","approvalToken":self._result["approvalToken"],"artifactSha256":self._artifact["sha256"],"artifactSize":self._artifact["size"]};self.changed.emit();return True
  @Slot()
- def reset(self):self._artifact=self._empty_artifact();self._result=self._empty();self._plan=self._empty_plan();self.changed.emit()
+ def reset(self):
+  if not self._can_mutate():return False
+  self._artifact=self._empty_artifact();self._result=self._empty();self._plan=self._empty_plan();self.changed.emit();return True
