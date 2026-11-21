@@ -15,8 +15,16 @@ class Tests(unittest.TestCase):
         self.assertIn('192.168.1.40',d._known_hosts());self.assertIn('192.168.1.50',d._known_hosts())
     def test_manual_ip_is_remembered_even_when_camera_temporarily_offline(self):
         d=module.Devices();d._remember_host('192.168.1.50',False);self.assertIn('192.168.1.50',d._known_hosts())
-    def test_invalid_history_host_is_not_saved(self):
-        d=module.Devices();d._remember_host('not-an-ip',True);self.assertEqual(d._known_hosts(),[])
+    def test_invalid_or_non_private_history_host_is_not_saved(self):
+        d=module.Devices()
+        for host in ('not-an-ip','8.8.8.8','100.64.1.2','127.0.0.1','169.254.2.3'):d._remember_host(host,True)
+        self.assertEqual(d._known_hosts(),[])
+    def test_stale_unsafe_history_rows_are_filtered_from_reconnect_candidates(self):
+        d=module.Devices()
+        with d._connect() as db:
+            db.execute("INSERT INTO discovery_history(host,last_seen,openipc) VALUES('8.8.8.8',1,1)")
+            db.execute("INSERT INTO discovery_history(host,last_seen,openipc) VALUES('192.168.1.50',2,1)")
+        self.assertEqual(d._known_hosts(),['192.168.1.50'])
     def test_discovered_add_requires_real_openipc_candidate(self):
         d=module.Devices();d._discovered=[{'host':'192.168.1.50','name':'Generic','openipc':False}]
         self.assertEqual(d.addDiscovered('192.168.1.50','Generic',True),'');self.assertEqual(d.count,0)
