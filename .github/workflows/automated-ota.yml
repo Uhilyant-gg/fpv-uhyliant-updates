@@ -65,7 +65,6 @@ jobs:
           $packaged = @(Get-ChildItem dist\FPV-Uhyliant -Recurse -File -Filter *.qml | ForEach-Object Name | Sort-Object -Unique)
           $missing = @($expected | Where-Object { $_ -notin $packaged })
           if ($missing.Count) { throw "Required application QML missing from package: $($missing -join ', ')" }
-          Write-Host "Verified $($expected.Count) application QML files; Qt runtime QML dependencies are allowed."
       - name: Packaged application tests
         shell: pwsh
         run: |
@@ -128,8 +127,8 @@ jobs:
           install -m 700 -d "$RUNNER_TEMP/sign" "releases/$VERSION"
           trap 'rm -f "$RUNNER_TEMP/sign/private.pem"' EXIT
           printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/sign/private.pem"
-          PACKAGE="FPV-Uhyliant-v$VERSION-$CHANNEL-UA-Windows.zip"; PACKAGE_PATH="build/release-output/$PACKAGE"; BUILD="$(printf '%s' "$VERSION" | tr -d '.')"; BASE_URL="https://<scrubbed-url-domain>/$GITHUB_REPOSITORY/main"
-          python tools/build_release.py --channel "$CHANNEL" --version "$VERSION" --build "$BUILD" --package "$PACKAGE_PATH" --base-url "$BASE_URL" --notes "$NOTES"
+          PACKAGE="FPV-Uhyliant-v$VERSION-$CHANNEL-UA-Windows.zip"; PACKAGE_PATH="build/release-output/$PACKAGE"; BUILD="$(printf '%s' "$VERSION" | tr -d '.')"; RELEASE_URL="https://<scrubbed-url-domain>/$GITHUB_REPOSITORY/releases/download/v$VERSION"
+          python tools/build_release.py --channel "$CHANNEL" --version "$VERSION" --build "$BUILD" --package "$PACKAGE_PATH" --base-url "$RELEASE_URL" --notes "$NOTES" --no-copy
           python src/release-tools/sign_release.py "$CHANNEL/release.unsigned.json" --key "$RUNNER_TEMP/sign/private.pem"
           mv "$CHANNEL/release.unsigned.json" "$CHANNEL/release.json"
           cp "$CHANNEL/release.json" "releases/$VERSION/release.json"
@@ -140,7 +139,7 @@ jobs:
         run: |
           set -euo pipefail
           git config user.name github-actions[bot]; git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add "releases/$VERSION" "$CHANNEL/release.json" "$CHANNEL/packages"
+          git add "releases/$VERSION" "$CHANNEL/release.json"
           git commit -m "Publish FPV Uhyliant v$VERSION metadata"
           git tag -a "v$VERSION" -m "FPV Uhyliant v$VERSION" "$SOURCE_SHA"
           git push origin HEAD:main
