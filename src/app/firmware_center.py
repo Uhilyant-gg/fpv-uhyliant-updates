@@ -1,9 +1,8 @@
-"""Safety gates and immutable firmware artifact verification for OpenIPC operations.
-This module prepares non-destructive execution plans; it does not flash hardware.
-"""
+"""Safety gates and immutable firmware artifact verification for OpenIPC operations."""
 import hashlib
 from pathlib import Path
 from PySide6.QtCore import QObject,Property,Signal,Slot
+from openipc_upgrade import upgrade_candidate
 SUPPORTED_PROFILES={"ssc30kq-imx335":{"platform":"ssc30kq","sensor":"imx335","modes":{"primary":{"requiresExistingOpenIPC":False},"upgrade":{"requiresExistingOpenIPC":True},"recovery-fullflash":{"requiresExistingOpenIPC":True}}}}
 MODES=("primary","upgrade","recovery-fullflash")
 class FirmwareCenter(QObject):
@@ -23,9 +22,11 @@ class FirmwareCenter(QObject):
  @Property("QStringList",constant=True)
  def modes(self):return list(MODES)
  @Slot(str,result="QVariantMap")
+ def upgradeReadiness(self,device_id):return upgrade_candidate(next((d for d in self.devices.items if d.get("id")==device_id),None))
+ @Slot(str,result="QVariantMap")
  def modePolicy(self,mode):
   if mode=="primary":return {"title":"Первинне встановлення","requiresExistingOpenIPC":False,"description":"Первинне встановлення. Не використовує recovery/fullflash як універсальний метод."}
-  if mode=="upgrade":return {"title":"Оновлення","requiresExistingOpenIPC":True,"description":"Оновлення лише для підтвердженого сумісного пристрою OpenIPC."}
+  if mode=="upgrade":return {"title":"Оновлення","requiresExistingOpenIPC":True,"description":"Штатне оновлення лише для підтвердженого сумісного OpenIPC."}
   if mode=="recovery-fullflash":return {"title":"Відновлення / fullflash","requiresExistingOpenIPC":True,"description":"Recovery/fullflash лише для пристрою з підтвердженою сумісною кастомною OpenIPC."}
   return {"title":"Невідомий режим","requiresExistingOpenIPC":True,"description":"Невідомий режим заблоковано."}
  def _invalidate(self,reason="Вхідні дані змінилися; повторіть попередню перевірку"):
@@ -58,9 +59,9 @@ class FirmwareCenter(QObject):
   if not self.approvalMatches(device_id,profile,mode):self._plan={"ready":False,"steps":[],"reason":"Схвалення попередньої перевірки не відповідає поточним вхідним даним","approvalToken":""};self.changed.emit();return False
   steps=["Повторно перевірити SHA-256 прошивки безпосередньо перед записом","Отримати ексклюзивне блокування операцій із пристроєм"]
   if mode=="primary":steps+=["Запустити адаптер первинного встановлення","Перезапустити пристрій"]
-  elif mode=="upgrade":steps+=["Запустити адаптер оновлення підтвердженої OpenIPC","Перезапустити пристрій"]
+  elif mode=="upgrade":steps+=["Запустити адаптер штатного OpenIPC sysupgrade","Перезапустити пристрій"]
   else:steps+=["Запустити recovery/fullflash адаптер для підтвердженої кастомної OpenIPC","Перезапустити пристрій"]
   steps+=["Повторно виявити пристрій","Перевірити ідентичність OpenIPC і прошивку","Зняти ексклюзивне блокування операцій із пристроєм"]
-  self._plan={"ready":True,"steps":steps,"reason":"План підготовлено; апаратний виконавець не підключений","approvalToken":self._result["approvalToken"]};self.changed.emit();return True
+  self._plan={"ready":True,"steps":steps,"reason":"План підготовлено; апаратний виконавець потребує фізичної перевірки","approvalToken":self._result["approvalToken"]};self.changed.emit();return True
  @Slot()
  def reset(self):self._artifact=self._empty_artifact();self._result=self._empty();self._plan=self._empty_plan();self.changed.emit()
