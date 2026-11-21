@@ -15,6 +15,14 @@ class Tests(unittest.TestCase):
   d,links,t,u=self.base();d._items=[{'id':'1','host':'192.168.1.50','openipcIdentity':{'verified':True}}];d._discovered=[];d._manual_result={'host':'192.168.1.50','reachable':True,'openipc':True,'identity':{'verified':True}}
   with tempfile.TemporaryDirectory() as root, patch('diagnostics_runtime.interfaces',return_value=[]), patch('diagnostics_runtime.system_routes',return_value=[]):
    evidence=DiagnosticsRuntime('2.0.12',d,links,t,u,DiagnosticEvents(),root)._network_evidence(d._items);item=next(x for x in evidence['devices'] if x['host']=='192.168.1.50');self.assertTrue(item['reachable']);self.assertTrue(item['openipcVerified']);self.assertTrue(item['discovered'])
+ def test_authenticated_discovery_evidence_is_exported_without_credentials(self):
+  d,links,t,u=self.base();d._items=[{'id':'1','host':'192.168.1.50','openipcIdentity':{'verified':True,'platform':'ssc30kq','sensor':'imx335'}}];d._discovered=[{'host':'192.168.1.50','reachable':True,'camera':True,'openipc':True,'authRequired':False,'identityVerified':True,'identity':{'verified':True,'platform':'ssc30kq','sensor':'imx335'},'evidence':['Majestic /api/v1/config.json']}];d._manual_result={}
+  with tempfile.TemporaryDirectory() as root, patch('diagnostics_runtime.interfaces',return_value=[]), patch('diagnostics_runtime.system_routes',return_value=[]):
+   b=DiagnosticsRuntime('2.0.12',d,links,t,u,DiagnosticEvents(),root).build();text=repr(b);evidence=b['network']['evidence'];item=next(x for x in evidence['devices'] if x['host']=='192.168.1.50');self.assertTrue(item['openipcVerified']);self.assertTrue(item['discovered']);self.assertNotIn('password',text.lower());self.assertNotIn('credential',text.lower())
+ def test_auth_required_candidate_is_not_reported_as_verified_openipc(self):
+  d,links,t,u=self.base();d._discovered=[{'host':'192.168.1.60','reachable':True,'camera':True,'openipc':False,'authRequired':True,'identityVerified':False,'identity':{'verified':False},'evidence':['Majestic API requires authentication (401)']}];d._manual_result={}
+  with tempfile.TemporaryDirectory() as root, patch('diagnostics_runtime.interfaces',return_value=[]), patch('diagnostics_runtime.system_routes',return_value=[]):
+   evidence=DiagnosticsRuntime('2.0.12',d,links,t,u,DiagnosticEvents(),root)._network_evidence([]);item=next(x for x in evidence['devices'] if x['host']=='192.168.1.60');self.assertTrue(item['discovered']);self.assertFalse(item['openipcVerified'])
  def test_export_creates_bundle(self):
   d,links,t,u=self.base()
   with tempfile.TemporaryDirectory() as root:
