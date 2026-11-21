@@ -1,6 +1,6 @@
 {
   "product": "FPV-Uhyliant",
-  "version": "2.0.15",
+  "version": "2.0.16",
   "stage": "test",
   "keyId": "fpv-uhyliant-production-v1",
   "manifestPath": "/fpv-uhyliant-updates/test/release.json"
