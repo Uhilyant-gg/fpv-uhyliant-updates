@@ -10,7 +10,8 @@ ApplicationWindow {
  function selectedStream(){for(var i=0;i<devicesModel.activeStreams.length;i++)if(devicesModel.activeStreams[i].id===selectedStreamId)return devicesModel.activeStreams[i];return null}
  function profileName(id){for(var i=0;i<devicesModel.videoProfiles.length;i++)if(devicesModel.videoProfiles[i].id===id)return devicesModel.videoProfiles[i].name;return "Не призначено"}
  function startSelected(){if(selectedStreamId!==""&&videoRuntime.prepare(selectedStreamId)){player.source=videoRuntime.url;player.play()}}
- MediaPlayer{id:player;videoOutput:videoOut;audioOutput:AudioOutput{muted:true};onPlayingChanged:{if(playing)videoRuntime.markPlaying()} onErrorOccurred:function(error,errorString){videoRuntime.playbackError(errorString)}}
+ AudioOutput{id:audioOut;muted:true}
+ MediaPlayer{id:player;videoOutput:videoOut;audioOutput:audioOut;onPlayingChanged:{if(playing)videoRuntime.markPlaying()} onErrorOccurred:function(error,errorString){videoRuntime.playbackError(errorString)}}
  component Glass:Rectangle{color:w.panel;border.color:w.line;border.width:1;radius:12}
  component StatusCard:Glass{required property string titleText;required property string valueText;required property color accent;implicitWidth:190;implicitHeight:72;Column{anchors.fill:parent;anchors.margins:12;spacing:4;Text{text:titleText;color:w.sub;font.pixelSize:12;font.bold:true}Text{text:valueText;color:accent;font.pixelSize:17;font.bold:true;elide:Text.ElideRight;width:parent.width}}}
  Timer{interval:1000;running:true;repeat:true;triggeredOnStart:true;onTriggered:{clockText=Qt.formatDateTime(new Date(),"dd.MM.yyyy  hh:mm:ss")}}
