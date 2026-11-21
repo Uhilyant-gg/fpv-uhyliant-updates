@@ -11,7 +11,7 @@ Camera discovery is route-aware but not an Internet scanner. Expand only bounded
 ## Authenticated firmware safety
 Credentials are session-only. Password fields are masked and cleared on reset/close/shutdown. Passwords must never be logged, persisted, included in snapshots/backups/errors/status/execution plans, shell interpolation or process argv. Password-capable SSH uses a library API with strict known-host verification. Authentication occurs before destructive execution. After authentication, current observed host, verified OpenIPC, platform and sensor must still match the approved compatible device before fixed `sysupgrade -k -r` is allowed.
 
-A completed SSH/sysupgrade invocation is only `reboot-pending`. Success requires bounded rediscovery, fresh verified OpenIPC evidence, fresh identity, hardware continuity and the actually observed post-update firmware. Do not invent a latest version. Do not infer Ultimate/Lite from hardware.
+A completed SSH/sysupgrade invocation is only `reboot-pending`. Success requires bounded rediscovery, fresh verified OpenIPC evidence, fresh platform and sensor, hardware continuity, and a non-empty actually observed post-update firmware version. An unknown authoritative target remains unknown; it must not make a missing observed version pass. Do not infer Ultimate/Lite from hardware or user selection.
 
 ## Other lifecycle invariants
 Normalized telemetry is tri-state and fallback synthesizes no values. Video runtimes remain isolated and prepared snapshots fail closed after input changes. Pairing secrets and metadata remain separated. Camera presets remain separate from video profiles and require post-apply observation.

@@ -11,13 +11,13 @@ Discovery is route-aware and bounded. Saved, last-seen and manual IPv4 addresses
 ## OpenIPC normal upgrade
 Normal update is fixed `sysupgrade -k -r` for currently verified compatible OpenIPC only. Credentials are session-only. The password-capable transport uses a library API and strict known-host verification, while `ExistingSshTransport` remains for OS-configured authentication. Authentication precedes destructive execution and current host/OpenIPC/platform/sensor are revalidated immediately before the command. Recovery/fullflash remains separate.
 
-`FirmwareUpdateSession` is the application orchestration boundary around executor, upgrade adapter and reboot verification. It starts without a transport, does not retain the configured transport itself, and exposes no credential fields in result/state. `main.py` still cannot perform a destructive update without explicit physical transport activation.
+`FirmwareUpdateSession` is the application orchestration boundary around executor, upgrade adapter and reboot verification. It starts without a transport, does not retain the configured transport itself, and exposes no credential fields in result/state. `main.py` cannot perform a destructive update without explicit physical transport activation.
 
 ## Reboot and verification
-Command dispatch means only `reboot-pending`. Post-reboot host input is validated before probing. `FirmwareUpdateLifecycle` performs bounded rediscovery, requires fresh verified OpenIPC evidence, and performs profile plus hardware-continuity verification. Generic reachability cannot complete the lifecycle. With no authoritative target version, the reported firmware is the freshly observed value.
+Command dispatch means only `reboot-pending`. Post-reboot host input is validated before probing. `FirmwareUpdateLifecycle` performs bounded rediscovery, requires fresh verified OpenIPC evidence, and performs profile plus hardware-continuity verification. Success additionally requires a non-empty freshly observed firmware version. An unknown authoritative target version remains unknown and never substitutes for missing observation. Generic reachability cannot complete the lifecycle.
 
-## Safety invariants
-No invented telemetry, hardware identity, variant, stream URLs, firmware version, credentials, pairing state or trust. Firmware, camera presets and video profiles remain separate. Generic ONVIF never implies OpenIPC. Destructive execution remains behind immutable approval/current-identity checks plus an explicit transport adapter. Passwords do not enter firmware plans, executor status/errors or persistent metadata. Ultimate/Lite is not inferred from platform or sensor.
+## Safety audit
+The pre-hardware audit covers authentication failure, command immutability, identity changes, rediscovery timeout/generic-host rejection, missing OpenIPC evidence, changed hardware, missing observed firmware, secret boundaries, disabled-by-default destructive wiring, and separation of normal upgrade from recovery/fullflash. Ultimate/Lite is not inferred or hardcoded into detection/update verification.
 
 ## Physical boundary
-Software orchestration and secret boundaries are prepared. Destructive transport remains disabled at application startup. Further real end-to-end validation requires the physical camera's actual credentials, accepted SSH host key and explicit destructive hardware run; these are not invented.
+Software orchestration and pre-hardware safety checks are complete. Destructive transport remains disabled at application startup. Further real end-to-end validation requires the physical camera's actual credentials, accepted SSH host key and explicit destructive hardware run; these are not invented.

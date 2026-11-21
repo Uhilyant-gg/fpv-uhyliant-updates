@@ -8,5 +8,9 @@ class PostFlashVerifyTests(unittest.TestCase):
  def test_wrong_sensor_or_firmware_fails(self):
   observed={'verified':True,'platform':'ssc30kq','sensor':'imx415','firmware':'old','evidence':['Majestic /api/v1/config.json']};self.assertFalse(verify_post_flash(self.before,observed,self.profile,'new')['ok'])
  def test_online_upgrade_accepts_new_observed_version_without_inventing_expected_version(self):
-  observed={'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'observed-after-upgrade','evidence':['OpenIPC status.cgi']};r=verify_post_flash(self.before,observed,self.profile,'');self.assertTrue(r['ok']);self.assertEqual(r['identity']['firmware'],'observed-after-upgrade')
+  observed={'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'observed-after-upgrade','evidence':['OpenIPC status.cgi']};r=verify_post_flash(self.before,observed,self.profile,'');self.assertTrue(r['ok']);self.assertEqual(r['identity']['firmware'],'observed-after-upgrade');self.assertEqual(r['expectedFirmware'],'')
+ def test_missing_post_update_firmware_cannot_report_success(self):
+  observed={'verified':True,'platform':'ssc30kq','sensor':'imx335','evidence':['OpenIPC status.cgi']};r=verify_post_flash(self.before,observed,self.profile,'');self.assertFalse(r['ok']);self.assertFalse(next(c for c in r['checks'] if c['name']=='firmware')['ok'])
+ def test_missing_before_identity_cannot_establish_continuity(self):
+  observed={'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'new','evidence':['OpenIPC status.cgi']};self.assertFalse(verify_post_flash({},observed,self.profile)['ok'])
 if __name__=='__main__':unittest.main()

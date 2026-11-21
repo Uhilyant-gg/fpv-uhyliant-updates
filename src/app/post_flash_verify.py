@@ -7,8 +7,10 @@ def verify_post_flash(before, observed, profile, expected_firmware=""):
     def add(name,ok,detail):checks.append({"name":name,"ok":bool(ok),"detail":detail})
     add("rediscovered",bool(observed),"Пристрій повторно виявлено" if observed else "Пристрій не виявлено повторно")
     add("openipc",current.get("verified"),"Докази OpenIPC підтверджено" if current.get("verified") else "Докази OpenIPC недоступні")
-    hardware_ok=current.get("platform","").lower()==profile.get("platform","").lower() and current.get("sensor","").lower()==profile.get("sensor","").lower()
+    hardware_ok=bool(current.get("platform") and current.get("sensor") and current.get("platform","").lower()==profile.get("platform","").lower() and current.get("sensor","").lower()==profile.get("sensor","").lower())
     add("hardware",hardware_ok,"Платформа та сенсор відповідають очікуваним" if hardware_ok else "Платформа або сенсор не відповідають очікуваним")
-    fw_ok=not expected_firmware or current.get("firmware")==expected_firmware;add("firmware",fw_ok,"Спостережувана прошивка відповідає очікуваній" if fw_ok else "Спостережувана прошивка не відповідає очікуваній")
-    same_identity=not before or (current.get("platform")==before.get("platform") and current.get("sensor")==before.get("sensor"));add("identity-continuity",same_identity,"Апаратну ідентичність збережено" if same_identity else "Апаратна ідентичність змінилася")
-    return {"ok":all(c["ok"] for c in checks),"checks":checks,"identity":current}
+    observed_firmware=str(current.get("firmware","")).strip();fw_ok=bool(observed_firmware) and (not expected_firmware or observed_firmware==expected_firmware)
+    add("firmware",fw_ok,"Отримано фактично спостережувану версію прошивки" if fw_ok else ("Спостережувана прошивка не відповідає очікуваній" if observed_firmware else "Версію прошивки після оновлення не спостережено"))
+    same_identity=bool(before) and current.get("platform")==before.get("platform") and current.get("sensor")==before.get("sensor")
+    add("identity-continuity",same_identity,"Апаратну ідентичність збережено" if same_identity else "Апаратна ідентичність змінилася або попередня ідентичність відсутня")
+    return {"ok":all(c["ok"] for c in checks),"checks":checks,"identity":current,"expectedFirmware":str(expected_firmware or "")}
