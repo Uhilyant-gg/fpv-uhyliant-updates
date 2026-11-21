@@ -2,25 +2,25 @@
 
 Read this file and `PROJECT_STATE.md` from current `main` before development. `main` is the single source of truth.
 
-## Baseline and invariants
-Windows ground station: Python + PySide6 + Qt Quick/QML. FPV remains video-first. Target stacks: ArduPilot, Betaflight, INAV. Target protocols: MAVLink, MSP, CRSF.
+## Invariants
+Windows ground station: Python + PySide6 + Qt Quick/QML. FPV remains video-first. Unknown telemetry stays unavailable. Camera presets, video profiles and firmware are separate. Generic ONVIF is not verified OpenIPC. Recovery/fullflash is not a generic install path. Secrets/private signing keys are not repository data.
 
-Unknown/stale/missing telemetry stays unavailable. Camera presets, video profiles and firmware remain separate. Generic ONVIF is not verified OpenIPC. Recovery/fullflash is not a generic install path. Private signing keys and pairing secrets must never be committed or exported in station snapshots.
+## OTA trust chain
+Treat OTA as one continuous trust chain: signed manifest -> declared package SHA-256 -> downloaded package -> ready state -> updater/helper handoff -> staged payload -> startup acknowledgement/rollback.
 
-## Release pipeline
-`.github/workflows/automated-ota.yml` is the authoritative unified Windows build/sign/publish path; legacy release and Windows-installer workflows are disabled. A release must build and publish against the workflow event SHA. Do not change release checkout back to a moving branch after build start.
+`ready.json` is strictly allow-listed and carries version, absolute package path and the digest obtained from the verified signed manifest/download. Always re-hash the package before install handoff. The detached helper receives the expected SHA-256 and must verify the package before extraction and after staging. Do not weaken this to path/version-only trust.
 
-Validate version/channel/prerelease policy before building. Test/development releases must remain prereleases. Carry a SHA-256 digest with the Windows artifact and verify it again after GitHub artifact transport, before manifest signing. Release tags must point to the immutable source SHA; metadata commits are distribution metadata, not the source that produced the binary.
+ZIP extraction must validate every member before writing any payload: no traversal outside staging, native/backslash escape ambiguity, symlinks, case-insensitive duplicate destinations, excessive member count or excessive claimed uncompressed size. Only then extract member-by-member.
 
-Signing private keys stay in GitHub Secrets and temporary runner storage only. Cleanup must be trap/finally style so a failed command cannot leave the temporary key in later workflow steps. Never commit certificate private keys. Current pipeline signs the OTA release manifest but does not claim Authenticode signing of Windows executables.
+Pending launcher state records version plus package SHA-256. A startup acknowledgement succeeds only for the fresh random token and expected version. Invalid pending state or failed startup rolls back to the previous application. Package digest is provenance/integrity metadata, not a substitute for the signed manifest.
 
-## Application security
-Portable backups use AES-256-GCM with scrypt and strict allow-listed snapshot validation. Restore is explicit and transactional. Pairing secrets/signing keys are excluded from backup.
+## Distribution and application security
+Release builds remain pinned to the workflow source SHA, artifact hashes are verified across jobs, and OTA manifests use the existing Ed25519 trust path. Portable station backups use AES-256-GCM/scrypt with strict transactional restore. Authenticode remains future work requiring a real certificate/secret.
 
 ## Next work
 1. Hardware validation when equipment is available.
 2. Station pairing with OS-protected secret storage and explicit trust/revocation.
-3. Executable signing when a real code-signing certificate/secret is available.
+3. Executable signing when real signing credentials are available.
 
 ## Workflow
 Inspect actual `main`, test software/tooling paths, synchronize canonical docs after material changes, and never claim CI success without evidence.

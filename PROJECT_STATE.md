@@ -3,25 +3,28 @@
 `main` is the single source of truth. Historical chat code must not replace newer repository code.
 
 ## Product direction
-Windows FPV ground station using Python + PySide6 + Qt Quick/QML. ArduPilot, Betaflight and INAV are target stacks; MAVLink, MSP and CRSF are target telemetry protocols. FPV remains video-first.
+Windows FPV ground station using Python + PySide6 + Qt Quick/QML. Target stacks: ArduPilot, Betaflight and INAV; target telemetry protocols: MAVLink, MSP and CRSF. FPV remains video-first.
 
 ## Runtime architecture
-Normalized telemetry preserves unknown/stale state. Verified OpenIPC identity stays distinct from generic ONVIF. Firmware remains guarded with no destructive hardware adapter enabled by default. Independent primary/secondary video runtimes, real-stream-only PiP, camera presets, link diagnostics, and AES-GCM station backup/transactional restore are implemented software-side. Hardware-dependent validation remains pending where documented.
+Normalized telemetry preserves unknown/stale state. Verified OpenIPC identity stays distinct from generic ONVIF. Firmware remains guarded with no generic destructive adapter. Independent primary/secondary video, real-stream-only PiP, camera presets, read-only link diagnostics, AES-GCM backup and transactional restore are implemented software-side.
+
+## OTA/update integrity
+The signed manifest still authenticates release metadata and package SHA-256. Download now persists the verified digest into an exact-field ready state. Installation re-hashes the package before handing it to the detached update helper, passes the expected digest explicitly, and the helper verifies it again before extraction and again after staging. This closes the previous gap where helper extraction trusted only a path/version argument.
+
+ZIP staging now rejects traversal paths, backslash member names, case-insensitive duplicate destinations, symbolic links, excessive member counts and excessive declared uncompressed size. Extraction is performed member-by-member only after the package digest and member set pass validation.
+
+Launcher pending-startup state is bound to the package digest. Pending state without a valid version/digest is not accepted as a successful update candidate. Startup acknowledgement remains token + version bound; on success the digest is recorded as `lastGoodPackageSha256`, while failed pending startup uses rollback.
 
 ## Distribution hardening
-The unified release pipeline now builds from the immutable workflow-trigger SHA instead of re-reading a moving `main`. Release input policy is validated in shared tooling, and non-stable channels must remain prereleases. Windows build artifacts carry a SHA-256 sidecar that is verified again after artifact download before release signing/publishing. Artifact names include the source SHA and retention is bounded.
+The authoritative release pipeline builds from an immutable workflow SHA, carries/verifies artifact SHA-256 across jobs, constrains release channel policy, and keeps signing private material in the runner secret/temp boundary. Authenticode remains future work requiring a real code-signing certificate/secret.
 
-Release publishing keeps signing material in the GitHub secret boundary, writes the temporary private key only under the runner temp directory, and removes it through an EXIT trap. The release tag is explicitly anchored to the immutable source SHA rather than the later metadata commit. Legacy release/installer workflows remain disabled entry points; the unified pipeline is authoritative.
-
-CI now runs tooling unit tests in addition to application tests and rejects common private-key/certificate artifact extensions. This hardening does not claim Windows Authenticode signing; executable code-signing remains a separate future capability requiring an appropriate certificate/secret.
-
-## External/hardware boundaries
-Real StabX, Starlink/WireGuard observers, target-camera firmware/preset execution and real dual-decoder validation remain `hardware-validation-pending`.
+## Hardware boundaries
+Real StabX, Starlink/WireGuard observers, target-camera firmware/preset execution and physical dual-decoder validation remain `hardware-validation-pending`.
 
 ## Next implementation order
 1. Hardware validation when target devices become available.
 2. Station pairing with OS-protected secrets and explicit trust/revocation lifecycle.
-3. Add executable signing/provenance hardening when the required certificate/secret is available.
+3. Authenticode/executable signing when the required certificate/secret becomes available.
 
 ## Acceptance rule
 No invented telemetry, hardware state, stream metadata or latency. Hardware-dependent validation stays explicit.

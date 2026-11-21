@@ -33,13 +33,14 @@ def sha(p):
 def load_ready(expected_manifest=None):
  try:r=json.loads((UP/'ready.json').read_text(encoding='utf-8'))
  except (OSError,ValueError,TypeError) as e:raise RuntimeError('Некоректний стан завантаженого оновлення') from e
- if not isinstance(r,dict) or not isinstance(r.get('version'),str) or not isinstance(r.get('package'),str):raise RuntimeError('Некоректний стан завантаженого оновлення')
+ if not isinstance(r,dict) or set(r)!={'version','package','sha256'} or not all(isinstance(r.get(k),str) for k in ('version','package','sha256')):raise RuntimeError('Некоректний стан завантаженого оновлення')
  vt(r['version']);package=Path(r['package']).resolve()
+ if not re.fullmatch(r'[0-9a-f]{64}',r['sha256'].lower()):raise RuntimeError('Некоректний SHA-256 у ready state')
+ if not package.is_file() or sha(package).lower()!=r['sha256'].lower():raise RuntimeError('Завантажений пакет змінився після перевірки')
  if expected_manifest:
-  pkg=expected_manifest.get('package') or {}
-  if r['version']!=expected_manifest.get('version') or package.name!=pkg.get('file'):raise RuntimeError('Завантажений пакет не відповідає перевіреному manifest')
-  if not package.is_file() or sha(package).lower()!=str(pkg.get('sha256','')).lower():raise RuntimeError('Завантажений пакет змінився після перевірки')
- return {'version':r['version'],'package':str(package)}
+  pkg=expected_manifest.get('package') or {};expected=str(pkg.get('sha256','')).lower()
+  if r['version']!=expected_manifest.get('version') or package.name!=pkg.get('file') or r['sha256'].lower()!=expected:raise RuntimeError('Завантажений пакет не відповідає перевіреному manifest')
+ return {'version':r['version'],'package':str(package),'sha256':r['sha256'].lower()}
 class W(QThread):
  done=Signal(bool,object);progress=Signal(int,str)
  def __init__(self,a,p):super().__init__();self.a=a;self.p=p
@@ -57,10 +58,11 @@ class W(QThread):
       b=r.read(524288)
       if not b:break
       f.write(b);n+=len(b);self.progress.emit(int(n*100/total) if total else 0,f'{n//1048576} MB')
-    if sha(part).lower()!=pkg['sha256'].lower():raise RuntimeError('SHA-256 пакета не збігається')
+    digest=sha(part).lower()
+    if digest!=pkg['sha256'].lower():raise RuntimeError('SHA-256 пакета не збігається')
     os.replace(part,t)
    except Exception:part.unlink(missing_ok=True);raise
-   ready={'version':o['version'],'package':str(t)};tmp=UP/'ready.tmp';tmp.write_text(json.dumps(ready),encoding='utf-8');os.replace(tmp,UP/'ready.json');self.done.emit(True,ready)
+   ready={'version':o['version'],'package':str(t),'sha256':digest};tmp=UP/'ready.tmp';tmp.write_text(json.dumps(ready),encoding='utf-8');os.replace(tmp,UP/'ready.json');self.done.emit(True,ready)
   except Exception as e:self.done.emit(False,str(e))
 class Updater(QObject):
  changed=Signal();progressChanged=Signal()
@@ -96,7 +98,7 @@ class Updater(QObject):
   if not self.installReady:self.state='error';self.status='Компонент оновлення недоступний';self.changed.emit();return
   try:r=load_ready(self.m)
   except RuntimeError as e:self.state='error';self.status=str(e);self.changed.emit();return
-  helper=self.root/'FPV-Uhyliant-Update.exe';subprocess.Popen([str(helper),'--root',str(self.root),'--package',r['package'],'--version',r['version'],'--wait-pid',str(os.getpid())],cwd=self.root,creationflags=getattr(subprocess,'DETACHED_PROCESS',0));QTimer.singleShot(300,QCoreApplication.quit)
+  helper=self.root/'FPV-Uhyliant-Update.exe';subprocess.Popen([str(helper),'--root',str(self.root),'--package',r['package'],'--version',r['version'],'--sha256',r['sha256'],'--wait-pid',str(os.getpid())],cwd=self.root,creationflags=getattr(subprocess,'DETACHED_PROCESS',0));QTimer.singleShot(300,QCoreApplication.quit)
  def _start(self,a,p,s):
   if self.busy:self.status='Операція оновлення вже виконується';self.changed.emit();return
   self.state=a;self.status=s;self.p=0;self.changed.emit();self.progressChanged.emit();w=W(a,p);self.w=w;w.progress.connect(self._prog);w.done.connect(lambda ok,d,current=w:self._done(a,current,ok,d));w.finished.connect(lambda current=w:self._finished(current));w.start()
