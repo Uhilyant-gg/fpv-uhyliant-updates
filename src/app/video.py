@@ -106,7 +106,9 @@ class VideoWorkspaceRuntime(QObject):
  def prepareSecondary(self,stream_id):
   self.reconcile()
   if not self._pip or not stream_id or stream_id==self.primary.streamId:return False
-  return self.secondary.prepare(stream_id)
+  if not self.secondary.prepare(stream_id):
+   self._pip=False;self.changed.emit();return False
+  return True
  @Slot(bool)
  def setPipEnabled(self,enabled):
   enabled=bool(enabled)
