@@ -71,7 +71,8 @@ def main():
  def shutdown():credentials.clear();video.stopAll();links.clear();pairing.clearPending();m.shutdown();msp_serial.stop();crsf_serial.stop()
  if not e.rootObjects():shutdown();raise RuntimeError('QML root object failed to load')
  app.aboutToQuit.connect(shutdown);root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized)
- if x.smoke_test:marker=x.smoke_marker or str(DATA/'smoke-test-ok.json');signal_smoke(marker);QTimer.singleShot(1500,app.quit)
+ if x.smoke_test:
+  marker=x.smoke_marker or str(DATA/'smoke-test-ok.json');signal_smoke(marker);QTimer.singleShot(1500,lambda:os._exit(0))
  else:QTimer.singleShot(1200,lambda:signal_ok(x.startup_token))
  return app.exec()
 if __name__=='__main__':
