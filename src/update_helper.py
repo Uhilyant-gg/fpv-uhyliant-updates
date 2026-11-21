@@ -1,11 +1,7 @@
-import argparse,json,os,shutil,subprocess,time,re
+import argparse,json,os,shutil,subprocess,time
 from pathlib import Path
 from app.update_package import extract_verified_zip,verify_package
-SHA_RE=re.compile(r'^[0-9a-fA-F]{64}$')
-def valid_handoff(root,package,version,sha256,wait_pid):
- try:r=Path(root).resolve();p=Path(package).resolve()
- except (OSError,RuntimeError,ValueError):return False
- return bool(version and version==Path(version).name and SHA_RE.fullmatch(sha256 or '') and type(wait_pid) is int and wait_pid>0 and p.is_file() and p.parent==r/'updates')
+from updater_handoff import valid_handoff
 a=argparse.ArgumentParser();a.add_argument('--root',required=True);a.add_argument('--package',required=True);a.add_argument('--version',required=True);a.add_argument('--sha256',required=True);a.add_argument('--wait-pid',type=int,required=True);x=a.parse_args()
 if not valid_handoff(x.root,x.package,x.version,x.sha256,x.wait_pid):raise SystemExit('invalid updater handoff')
 r=Path(x.root).resolve();app=r/'app';cur=app/'current';old=app/'rollback'/'previous';stage_root=app/'staging';stage=stage_root/x.version;state=app/'launcher-state.json';data=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';data.mkdir(parents=True,exist_ok=True);log=data/'updater.log'
