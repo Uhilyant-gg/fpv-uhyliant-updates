@@ -23,7 +23,7 @@ jobs:
       - name: Install Linux Qt runtime libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libdbus-1-3 libfontconfig1 libglib2.0-0
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libdbus-1-3 libfontconfig1 libglib2.0-0 libpulse0
       - name: Install application dependencies
         run: pip install -r src/requirements.txt
       - name: Compile all Python sources
