@@ -12,19 +12,22 @@ Normalized read-only providers sit behind `TelemetryRouter`; unknown/stale/missi
 Verified OpenIPC identity stays distinct from generic ONVIF. Firmware Center has SSC30KQ / IMX335 compatibility, primary/upgrade/recovery separation, SHA-256 verification, immutable approvals, pre-handoff re-hash, operation locking and verified post-reboot identity lifecycle. No hardware adapter is registered by default; destructive work is `hardware-validation-pending`.
 
 ## Video workspace
-`VideoWorkspaceRuntime` owns independent primary and secondary `VideoRuntime` instances. QML has separate Qt `MediaPlayer` and `VideoOutput` paths, with the secondary rendered as a PiP overlay only for two distinct persisted enabled streams. Disabling PiP stops and clears secondary playback; disconnect stops both paths; swapping rebuilds playback from the two real selected stream identities. Primary and secondary recovery counters, errors, attempts, last observable events and configured metadata remain isolated.
+`VideoWorkspaceRuntime` owns independent primary and secondary `VideoRuntime` instances. QML has separate Qt `MediaPlayer` and `VideoOutput` paths, with the secondary rendered as a PiP overlay only for two distinct persisted enabled streams. Disabling PiP stops and clears secondary playback; disconnect stops both paths; swapping rebuilds playback from the two real selected stream identities.
 
-Playback health uses observable Qt/runtime playing, stopped, error, reconnect and stall events. Stream diagnostics expose associated profile codec/resolution/FPS/latency-mode only when configured and endpoint-connect timing only as reachability information, never invented glass-to-glass latency. Qt-unavailable dropped-frame or measured-latency values are not synthesized.
+Playback health uses observable Qt/runtime events. Endpoint-connect timing remains reachability information, never glass-to-glass latency.
+
+## External navigation / link diagnostics
+A read-only `LinkDiagnostics` boundary now models observed external-navigation and network-link state separately. Missing data remains unavailable, observations become stale after their configured freshness window, and network RTT is accepted only when actually supplied by an observer. The FPV diagnostics UI exposes these states without synthesizing StabX, Starlink, VPN, quality or latency values.
+
+Actual StabX protocol ingestion and Starlink/WireGuard OS adapters remain `hardware-validation-pending`; this layer intentionally produces no control output.
 
 ## Presets / profiles
-Camera presets are versioned, hardware-compatible device configuration and require verified OpenIPC platform/sensor identity. The initial SSC30KQ / IMX335 catalog now contains normal FPV and explicit 180-degree orientation variants. Selection produces a safe camera-only apply plan and revalidates identity before handoff. Hardware execution is not connected and remains `hardware-validation-pending`.
-
-Camera presets remain strictly separate from per-stream video profiles and from firmware operations. Preset plans never contain codec/FPS/video-profile application and firmware operations never apply video profiles.
+Camera presets are versioned hardware-compatible device configuration requiring verified OpenIPC platform/sensor identity. Camera presets remain separate from per-stream video profiles and firmware operations.
 
 ## Next implementation order
 1. Hardware-only firmware/preset adapters and real SSC30KQ / IMX335 validation remain pending physical hardware.
-2. Validate dual-decoder performance and real RTSP recovery on target Windows hardware (`hardware-validation-pending`).
-3. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
+2. Validate dual-decoder and real RTSP recovery on target Windows hardware (`hardware-validation-pending`).
+3. Connect verified read-only StabX/external-navigation and Starlink/VPN observers to the diagnostics boundary when protocol/hardware evidence is available.
 4. Add encrypted DB export/import, station pairing and distribution hardening.
 
 ## Acceptance rule

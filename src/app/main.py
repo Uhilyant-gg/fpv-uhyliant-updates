@@ -34,6 +34,7 @@ def main():
  from firmware_center import FirmwareCenter
  from firmware_executor import FirmwareExecutor
  from camera_presets import CameraPresets
+ from link_diagnostics import LinkDiagnostics
  from mavlink_runtime import MavlinkRuntime
  from msp_runtime import MspRuntime
  from crsf_runtime import CrsfRuntime
@@ -46,10 +47,10 @@ def main():
   QTimer.singleShot(350,app.quit);rc=app.exec();m.shutdown();msp_serial.stop();crsf_serial.stop();print(json.dumps({'status':'ok','backend':'mavlink','telemetry':'not simulated'}));return rc
  icon=here/'fpv-uhyliant.ico'
  if icon.exists():app.setWindowIcon(QIcon(str(icon)))
- QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();video=VideoWorkspaceRuntime(d);v=video.primary;secondary=video.secondary;streams=StreamWorkspace(d);fw=FirmwareCenter(d);fwexec=FirmwareExecutor(fw);presets=CameraPresets(d);telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate)
+ QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();video=VideoWorkspaceRuntime(d);v=video.primary;secondary=video.secondary;streams=StreamWorkspace(d);fw=FirmwareCenter(d);fwexec=FirmwareExecutor(fw);presets=CameraPresets(d);links=LinkDiagnostics();telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate)
  d.streamsChanged.connect(streams.autoSelect);streams.autoSelect()
- ctx=e.rootContext();ctx.setContextProperty('station',s);ctx.setContextProperty('devicesModel',d);ctx.setContextProperty('videoRuntime',v);ctx.setContextProperty('secondaryVideoRuntime',secondary);ctx.setContextProperty('videoWorkspaceRuntime',video);ctx.setContextProperty('streamWorkspace',streams);ctx.setContextProperty('firmwareCenter',fw);ctx.setContextProperty('firmwareExecutor',fwexec);ctx.setContextProperty('cameraPresets',presets);ctx.setContextProperty('mavlinkRuntime',m);ctx.setContextProperty('mspSerial',msp_serial);ctx.setContextProperty('crsfSerial',crsf_serial);ctx.setContextProperty('telemetryRuntime',telemetry);ctx.setContextProperty('vehicleRuntime',vehicle);ctx.setContextProperty('updater',u);ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
- def shutdown():video.stopAll();m.shutdown();msp_serial.stop();crsf_serial.stop()
+ ctx=e.rootContext();ctx.setContextProperty('station',s);ctx.setContextProperty('devicesModel',d);ctx.setContextProperty('videoRuntime',v);ctx.setContextProperty('secondaryVideoRuntime',secondary);ctx.setContextProperty('videoWorkspaceRuntime',video);ctx.setContextProperty('streamWorkspace',streams);ctx.setContextProperty('firmwareCenter',fw);ctx.setContextProperty('firmwareExecutor',fwexec);ctx.setContextProperty('cameraPresets',presets);ctx.setContextProperty('linkDiagnostics',links);ctx.setContextProperty('mavlinkRuntime',m);ctx.setContextProperty('mspSerial',msp_serial);ctx.setContextProperty('crsfSerial',crsf_serial);ctx.setContextProperty('telemetryRuntime',telemetry);ctx.setContextProperty('vehicleRuntime',vehicle);ctx.setContextProperty('updater',u);ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
+ def shutdown():video.stopAll();links.clear();m.shutdown();msp_serial.stop();crsf_serial.stop()
  if not e.rootObjects():
   shutdown()
   try:tail='\n'.join(qtlog.read_text(encoding='utf-8',errors='replace').splitlines()[-80:])

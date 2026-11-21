@@ -9,23 +9,21 @@ Windows ground station: Python + PySide6 + Qt Quick/QML. Home -> Devices / Quick
 - New telemetry/control backends begin read-only; unknown/stale/missing state is unavailable.
 - Camera presets and stream video profiles are separate. Firmware never applies video profiles.
 - Generic ONVIF/name hints are not OpenIPC evidence.
-- Primary/upgrade/recovery-fullflash are separate. Recovery/fullflash is only for verified compatible existing custom OpenIPC.
-- Destructive writes require verified compatibility, image/recovery/layout gates, immutable approval, pre-handoff re-hash, locking, reboot/rediscovery and observed post-operation verification.
+- Primary/upgrade/recovery-fullflash are separate; recovery/fullflash is only for verified compatible existing custom OpenIPC.
+- Destructive writes require verified compatibility, immutable approval and observed post-operation verification.
 
 ## Current architecture
-Telemetry provider integration and MSP/CRSF serial foundations exist; hardware validation remains pending.
+Telemetry provider integration and MSP/CRSF serial foundations exist; hardware validation remains pending. Firmware Center and guarded executor lifecycle reach the real-hardware boundary; no adapter is enabled by default.
 
-Firmware Center and guarded executor lifecycle reach the real-hardware boundary. No adapter is enabled by default. Post-flash identity can be verified from a structured observation, but acquiring real observations is `hardware-validation-pending`.
+Video uses `StreamWorkspace` plus `VideoWorkspaceRuntime` with isolated primary/secondary `VideoRuntime` objects and independent Qt render paths. PiP requires distinct real streams. Playback health is observational only; do not synthesize decoded FPS, dropped frames or glass-to-glass latency.
 
-Video uses `StreamWorkspace` for real persisted selection and `VideoWorkspaceRuntime` for lifecycle. The runtime owns isolated primary/secondary `VideoRuntime` objects. QML binds them to independent `MediaPlayer`/`VideoOutput` pairs. PiP is permitted only when primary and secondary are distinct real streams. PiP off stops the secondary decoder/runtime; disconnect stops both; swap restarts playback using only the selected persisted stream IDs.
+Camera presets are separate versioned device/camera settings requiring verified OpenIPC platform and sensor identity. Hardware application remains pending a verified device-specific executor.
 
-Playback health must remain observational: Qt playing/stopped/error signals plus runtime reconnect/stall transitions, attempts and last-event timestamps are allowed. Do not invent decoded FPS, dropped frames, glass-to-glass latency or other values Qt/runtime did not provide. Profile metadata is configuration metadata, and endpoint check time is reachability only.
-
-Camera presets are a separate versioned catalog of device/camera settings. Preset compatibility requires verified OpenIPC platform and sensor identity. A preset selection may build a camera-only apply plan, but the plan must re-check identity before handoff and must remain `hardware-validation-pending` until a verified device-specific executor exists. Do not put codec, FPS, stream profile selection or firmware installation into a camera preset.
+`LinkDiagnostics` is the read-only boundary for external-navigation and data-link observations. External navigation and network state are separate contracts. Unknown fields stay unavailable; observations age to stale; RTT may be shown only if a real observer supplies it. Do not infer StabX health from generic telemetry, do not infer Starlink status from Internet access, and do not call RTT video latency. No control path is introduced here.
 
 ## Next work
 1. Validate camera-preset execution and simultaneous video paths on real SSC30KQ / IMX335 Windows hardware (`hardware-validation-pending`).
-2. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
+2. Add verified hardware/protocol observers feeding `LinkDiagnostics` for StabX/external navigation and Starlink/WireGuard when evidence is available.
 3. Add encrypted DB export/import, station pairing and distribution hardening.
 
 ## Workflow
