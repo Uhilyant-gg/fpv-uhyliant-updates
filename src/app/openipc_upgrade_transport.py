@@ -5,12 +5,14 @@ class OpenIPCUpgradeAdapter:
  def __init__(self,devices,transport):self.devices=devices;self.transport=transport
  def _device(self,did):return next((d for d in self.devices.items if d.get('id')==did),None)
  def execute(self,device_id,profile,mode,artifact,plan):
-  if mode!='upgrade':return False
+  if mode!='upgrade' or not isinstance(artifact,dict) or not isinstance(plan,dict):return False
+  sha=str(artifact.get('sha256','')).lower();size=artifact.get('size')
+  if not artifact.get('verified') or len(sha)!=64 or any(c not in '0123456789abcdef' for c in sha) or type(size) is not int or size<=0:return False
+  if plan.get('ready') is not True or not plan.get('approvalToken') or plan.get('artifactSha256')!=sha or plan.get('artifactSize')!=size:return False
   initial=upgrade_candidate(self._device(device_id))
   if not initial.get('ready'):return False
   authenticate=getattr(self.transport,'authenticate',None)
   if not callable(authenticate) or not authenticate(initial['host']):return False
-  # Re-read observed identity after authentication and immediately before the destructive command.
   current=self._device(device_id);ready=upgrade_candidate(current)
   if not ready.get('ready') or ready['host']!=initial['host'] or ready.get('platform')!=initial.get('platform') or ready.get('sensor')!=initial.get('sensor'):return False
   return bool(self.transport.run(ready['host'],list(UPGRADE_ARGV)))
