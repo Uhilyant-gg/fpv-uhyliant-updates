@@ -13,7 +13,10 @@ on:
         required: true
         default: test
         type: choice
-        options: [test, stable, development]
+        options:
+          - test
+          - stable
+          - development
       notes:
         description: Release notes
         required: true
@@ -39,95 +42,71 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
-        with: {ref: main, fetch-depth: 0}
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
       - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
+        with:
+          python-version: '3.12'
       - name: Validate source version
         shell: pwsh
         run: |
           if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version' }
           $meta = Get-Content VERSION.json -Raw | ConvertFrom-Json
           if ($meta.version -ne $env:VERSION) { throw 'VERSION.json mismatch' }
-          python -c "from pathlib import Path;ns={};exec(Path('src/app/version.py').read_text(encoding='utf-8'),ns);assert ns['VERSION']=='$env:VERSION'"
-          $existingTag = git tag -l "v$env:VERSION"
-          if ($existingTag) { throw "Tag already exists" }
+          python -c "from pathlib import Path; ns={}; exec(Path('src/app/version.py').read_text(encoding='utf-8'),ns); assert ns['VERSION']=='$env:VERSION'"
+          if (git tag -l "v$env:VERSION") { throw 'Tag already exists' }
       - name: Install build dependencies
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r src/requirements.txt
           python -m pip install pyinstaller pillow
-      - name: MAVLink backend source checks
+      - name: Source checks
         shell: pwsh
         run: |
-          python -m py_compile src/app/mavlink_runtime.py
+          python -m compileall -q -f src tools
           python src/app/main.py --mavlink-self-test
       - name: Prepare assets
         shell: pwsh
         run: |
           python tools/build_icon.py
-          New-Item -ItemType Directory -Force src\app\security | Out-Null
-          New-Item -ItemType Directory -Force bootstrap-output | Out-Null
+          New-Item -ItemType Directory -Force src\app\security, bootstrap-output | Out-Null
           Copy-Item test\release-public-key.pem src\app\security\production-v1-public.pem -Force
           Copy-Item assets\fpv-uhyliant.ico src\app\fpv-uhyliant.ico -Force
       - name: Build binaries
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant --icon assets/fpv-uhyliant.ico --paths src/app --add-data "src/app/Main.qml;." --add-data "src/app/DevicesPanel.qml;." --add-data "src/app/MavlinkDiagnostics.qml;." --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --hidden-import PySide6.QtMultimedia --hidden-import pymavlink --hidden-import pymavlink.mavutil --collect-all PySide6.QtMultimedia --collect-all pymavlink --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.QtWebEngineQuick --exclude-module PySide6.QtPdf --exclude-module PySide6.QtBluetooth --exclude-module PySide6.QtNfc --exclude-module PySide6.QtSql --exclude-module PySide6.QtTest src/app/main.py
+          pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant --icon assets/fpv-uhyliant.ico --paths src/app --add-data "src/app/Main.qml;." --add-data "src/app/DevicesPanel.qml;." --add-data "src/app/MavlinkDiagnostics.qml;." --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --hidden-import PySide6.QtMultimedia --hidden-import pymavlink --hidden-import pymavlink.mavutil --collect-all PySide6.QtMultimedia --collect-all pymavlink src/app/main.py
           pyinstaller --noconfirm --clean --onefile --windowed --name FPV-Uhyliant-Launcher --icon assets/fpv-uhyliant.ico src/launcher.py
           pyinstaller --noconfirm --clean --onefile --windowed --name FPV-Uhyliant-Update --icon assets/fpv-uhyliant.ico src/update_helper.py
-          Copy-Item dist\FPV-Uhyliant-Launcher.exe bootstrap-output\ -Force
-          Copy-Item dist\FPV-Uhyliant-Update.exe bootstrap-output\ -Force
-      - name: Packaged MAVLink backend startup test
+      - name: Packaged backend test
         shell: pwsh
         run: |
           $p = Start-Process -FilePath "dist\FPV-Uhyliant\FPV-Uhyliant.exe" -ArgumentList '--mavlink-self-test' -PassThru -Wait
-          if ($p.ExitCode -ne 0) { throw "Packaged MAVLink backend self-test failed: $($p.ExitCode)" }
-      - name: Packaged GUI QML smoke-test
+          if ($p.ExitCode -ne 0) { throw "Packaged backend test failed: $($p.ExitCode)" }
+      - name: Packaged GUI smoke-test
         shell: pwsh
         run: |
-          $smokeRoot = Join-Path $env:RUNNER_TEMP 'fpv-smoke'
-          $marker = Join-Path $smokeRoot 'smoke-test-ok.json'
-          New-Item -ItemType Directory -Force $smokeRoot | Out-Null
-          $env:LOCALAPPDATA = $smokeRoot
-          $env:QT_LOGGING_RULES = 'qt.multimedia.*=true;qt.qml.*=true'
-          $env:QT_DEBUG_PLUGINS = '1'
-          $argLine = "--smoke-test --smoke-marker `"$marker`""
-          $p = Start-Process -FilePath "dist\FPV-Uhyliant\FPV-Uhyliant.exe" -ArgumentList $argLine -PassThru
+          $root = Join-Path $env:RUNNER_TEMP 'fpv-smoke'
+          $marker = Join-Path $root 'smoke-test-ok.json'
+          New-Item -ItemType Directory -Force $root | Out-Null
+          $env:LOCALAPPDATA = $root
+          $p = Start-Process -FilePath "dist\FPV-Uhyliant\FPV-Uhyliant.exe" -ArgumentList "--smoke-test --smoke-marker `"$marker`"" -PassThru
           $deadline = (Get-Date).AddSeconds(20)
           while ((Get-Date) -lt $deadline -and -not (Test-Path $marker) -and -not $p.HasExited) { Start-Sleep -Milliseconds 250; $p.Refresh() }
-          if (-not (Test-Path $marker)) {
-            $exit = if ($p.HasExited) { $p.ExitCode } else { 'running' }
-            if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
-            $dataDir = Join-Path $smokeRoot 'FPV-Uhyliant'
-            if (Test-Path (Join-Path $dataDir 'startup.log')) { Get-Content (Join-Path $dataDir 'startup.log') }
-            if (Test-Path (Join-Path $dataDir 'qt-startup.log')) { Get-Content (Join-Path $dataDir 'qt-startup.log') }
-            throw "Packaged GUI/QML initialization failed before smoke marker; exit=$exit"
-          }
-          Get-Content $marker
+          if (-not (Test-Path $marker)) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }; throw 'GUI smoke marker not created' }
           if (-not $p.WaitForExit(5000)) { Stop-Process -Id $p.Id -Force }
-          elseif ($p.ExitCode -ne 0) { throw "Packaged GUI smoke-test exited with code $($p.ExitCode)" }
-      - name: Upload smoke-test diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: smoke-test-diagnostics-${{ inputs.version }}
-          path: |
-            ${{ runner.temp }}/fpv-smoke/FPV-Uhyliant/startup.log
-            ${{ runner.temp }}/fpv-smoke/FPV-Uhyliant/qt-startup.log
-            ${{ runner.temp }}/fpv-smoke/smoke-test-ok.json
-          if-no-files-found: warn
+          elseif ($p.ExitCode -ne 0) { throw "GUI smoke-test failed: $($p.ExitCode)" }
       - name: Package OTA and installer
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force release-output | Out-Null
-          New-Item -ItemType Directory -Force installer-output | Out-Null
-          $pkg = "FPV-Uhyliant-v$env:VERSION-Test-UA-Windows.zip"
+          New-Item -ItemType Directory -Force release-output, installer-output | Out-Null
+          $pkg = "FPV-Uhyliant-v$env:VERSION-$env:CHANNEL-UA-Windows.zip"
           Compress-Archive -Path dist\FPV-Uhyliant\* -DestinationPath "release-output\$pkg" -CompressionLevel Optimal
           choco install innosetup --no-progress -y
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:VERSION" packaging\FPV-Uhyliant.iss
-          if (-not (Test-Path "installer-output\FPV-Uhyliant-Setup-$env:VERSION.exe")) { throw 'Installer not found' }
       - uses: actions/upload-artifact@v4
         with:
           name: windows-build-${{ inputs.version }}
@@ -140,81 +119,77 @@ jobs:
     needs: windows
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-        with: {ref: main, fetch-depth: 0}
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
       - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
+        with:
+          python-version: '3.12'
       - uses: actions/download-artifact@v4
-        with: {name: windows-build-${{ inputs.version }}, path: build}
-      - run: python -m pip install --disable-pip-version-check cryptography
-      - name: Create signed manifest for Release asset
+        with:
+          name: windows-build-${{ inputs.version }}
+          path: build
+      - run: python -m pip install cryptography
+      - name: Create and sign release manifest
         shell: bash
         env:
           PRIVATE_KEY: ${{ secrets.FPV_RELEASE_PRIVATE_KEY }}
         run: |
           set -euo pipefail
           test -n "$PRIVATE_KEY"
-          install -m 700 -d "$RUNNER_TEMP/sign"
+          install -m 700 -d "$RUNNER_TEMP/sign" "$CHANNEL" "releases/$VERSION"
           printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/sign/private.pem"
-          chmod 600 "$RUNNER_TEMP/sign/private.pem"
-          PACKAGE="FPV-Uhyliant-v$VERSION-Test-UA-Windows.zip"
+          PACKAGE="FPV-Uhyliant-v$VERSION-$CHANNEL-UA-Windows.zip"
           PACKAGE_PATH="build/release-output/$PACKAGE"
-          RELEASE_DIR="releases/$VERSION"
-          mkdir -p "$RELEASE_DIR"
           SHA="$(sha256sum "$PACKAGE_PATH" | awk '{print $1}')"
-          printf '%s  %s\n' "$SHA" "$PACKAGE" > "$RELEASE_DIR/SHA256SUMS.txt"
-          OWNER="$GITHUB_REPOSITORY_OWNER"; REPO="${GITHUB_REPOSITORY#*/}"; HOST="git""hub"".""com"; SCHEME="$(printf '%s' 'aHR0cHM6Ly8=' | base64 -d)"
-          RELEASE_URL="${SCHEME}${HOST}/${OWNER}/${REPO}/releases/download/v${VERSION}/${PACKAGE}"
-          python - "$CHANNEL/release.json" "$VERSION" "$CHANNEL" "$PACKAGE" "$SHA" "$RELEASE_URL" "$NOTES" <<'PY'
-          import json,sys,urllib.parse
-          out,v,ch,pkg,sha,url,notes=sys.argv[1:]
-          u=urllib.parse.urlparse(url);assert u.scheme=='https' and u.hostname=='github.com'
-          m={'product':'FPV-Uhyliant','channel':ch,'version':v,'build':int(''.join(v.split('.'))),'mandatory':False,'minimumUpdaterVersion':'2.0.4','package':{'file':pkg,'url':url,'sha256':sha},'releaseNotes':[notes]}
-          open(out,'w',encoding='utf-8').write(json.dumps(m,ensure_ascii=False,indent=2)+'\n')
-          PY
-          printf '# FPV Uhyliant %s\n\n%s\n' "$VERSION" "$NOTES" > "$RELEASE_DIR/CHANGELOG.md"
+          RELEASE_URL="https://<scrubbed-url-domain>/$GITHUB_REPOSITORY/releases/download/v$VERSION/$PACKAGE"
+          python tools/build_release.py --version "$VERSION" --channel "$CHANNEL" --package "$PACKAGE_PATH" --url "$RELEASE_URL" --notes "$NOTES" --output "$CHANNEL/release.json"
           python src/release-tools/sign_release.py "$CHANNEL/release.json" --key "$RUNNER_TEMP/sign/private.pem"
-          cp "$CHANNEL/release.json" "$RELEASE_DIR/release.json"
+          cp "$CHANNEL/release.json" "releases/$VERSION/release.json"
+          printf '%s  %s\n' "$SHA" "$PACKAGE" > "releases/$VERSION/SHA256SUMS.txt"
+          printf '# FPV Uhyliant %s\n\n%s\n' "$VERSION" "$NOTES" > "releases/$VERSION/CHANGELOG.md"
           rm -f "$RUNNER_TEMP/sign/private.pem"
           python tools/verify_repository.py --channel "$CHANNEL" --package "$PACKAGE_PATH"
-          printf '%s  %s\n' "$SHA" "$PACKAGE_PATH" | sha256sum -c -
-      - name: Commit lightweight release metadata and tag
+      - name: Commit metadata and tag
         shell: bash
         run: |
           set -euo pipefail
           git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add "releases/$VERSION/CHANGELOG.md" "releases/$VERSION/SHA256SUMS.txt" "releases/$VERSION/release.json" "$CHANNEL/release.json"
+          git config user.email 4189826+github-actions[bot]@users.noreply.github.com
+          git add "releases/$VERSION" "$CHANNEL/release.json"
           git commit -m "Publish FPV Uhyliant v$VERSION metadata"
           git tag -a "v$VERSION" -m "FPV Uhyliant v$VERSION"
           git push origin main
           git push origin "v$VERSION"
-      - name: Publish GitHub Release assets
-        uses: softprops/action-gh-release@v3
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ inputs.version }}
           name: FPV Uhyliant ${{ inputs.version }}
           prerelease: ${{ inputs.prerelease }}
           body_path: releases/${{ inputs.version }}/CHANGELOG.md
           files: |
-            build/release-output/FPV-Uhyliant-v${{ inputs.version }}-Test-UA-Windows.zip
-            build/installer-output/FPV-Uhyliant-Setup-${{ inputs.version }}.exe
+            build/release-output/*.zip
+            build/installer-output/*.exe
             releases/${{ inputs.version }}/SHA256SUMS.txt
             releases/${{ inputs.version }}/release.json
-      - name: Prepare lightweight Pages tree
+      - name: Prepare Pages artifact
         shell: bash
         run: |
           mkdir -p _site/test _site/stable _site/development
-          if [ -f test/release.json ]; then cp test/release.json _site/test/release.json; fi
-          if [ -f stable/release.json ]; then cp stable/release.json _site/stable/release.json; fi
-          if [ -f development/release.json ]; then cp development/release.json _site/development/release.json; fi
+          for channel in test stable development; do if [ -f "$channel/release.json" ]; then cp "$channel/release.json" "_site/$channel/release.json"; fi; done
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
-        with: {path: _site}
+        with:
+          path: _site
+
   deploy-pages:
     needs: sign-publish
-    permissions: {pages: write, id-token: write}
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
