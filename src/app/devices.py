@@ -3,22 +3,24 @@ from pathlib import Path
 import psutil
 from PySide6.QtCore import QObject, Property, QThread, Signal, Slot
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
+from openipc_device import normalize_openipc_identity
 
 DATA=Path(os.environ.get("LOCALAPPDATA",Path.home()))/"FPV-Uhyliant"; LEGACY_DB=DATA/"devices.json"; DB=DATA/"devices.sqlite3"
-SERVICES=("_http._tcp.local.","_rtsp._tcp.local.","_ssh._tcp.local."); WS_DISCOVERY=("239.255.255.250",3702); MAX_WORKERS=32; SCHEMA_VERSION=3
+SERVICES=("_http._tcp.local.","_rtsp._tcp.local.","_ssh._tcp.local."); WS_DISCOVERY=("239.255.255.250",3702); MAX_WORKERS=32; SCHEMA_VERSION=4
 HOST_RE=re.compile(r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*\.?$")
 def valid_host(host):
  host=host.strip()
  if not host or "://" in host or "/" in host or "\\" in host or any(c.isspace() for c in host):return False
  try:ip=ipaddress.ip_address(host);return ip.version==4 and not(ip.is_unspecified or ip.is_multicast)
  except ValueError:return bool(HOST_RE.fullmatch(host))
-def merge(found,host,name="",service="",verified=False,evidence=""):
+def merge(found,host,name="",service="",verified=False,evidence="",identity=None):
  if not host:return
- i=found.setdefault(host,{"name":name or host,"host":host,"hostname":name or host,"services":[],"openipc":False,"evidence":[]})
+ i=found.setdefault(host,{"name":name or host,"host":host,"hostname":name or host,"services":[],"openipc":False,"evidence":[],"identity":normalize_openipc_identity()})
  if name and i["name"]==host:i["name"]=name;i["hostname"]=name
  if service and service not in i["services"]:i["services"].append(service)
  if verified:i["openipc"]=True
  if evidence and evidence not in i["evidence"]:i["evidence"].append(evidence)
+ if i["openipc"]:i["identity"]=normalize_openipc_identity(identity or {},i["evidence"])
 def interfaces():
  out=[];stats=psutil.net_if_stats()
  for name,addrs in psutil.net_if_addrs().items():
@@ -31,10 +33,10 @@ def interfaces():
    out.append({"id":f"{name}|{a.address}","name":name,"address":a.address,"netmask":mask,"network":net,"label":f"{name} — {a.address} — {net}"})
  return out
 def probe(host,cancel):
- if cancel.is_set():return host,False,[]
+ if cancel.is_set():return host,False,[],{}
  try:ipaddress.ip_address(host)
- except ValueError:return host,False,[]
- evidence=[];verified=False
+ except ValueError:return host,False,[],{}
+ evidence=[];verified=False;identity={}
  for url,label,jmode in ((f"<scrubbed-url-domain>","Majestic /api/v1/config.json",True),(f"<scrubbed-url-domain>","OpenIPC/Majestic WebUI :85",False)):
   if cancel.is_set():break
   try:
@@ -42,10 +44,13 @@ def probe(host,cancel):
    with urllib.request.urlopen(req,timeout=.45) as r:raw=r.read(524288 if jmode else 65536)
    if jmode:
     data=json.loads(raw.decode());matched=isinstance(data,dict) and data and any(k in data for k in ("video0","video1","system","fpv","isp","rtsp"))
+    if matched:
+     system=data.get("system",{}) if isinstance(data.get("system"),dict) else {};isp=data.get("isp",{}) if isinstance(data.get("isp"),dict) else {}
+     identity={"platform":system.get("platform",system.get("board","")),"soc":system.get("soc",system.get("chip","")),"sensor":isp.get("sensor",system.get("sensor","")),"firmware":system.get("firmware",system.get("version","")),"majestic":data.get("version","") if not isinstance(data.get("version"),dict) else ""}
    else:body=raw.decode("utf-8","ignore").lower();matched="openipc" in body or "majestic" in body
    if matched:verified=True;evidence.append(label)
   except (urllib.error.URLError,TimeoutError,socket.timeout,UnicodeError,json.JSONDecodeError,OSError):pass
- return host,verified,evidence
+ return host,verified,evidence,identity
 def onvif(found,cancel,bind_ip,network):
  for probe_type in ("dn:NetworkVideoTransmitter",""):
   if cancel.is_set():return
@@ -84,11 +89,12 @@ class Worker(QThread):
       info=z.get_service_info(t,n,timeout=800)
       if not info:return
       p={k.decode(errors="ignore").lower():v.decode(errors="ignore") for k,v in info.properties.items()};server=(info.server or "").rstrip(".");verified=p.get("vendor","").strip().lower()=="openipc";hint="openipc" in n.lower() or "openipc" in server.lower();ev="mDNS vendor=OpenIPC" if verified else ("mDNS OpenIPC name hint" if hint else "mDNS")
+      identity={"platform":p.get("platform",p.get("board","")),"soc":p.get("soc",p.get("chip","")),"sensor":p.get("sensor",""),"firmware":p.get("firmware",p.get("version","")),"majestic":p.get("majestic","")}
       for host in info.parsed_addresses():
        try:
         if ipaddress.ip_address(host) not in net:continue
        except ValueError:continue
-       merge(found,host,server or n.split(".")[0],t,verified,ev)
+       merge(found,host,server or n.split(".")[0],t,verified,ev,identity)
       worker.live.emit(list(found.values()));worker.emit_progress("mDNS",f=len(found))
      except (OSError,UnicodeError,ValueError):pass
     def update_service(self,z,t,n):self.add_service(z,t,n)
@@ -102,10 +108,10 @@ class Worker(QThread):
     targets=list(found);self.emit_progress("fingerprint",0,len(targets),len(found))
     for idx,host in enumerate(targets,1):
      if self.cancel.is_set():break
-     _,verified,evidence=probe(host,self.cancel)
+     _,verified,evidence,identity=probe(host,self.cancel)
      if verified:
-      merge(found,host,service="Majestic/OpenIPC fingerprint",verified=True)
-      for reason in evidence:merge(found,host,evidence=reason)
+      merge(found,host,service="Majestic/OpenIPC fingerprint",verified=True,identity=identity)
+      for reason in evidence:merge(found,host,evidence=reason,identity=identity)
      self.emit_progress("fingerprint",idx,len(targets),len(found));self.live.emit(list(found.values()))
    if not self.cancel.is_set():
     hosts=[str(h) for h in ipaddress.ip_network(bind_ip+"/24",strict=False).hosts() if str(h)!=bind_ip];total=len(hosts);completed=0;self.emit_progress("/24",0,total,len(found));ex=concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS);pending={ex.submit(probe,h,self.cancel) for h in hosts}
@@ -114,11 +120,11 @@ class Worker(QThread):
       finished,pending=concurrent.futures.wait(pending,timeout=.1,return_when=concurrent.futures.FIRST_COMPLETED)
       for fut in finished:
        completed+=1
-       try:host,verified,evidence=fut.result()
+       try:host,verified,evidence,identity=fut.result()
        except Exception:continue
        if verified:
-        merge(found,host,"OpenIPC "+host,"/24 fingerprint",True)
-        for reason in evidence:merge(found,host,evidence=reason)
+        merge(found,host,"OpenIPC "+host,"/24 fingerprint",True,identity=identity)
+        for reason in evidence:merge(found,host,evidence=reason,identity=identity)
        self.emit_progress("/24",completed,total,len(found))
       if finished:self.live.emit(list(found.values()))
     finally:
@@ -143,7 +149,10 @@ class Devices(QObject):
    if ver<3:
     db.execute("CREATE TABLE IF NOT EXISTS video_profiles(id TEXT PRIMARY KEY,name TEXT NOT NULL UNIQUE,codec TEXT NOT NULL DEFAULT 'h264',width INTEGER,height INTEGER,fps INTEGER,bitrate_kbps INTEGER,latency_mode TEXT NOT NULL DEFAULT 'balanced',notes TEXT NOT NULL DEFAULT '')")
     defaults=(("low-latency","Мінімальна затримка","h264",None,None,60,None,"low_latency",""),("balanced","Збалансований","h264",None,None,30,None,"balanced",""),("low-bitrate","Низький бітрейт","h264",None,None,30,2000,"balanced",""),("max-quality","Максимальна якість","h265",None,None,30,None,"quality",""))
-    db.executemany("INSERT OR IGNORE INTO video_profiles VALUES(?,?,?,?,?,?,?,?,?)",defaults);db.execute("PRAGMA user_version=3")
+    db.executemany("INSERT OR IGNORE INTO video_profiles VALUES(?,?,?,?,?,?,?,?,?)",defaults)
+   if ver<4:
+    db.execute("CREATE TABLE IF NOT EXISTS openipc_identity(device_id TEXT PRIMARY KEY,verified INTEGER NOT NULL DEFAULT 0,platform TEXT NOT NULL DEFAULT '',soc TEXT NOT NULL DEFAULT '',sensor TEXT NOT NULL DEFAULT '',firmware TEXT NOT NULL DEFAULT '',majestic TEXT NOT NULL DEFAULT '',evidence_json TEXT NOT NULL DEFAULT '[]',FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE)")
+    db.execute("PRAGMA user_version=4")
    if db.execute("SELECT COUNT(*) FROM devices").fetchone()[0]==0 and LEGACY_DB.exists():
     try:
      raw=json.loads(LEGACY_DB.read_text(encoding="utf-8"));items=raw.get("devices",[]) if isinstance(raw,dict) else []
@@ -156,6 +165,8 @@ class Devices(QObject):
   try:
    with self._connect() as db:
     cols="id,name,type,host,port,connection,notes";self._items=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM devices ORDER BY name COLLATE NOCASE")]
+    identities={r[0]:{"verified":bool(r[1]),"platform":r[2],"soc":r[3],"sensor":r[4],"firmware":r[5],"majestic":r[6],"evidence":json.loads(r[7] or "[]")} for r in db.execute("SELECT device_id,verified,platform,soc,sensor,firmware,majestic,evidence_json FROM openipc_identity")}
+    for i in self._items:i["openipcIdentity"]=identities.get(i["id"],normalize_openipc_identity())
     row=db.execute("SELECT value FROM settings WHERE key='activeDeviceId'").fetchone();saved=row[0] if row else ""
    self._active_id=saved if any(i["id"]==saved for i in self._items) else ""
    self._load_streams();self._load_profiles()
@@ -169,6 +180,9 @@ class Devices(QObject):
   self.profilesChanged.emit()
  def _save_active(self):
   with self._connect() as db:db.execute("INSERT OR REPLACE INTO settings VALUES('activeDeviceId',?)",(self._active_id,))
+ def _save_identity(self,device_id,identity):
+  identity=normalize_openipc_identity(identity,identity.get("evidence",[]))
+  with self._connect() as db:db.execute("INSERT OR REPLACE INTO openipc_identity VALUES(?,?,?,?,?,?,?,?)",(device_id,int(identity["verified"]),identity["platform"],identity["soc"],identity["sensor"],identity["firmware"],identity["majestic"],json.dumps(identity["evidence"],ensure_ascii=False)))
  def _public_item(self,i):return {**i,"active":i["id"]==self._active_id}
  @Property("QVariantList",notify=changed)
  def items(self):return [self._public_item(i) for i in self._items]
@@ -258,10 +272,14 @@ class Devices(QObject):
   if worker:worker.deleteLater()
  @Slot(str,str,bool,result=str)
  def addDiscovered(self,host,name,confirmed):
-  if not confirmed:return ""
+  match=next((x for x in self._discovered if x.get("host")==host),None)
+  if not confirmed or not match or not match.get("openipc"):return ""
+  identity=normalize_openipc_identity(match.get("identity"),match.get("evidence",[]))
   for i in self._items:
-   if i["host"]==host:self._active_id=i["id"];self._save_active();self.changed.emit();return i["id"]
-  return self.addDevice(name or "OpenIPC "+host,"Камера OpenIPC",host,80,"Мережа","OpenIPC verified")
+   if i["host"]==host:self._save_identity(i["id"],identity);self._load();self._active_id=i["id"];self._save_active();self.changed.emit();return i["id"]
+  did=self.addDevice(name or "OpenIPC "+host,"Камера OpenIPC",host,80,"Мережа","OpenIPC verified")
+  if did:self._save_identity(did,identity);self._load();self.changed.emit()
+  return did
  @Slot(str,str,str,int,str,str,result=str)
  def addDevice(self,name,device_type,host,port,connection,note):
   name,host=name.strip(),host.strip()
