@@ -5,7 +5,7 @@ Item {
  id:root
  signal closeRequested();signal activateDevice(string deviceId)
  property color fg:"#f5f8fc";property color muted:"#8799ad";property color surface:"#0d1723";property color raised:"#132235";property color accent:"#35e0a1";property color blue:"#4195ff";property color line:"#203348";property color danger:"#ff7080"
- property var selectedFound:null;property var selectedSaved:null
+ property var selectedFound:null;property var selectedSaved:null;property string authHost:"";property string authName:""
  function value(v){return v===undefined||v===null||v===""?"Не визначено":v}
  function selectFound(item){selectedFound=item}
  Rectangle{anchors.fill:parent;color:"#08111b"}
@@ -45,13 +45,13 @@ Item {
        RowLayout{anchors.fill:parent;anchors.margins:12;spacing:12
         Rectangle{width:39;height:39;radius:12;color:modelData.openipc?"#15392f":"#172334";Text{anchors.centerIn:parent;text:"●";color:modelData.openipc?accent:muted}}
         ColumnLayout{Layout.fillWidth:true;spacing:3;Text{text:modelData.name;color:fg;font.bold:true;font.pixelSize:15}Text{text:modelData.host;color:muted;font.pixelSize:12}}
-        Rectangle{width:150;height:28;radius:14;color:modelData.openipc?"#15392f":"#202b38";Text{anchors.centerIn:parent;text:modelData.openipc?"OpenIPC підтверджено":"Кандидат";color:modelData.openipc?accent:muted;font.pixelSize:11}}
+        Rectangle{width:170;height:28;radius:14;color:modelData.openipc?"#15392f":"#202b38";Text{anchors.centerIn:parent;text:modelData.openipc?"OpenIPC підтверджено":(modelData.authRequired?"Потрібен логін":"Кандидат");color:modelData.openipc?accent:muted;font.pixelSize:11}}
        }
       }
      }
      ColumnLayout{visible:devicesModel.discovered.length===0&&!devicesModel.scanning;Layout.alignment:Qt.AlignHCenter|Qt.AlignVCenter;spacing:8;Text{text:"Нічого не знайдено";color:fg;font.pixelSize:18;font.bold:true;horizontalAlignment:Text.AlignHCenter;Layout.fillWidth:true}Text{text:"Запустіть пошук або вкажіть IP камери";color:muted;horizontalAlignment:Text.AlignHCenter;Layout.fillWidth:true}}
      RowLayout{Layout.fillWidth:true
-      Button{text:"Додати камеру";font.bold:true;enabled:selectedFound&&selectedFound.openipc;onClicked:{devicesModel.addDiscovered(selectedFound.host,selectedFound.name,true);selectedSaved=null}HoverHint{text:"Зберегти камеру лише після підтвердження OpenIPC."}}
+      Button{text:"Додати камеру";font.bold:true;enabled:selectedFound!==null;onClicked:{if(selectedFound.openipc&&selectedFound.identityVerified){devicesModel.addDiscovered(selectedFound.host,selectedFound.name,true);selectedSaved=null}else{root.authHost=selectedFound.host;root.authName=selectedFound.name;authPopup.open()}}HoverHint{text:"Для захищеної камери логін і пароль запитуються лише під час додавання."}}
       Button{text:"Відомості";flat:true;enabled:selectedFound!==null;onClicked:detailsPopup.open();HoverHint{text:"Показати отримані технічні відомості та підтвердження."}}
       Item{Layout.fillWidth:true}
       Text{visible:selectedFound!==null;text:selectedFound&&selectedFound.r2d2?"R2D2 підтверджено":"";color:accent;font.bold:true;font.pixelSize:11}
@@ -67,7 +67,16 @@ Item {
    Text{visible:devicesModel.manualBusy;text:"Перевіряємо камеру…";color:blue}
    Text{visible:devicesModel.manualError!=="";text:devicesModel.manualError;color:danger;wrapMode:Text.WordWrap;Layout.fillWidth:true}
    Rectangle{visible:devicesModel.manualResult.openipc===true;Layout.fillWidth:true;height:66;radius:12;color:"#15392f";Column{anchors.fill:parent;anchors.margins:10;spacing:4;Text{text:"OpenIPC підтверджено";color:accent;font.bold:true}Text{text:value(devicesModel.manualResult.identity.platform)+" · "+value(devicesModel.manualResult.identity.sensor);color:fg}}}
-   RowLayout{Layout.fillWidth:true;Button{text:devicesModel.manualBusy?"Перевірка…":"Перевірити";enabled:!devicesModel.manualBusy;onClicked:devicesModel.inspectManualIp(manualIp.text);HoverHint{text:"Перевірити адресу через той самий fingerprint pipeline."}}Button{text:"Додати";enabled:devicesModel.manualResult.openipc===true;onClicked:{devicesModel.addDiscovered(devicesModel.manualResult.host,"OpenIPC "+devicesModel.manualResult.host,true);manualPopup.close()}HoverHint{text:"Зберегти підтверджену OpenIPC-камеру."}}Item{Layout.fillWidth:true}Button{text:"Закрити";flat:true;onClicked:manualPopup.close()}}
+   RowLayout{Layout.fillWidth:true;Button{text:devicesModel.manualBusy?"Перевірка…":"Перевірити";enabled:!devicesModel.manualBusy;onClicked:devicesModel.inspectManualIp(manualIp.text);HoverHint{text:"Перевірити адресу через той самий fingerprint pipeline."}}Button{text:"Додати";enabled:devicesModel.manualResult.camera===true;onClicked:{if(devicesModel.manualResult.openipc&&devicesModel.manualResult.identityVerified){devicesModel.addDiscovered(devicesModel.manualResult.host,"OpenIPC "+devicesModel.manualResult.host,true);manualPopup.close()}else{root.authHost=devicesModel.manualResult.host;root.authName="Камера "+devicesModel.manualResult.host;manualPopup.close();authPopup.open()}}HoverHint{text:"Запросити доступ лише під час додавання захищеної камери."}}Item{Layout.fillWidth:true}Button{text:"Закрити";flat:true;onClicked:manualPopup.close()}}
+  }
+ }
+ Popup{id:authPopup;anchors.centerIn:parent;width:Math.min(440,root.width-40);modal:true;padding:20;background:Rectangle{color:raised;radius:18;border.color:line}
+  ColumnLayout{width:parent.width;spacing:12
+   Text{text:"Доступ до камери";color:fg;font.pixelSize:22;font.bold:true}Text{text:root.authHost;color:muted}
+   TextField{id:authUser;Layout.fillWidth:true;text:"root";placeholderText:"Логін"}
+   TextField{id:authPassword;Layout.fillWidth:true;placeholderText:"Пароль";echoMode:TextInput.Password}
+   Text{visible:devicesModel.manualError!=="";text:devicesModel.manualError;color:danger;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+   RowLayout{Layout.fillWidth:true;Button{text:"Перевірити й додати";font.bold:true;onClicked:{var added=devicesModel.authenticateAndAdd(root.authHost,root.authName,authUser.text,authPassword.text);if(added!==""){authPassword.text="";authPopup.close();selectedFound=null}}}Item{Layout.fillWidth:true}Button{text:"Скасувати";flat:true;onClicked:{authPassword.text="";authPopup.close()}}}
   }
  }
  Popup{id:detailsPopup;anchors.centerIn:parent;width:Math.min(540,root.width-40);modal:true;padding:20;background:Rectangle{color:raised;radius:18;border.color:line}

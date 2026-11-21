@@ -87,6 +87,19 @@ class Devices(LegacyDevices):
         self._manual_busy=False;self._manual_worker=None;self._manual_result=result if result.get("camera") else {};self._manual_error=error or ("На цій адресі не знайдено доступної камери" if not self._manual_result else "")
         if self._manual_result:self._remember_host(result.get("host",""),result.get("openipc",False))
         self.manualChanged.emit()
+    @Slot(str,str,str,str,result=str)
+    def authenticateAndAdd(self,host,name,username,password):
+        address=_safe_private_host(host)
+        if not address:return ""
+        result=fingerprint(address,threading.Event(),str(username or "").strip(),str(password or ""))
+        if not result.get("openipc") or not result.get("identityVerified"):
+            self._manual_error="Невірний логін/пароль або OpenIPC не підтверджено";self.manualChanged.emit();return ""
+        self._manual_result=result
+        for index,item in enumerate(self._discovered):
+            if item.get("host")==address:self._discovered[index]=result;break
+        else:self._discovered.append(result)
+        self.discoveryChanged.emit();self.manualChanged.emit()
+        return self.addDiscovered(address,name,True)
     @Slot(str,str,bool,result=str)
     def addDiscovered(self,host,name,verified):
         candidate=next((x for x in self._discovered if x.get("host")==host),None)
