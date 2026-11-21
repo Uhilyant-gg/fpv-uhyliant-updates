@@ -17,14 +17,15 @@ Verified OpenIPC identity stays distinct from generic ONVIF. Firmware Center has
 Playback health uses observable Qt/runtime playing, stopped, error, reconnect and stall events. Stream diagnostics expose associated profile codec/resolution/FPS/latency-mode only when configured and endpoint-connect timing only as reachability information, never invented glass-to-glass latency. Qt-unavailable dropped-frame or measured-latency values are not synthesized.
 
 ## Presets / profiles
-Versioned camera presets remain separate from per-stream video profiles. Firmware operations never apply video profiles.
+Camera presets are versioned, hardware-compatible device configuration and require verified OpenIPC platform/sensor identity. The initial SSC30KQ / IMX335 catalog now contains normal FPV and explicit 180-degree orientation variants. Selection produces a safe camera-only apply plan and revalidates identity before handoff. Hardware execution is not connected and remains `hardware-validation-pending`.
+
+Camera presets remain strictly separate from per-stream video profiles and from firmware operations. Preset plans never contain codec/FPS/video-profile application and firmware operations never apply video profiles.
 
 ## Next implementation order
-1. Hardware-only firmware adapters and real SSC30KQ / IMX335 validation remain pending physical hardware.
+1. Hardware-only firmware/preset adapters and real SSC30KQ / IMX335 validation remain pending physical hardware.
 2. Validate dual-decoder performance and real RTSP recovery on target Windows hardware (`hardware-validation-pending`).
-3. Expand camera presets separately from stream video profiles.
-4. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
-5. Add encrypted DB export/import, station pairing and distribution hardening.
+3. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
+4. Add encrypted DB export/import, station pairing and distribution hardening.
 
 ## Acceptance rule
 No invented telemetry, hardware state, stream metadata or latency. Hardware-dependent validation is `hardware-validation-pending`.

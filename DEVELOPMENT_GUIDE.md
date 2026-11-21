@@ -21,13 +21,12 @@ Video uses `StreamWorkspace` for real persisted selection and `VideoWorkspaceRun
 
 Playback health must remain observational: Qt playing/stopped/error signals plus runtime reconnect/stall transitions, attempts and last-event timestamps are allowed. Do not invent decoded FPS, dropped frames, glass-to-glass latency or other values Qt/runtime did not provide. Profile metadata is configuration metadata, and endpoint check time is reachability only.
 
-Versioned camera presets remain independent from video profiles.
+Camera presets are a separate versioned catalog of device/camera settings. Preset compatibility requires verified OpenIPC platform and sensor identity. A preset selection may build a camera-only apply plan, but the plan must re-check identity before handoff and must remain `hardware-validation-pending` until a verified device-specific executor exists. Do not put codec, FPS, stream profile selection or firmware installation into a camera preset.
 
 ## Next work
-1. Validate simultaneous decoder/render and recovery behavior on target Windows hardware (`hardware-validation-pending`).
-2. Expand camera presets independently.
-3. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
-4. Add encrypted DB export/import, station pairing and distribution hardening.
+1. Validate camera-preset execution and simultaneous video paths on real SSC30KQ / IMX335 Windows hardware (`hardware-validation-pending`).
+2. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
+3. Add encrypted DB export/import, station pairing and distribution hardening.
 
 ## Workflow
 Inspect actual `main`, test software paths, mark hardware-only validation `hardware-validation-pending`, synchronize canonical docs after material changes and never claim CI/write success without evidence.
