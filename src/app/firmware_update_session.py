@@ -12,7 +12,7 @@ from route_discovery import fingerprint,plan_targets,system_routes
 class FirmwareUpdateSession(QObject):
  changed=Signal()
  def __init__(self,executor,devices,probe=None,candidates=None,sleep=time.sleep,rediscovery_attempts=30,rediscovery_interval=2.0,events=None):
-  super().__init__();self.executor=executor;self.devices=devices;self._enabled=False;self._result=self._empty();self._probe_provider=probe;self._candidate_provider=candidates;self._sleep=sleep;self._rediscovery_attempts=max(1,min(int(rediscovery_attempts),120));self._rediscovery_interval=max(0.0,min(float(rediscovery_interval),10.0));self._events=events;self._correlation_id=''
+  super().__init__();self.executor=executor;self.devices=devices;self._enabled=False;self._result=self._empty();self._probe_provider=probe;self._candidate_provider=candidates;self._sleep=sleep;self._rediscovery_attempts=max(1,min(int(rediscovery_attempts),120));self._rediscovery_interval=max(0.0,min(float(rediscovery_interval),10.0));self._events=events;self._correlation_id='';self._transport_binding={}
  def _empty(self):return {'enabled':False,'state':'hardware-validation-pending','reason':'Апаратний транспорт оновлення не підключено','observedFirmware':'','verification':{}}
  def _event(self,level,message,detail=None):
   if self._events is None:return
@@ -20,9 +20,9 @@ class FirmwareUpdateSession(QObject):
   except Exception:pass
  @Property('QVariantMap',notify=changed)
  def result(self):return deepcopy(self._result)
- def configure_transport(self,transport):
+ def configure_transport(self,transport,binding=None):
   if self.executor.busy:return False
-  self._enabled=transport is not None
+  self._enabled=transport is not None;self._transport_binding=deepcopy(binding) if self._enabled and isinstance(binding,dict) else {}
   self.executor.register_adapter(OpenIPCUpgradeAdapter(self.devices,transport) if transport is not None else None)
   self._result={'enabled':True,'state':'ready','reason':'Транспорт підключено для явної апаратної перевірки','observedFirmware':'','verification':{}} if self._enabled else self._empty();self.changed.emit();return True
  @Slot(QObject,QObject,result=bool)
@@ -32,15 +32,21 @@ class FirmwareUpdateSession(QObject):
   except Exception:return False
   if not isinstance(readiness,dict) or readiness.get('ready') is not True:return False
   if not isinstance(snapshot,dict) or not str(snapshot.get('username','')).strip() or snapshot.get('hasPassword') is not True:return False
+  device_id=str(readiness.get('deviceId') or '');profile=str(readiness.get('profile') or '');mode=str(readiness.get('mode') or '');approval_token=str(readiness.get('approvalToken') or '')
+  if not device_id or not profile or mode!='upgrade' or not approval_token:return False
   expected=(readiness.get('host'),readiness.get('platform'),readiness.get('sensor'))
   if not _private_candidate(expected[0]) or not str(expected[1] or '').strip() or not str(expected[2] or '').strip():return False
-  device=next((dict(d) for d in self.devices.items if d.get('active')),None)
+  device=next((dict(d) for d in self.devices.items if d.get('id')==device_id),None)
   if device is None:return False
-  identity=dict(device.get('openipcIdentity') or {})
-  current=(device.get('host'),identity.get('platform'),identity.get('sensor'))
+  identity=dict(device.get('openipcIdentity') or {});current=(device.get('host'),identity.get('platform'),identity.get('sensor'))
   if current!=expected or identity.get('verified') is not True:return False
-  ok=self.configure_transport(AuthenticatedCameraTransport(credentials))
-  if ok:self._event('info','authenticated transport ready',{'deviceId':device.get('id'),'host':current[0],'platform':current[1],'sensor':current[2]})
+  center=self.executor.center;plan=center.executionPlan;approval=center.result
+  if plan.get('ready') is not True or approval.get('ready') is not True:return False
+  if plan.get('deviceId')!=device_id or approval.get('deviceId')!=device_id or plan.get('profile')!=profile or approval.get('profile')!=profile or plan.get('mode')!=mode or approval.get('mode')!=mode:return False
+  if plan.get('approvalToken')!=approval_token or approval.get('approvalToken')!=approval_token:return False
+  binding={'deviceId':device_id,'host':current[0],'platform':current[1],'sensor':current[2],'profile':profile,'mode':mode,'approvalToken':approval_token}
+  ok=self.configure_transport(AuthenticatedCameraTransport(credentials),binding)
+  if ok:self._event('info','authenticated transport ready',{'deviceId':device_id,'host':current[0],'platform':current[1],'sensor':current[2],'profile':profile,'mode':mode})
   return ok
  @Slot(result=bool)
  def disableTransport(self):return self.configure_transport(None)
@@ -56,6 +62,9 @@ class FirmwareUpdateSession(QObject):
  @Slot(str,str,str,result=bool)
  def execute(self,device_id,profile,mode):
   if not self._enabled:self._result=self._empty();self.changed.emit();return False
+  center=self.executor.center;plan=center.executionPlan;binding=self._transport_binding
+  if not binding or binding.get('deviceId')!=device_id or binding.get('profile')!=profile or binding.get('mode')!=mode or binding.get('approvalToken')!=plan.get('approvalToken'):
+   self._result={'enabled':True,'state':'blocked','reason':'Автентифікований preflight більше не відповідає схваленому оновленню','observedFirmware':'','verification':{}};self.changed.emit();return False
   self._correlation_id=uuid.uuid4().hex;self._event('info','firmware update requested',{'deviceId':device_id,'profile':profile,'mode':mode})
   ok=self.executor.execute(device_id,profile,mode);self._sync(ok);state=self._result.get('state','')
   self._event('info' if ok else 'error','firmware dispatch accepted' if ok else 'firmware dispatch blocked',{'deviceId':device_id,'profile':profile,'mode':mode,'state':state,'reason':self._result.get('reason','')})
@@ -76,4 +85,4 @@ class FirmwareUpdateSession(QObject):
  @Slot()
  def reset(self):
   if self.executor.busy:return False
-  self.executor.reset();self._result={'enabled':self._enabled,'state':'ready' if self._enabled else 'hardware-validation-pending','reason':'' if self._enabled else 'Апаратний транспорт оновлення не підключено','observedFirmware':'','verification':{}};self._correlation_id='';self.changed.emit();return True
+  self.executor.reset();self._transport_binding={};self._result={'enabled':self._enabled,'state':'ready' if self._enabled else 'hardware-validation-pending','reason':'' if self._enabled else 'Апаратний транспорт оновлення не підключено','observedFirmware':'','verification':{}};self._correlation_id='';self.changed.emit();return True
