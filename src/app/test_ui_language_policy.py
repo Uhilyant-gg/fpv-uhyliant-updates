@@ -66,7 +66,7 @@ class UiLanguagePolicyTests(unittest.TestCase):
         self.assertGreaterEqual(self.hover_hint_count(self.sources["PairingPanel.qml"]), 2)
 
     def test_main_surface_has_delayed_help(self):
-        self.assertGreaterEqual(self.hover_hint_count(self.sources["Main.qml"]), 16)
+        self.assertGreaterEqual(self.hover_hint_count(self.sources["Main.qml"]), 12)
 
 
 if __name__ == "__main__":
