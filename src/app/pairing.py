@@ -51,7 +51,7 @@ class PairingRegistry(QObject):
  @Property(bool,notify=changed)
  def secretStoreAvailable(self):return bool(getattr(self.store,'available',False))
  @Property(bool,notify=changed)
- def metadataStoreAvailable(self):return bool(getattr(self.metadata,'available',False)) and not self._metadata_error
+ def metadataStoreAvailable(self):return bool(getattr(self.metadata,'available',False))
  @Property(str,notify=changed)
  def metadataError(self):return self._metadata_error
  @Property('QVariantList',notify=changed)
@@ -62,7 +62,7 @@ class PairingRegistry(QObject):
  @Slot(str,str,result='QVariantMap')
  def begin(self,label,endpoint):
   label=label.strip();endpoint=endpoint.strip()
-  if not self.secretStoreAvailable or not self.metadataStoreAvailable or not label or not endpoint:return {}
+  if not self.secretStoreAvailable or not self.metadataStoreAvailable or self._metadata_error or not label or not endpoint:return {}
   pid=uuid.uuid4().hex;secret=secrets.token_bytes(32);public={'id':pid,'label':label,'endpoint':endpoint,'fingerprint':self._fingerprint(secret),'createdAt':int(self.clock()),'state':'pending'};self._pending[pid]={'public':public,'secret':secret};self.changed.emit();return deepcopy(public)
  @Slot(str,bool,result=bool)
  def confirm(self,pairing_id,approved):
