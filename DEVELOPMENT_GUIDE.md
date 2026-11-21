@@ -35,48 +35,46 @@ Devices -> Camera -> Firmware
 12. Every published release requires a signed manifest, SHA-256 metadata and Git tag.
 13. New flight protocol backends start read-only.
 14. Do not display invented or stale telemetry as live.
+15. Protocol-specific parsing belongs below the normalized telemetry-provider boundary; FPV UI consumes the vehicle model rather than duplicating protocol-specific telemetry UI.
 
 ## Current development state
-MAVLink phase 1 is implemented in read-only form and awaits real FC/long-running-link validation. The RTSP runtime now has explicit reconnect/stalled/error state handling and the UI has bounded automatic recovery plus manual reconnect/diagnostic visibility. Both areas still require real-hardware validation.
+MAVLink phase 1 and the normalized vehicle/diagnostics foundation exist. Read-only MSP and passive CRSF parsing/runtime foundations now also exist behind normalized providers, with software tests. The app is still wired to MAVLink by default, so MSP/CRSF transport and provider selection remain integration work. All real FC/radio validation is hardware-validation-pending and must not block software-only progress.
+
+RTSP recovery/diagnostics exist but still require real OpenIPC validation.
 
 ## Current implementation order
-### P0. Hardware validation
-Validate MAVLink phase 1 against a real flight controller and exercise RTSP playback/recovery against real OpenIPC hardware. Preserve diagnostics from failures.
+### P0. Protocol integration
+Add safe provider selection and serial transport/device handling for MSP and CRSF, while keeping new paths read-only and preserving a single vehicle/UI model.
 
 ### P1. Vehicle model and diagnostics
-Introduce a vehicle-level model above individual telemetry transports and a structured diagnostics engine so MAVLink, later MSP/CRSF, video, network and external-navigation health can be represented consistently.
+Continue strengthening structured diagnostics so telemetry, video, network and external-navigation health share consistent unavailable/stale/error semantics.
 
 ### P2. Safe OpenIPC provisioning
 Target workflow:
 Detect -> Identify -> Select firmware -> Pre-check -> Flash -> Reboot -> Rediscover -> Verify
 
-Initial supported hardware should include the SSC30KQ / IMX335 OpenIPC setup used during manual flashing/recovery work. Keep primary installation, upgrade and recovery/fullflash paths separate. Before destructive writes, identify hardware/flash layout, validate compatibility, preserve recoverable state and verify images.
+Initial supported hardware should include SSC30KQ / IMX335. Keep primary installation, upgrade and recovery/fullflash paths separate. Before destructive writes, identify hardware/flash layout, validate compatibility, preserve a recovery path and verify images.
 
 ### P3. OpenIPC device integration and video
-Make OpenIPC cameras first-class devices with identity/platform/sensor, firmware, network, Majestic state, streams and diagnostics. Continue real-video work including stream discovery, main/sub streams, codec/resolution/FPS visibility where available, latency diagnostics, stream switching, fullscreen and later secondary/thermal/PiP. TCP port reachability is not proof of healthy RTSP playback.
+Make OpenIPC cameras first-class devices with verified identity/platform/sensor, firmware, network, Majestic state, streams and diagnostics. Continue stream discovery, main/sub streams, codec/resolution/FPS visibility where available, latency diagnostics, stream switching, fullscreen and preparation for secondary/thermal/PiP. TCP port reachability is not proof of healthy RTSP playback.
 
 ### P4. Presets and profiles
-Keep camera preset separate from per-stream video profiles. Video profiles cover playback/stream-oriented settings and must not silently participate in firmware flashing.
+Keep versioned camera presets separate from per-stream video profiles. Video profiles must not silently participate in firmware flashing.
 
-### P5. Protocol normalization
-After the vehicle/diagnostics abstraction exists, add normalized providers and then read-only MSP and CRSF support for Betaflight/INAV while retaining MAVLink support for ArduPilot.
+### P5. StabX and network integration
+Add external-navigation/StabX status only through a verified supported interface, plus Starlink/VPN/link diagnostics. Feed only verified received status into FPV OSD and diagnostics.
 
-### P6. StabX and network integration
-Add external-navigation/StabX status integration when exposed by a supported interface, plus Starlink/VPN/link diagnostics. Feed only verified received status into FPV OSD and diagnostics.
+### P6. Distribution and persistence
+Add encrypted database export/import and station pairing, then continue frozen executable, installer, updater, signed OTA and rollback validation.
 
 ## Development workflow
-1. Read current `DEVELOPMENT_GUIDE.md` and `PROJECT_STATE.md` from `main` at the start of development work.
-2. Inspect actual current source before editing.
-3. Update both canonical context files after material changes to state, blockers, roadmap, architecture, release behavior or workflow.
-4. `PROJECT_STATE.md` records what is true now and what happens next.
-5. `DEVELOPMENT_GUIDE.md` records product rules and development order.
-6. Small corrective changes may go directly to `main` when appropriate.
-7. Risky/substantial changes should receive focused review and CI before merge.
-8. Preserve existing release/update/security behavior unless explicitly changing it.
-9. Do not publish failing validation.
-10. For Windows GUI changes, validate the frozen executable, not only source execution.
-11. Preserve useful failure logs/artifacts.
-12. Firmware changes must not silently apply video profiles.
-
-## Next major milestone
-The next milestone requires real-hardware evidence: stable MAVLink telemetry on a supported FC and reliable RTSP playback/recovery on a supported OpenIPC camera. After that, vehicle-level diagnostics and safe provisioning can be built on validated foundations.
+1. Read current `DEVELOPMENT_GUIDE.md` and `PROJECT_STATE.md` from `main` before work.
+2. Inspect actual current source and recent commits before editing.
+3. Update both canonical context files after material state/architecture/roadmap changes.
+4. Do not publish failing validation or claim CI success without evidence.
+5. Small corrective changes may go directly to `main`; risky/substantial changes should receive focused review and CI before merge.
+6. Preserve release/update/security behavior unless explicitly changing it.
+7. For Windows GUI changes, validate the frozen executable, not only source execution.
+8. Preserve useful failure logs/artifacts.
+9. Firmware changes must not silently apply video profiles.
+10. Mark hardware-only verification as hardware-validation-pending and continue software-testable work.
