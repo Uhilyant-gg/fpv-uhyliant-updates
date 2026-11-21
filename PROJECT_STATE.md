@@ -13,6 +13,9 @@ Normal update is fixed `sysupgrade -k -r` for currently verified compatible Open
 
 `FirmwareUpdateSession` is the application orchestration boundary around executor, upgrade adapter and reboot verification. It starts without a transport and exposes no credential fields in result/state. `main.py` cannot perform a destructive update without explicit physical transport activation.
 
+## Firmware acquisition
+The official upstream catalog boundary is `https://<scrubbed-url-domain>/firmware/manifest.json%60. Acquisition parsing is fail-closed: only complete entries with observed platform + sensor, explicit variant/channel/build, HTTPS OpenIPC download URL, SHA-256 and bounded positive size become candidates. Variant and build are never guessed. Downloaded bytes must match both catalog SHA-256 and exact size before handoff to the existing `FirmwareCenter.verifyImage()` boundary. The parser is deliberately tolerant of a small set of field/container aliases so upstream packaging is not bound to one filename convention, while unknown manifest shapes remain rejected.
+
 ## Reboot and verification
 Command dispatch means only `reboot-pending`. Post-reboot rediscovery first retries the destructive dispatch host and may then examine only route-aware bounded private candidates produced by the existing discovery policy. A changed DHCP address is accepted only from fresh OpenIPC endpoint evidence with matching pre-update platform and sensor; an unrelated OpenIPC camera is skipped rather than selected. Success still requires a non-empty actually observed firmware version. Rediscovery remains ICMP-independent and never expands public, default, oversized or known virtual-adapter routes.
 
