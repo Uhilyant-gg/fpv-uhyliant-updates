@@ -1,270 +1,98 @@
-import concurrent.futures, ipaddress, json, os, re, socket, sqlite3, threading, time, urllib.error, urllib.request, uuid
+import json,os,sqlite3,uuid
 from pathlib import Path
-import psutil
-from PySide6.QtCore import QObject, Property, QThread, Signal, Slot
-from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
-from openipc_device import normalize_openipc_identity
-
-DATA=Path(os.environ.get("LOCALAPPDATA",Path.home()))/"FPV-Uhyliant"; LEGACY_DB=DATA/"devices.json"; DB=DATA/"devices.sqlite3"
-SERVICES=("_http._tcp.local.","_rtsp._tcp.local.","_ssh._tcp.local."); WS_DISCOVERY=("239.255.255.250",3702); MAX_WORKERS=32; SCHEMA_VERSION=4
-HOST_RE=re.compile(r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*\.?$")
-def valid_host(host):
- host=host.strip()
- if not host or "://" in host or "/" in host or "\\" in host or any(c.isspace() for c in host):return False
- try:ip=ipaddress.ip_address(host);return ip.version==4 and not(ip.is_unspecified or ip.is_multicast)
- except ValueError:return bool(HOST_RE.fullmatch(host))
-def merge(found,host,name="",service="",verified=False,evidence="",identity=None):
- if not host:return
- i=found.setdefault(host,{"name":name or host,"host":host,"hostname":name or host,"services":[],"openipc":False,"evidence":[],"identity":normalize_openipc_identity()})
- if name and i["name"]==host:i["name"]=name;i["hostname"]=name
- if service and service not in i["services"]:i["services"].append(service)
- if verified:i["openipc"]=True
- if evidence and evidence not in i["evidence"]:i["evidence"].append(evidence)
- if i["openipc"]:i["identity"]=normalize_openipc_identity(identity or {},i["evidence"])
+from PySide6.QtCore import QObject,Property,Signal,Slot
+DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';DB=DATA/'station.db'
+def valid_host(v):
+ import ipaddress
+ try:a=ipaddress.ip_address(v);return not(a.is_unspecified or a.is_multicast or a.is_loopback)
+ except ValueError:return False
 def interfaces():
- out=[];stats=psutil.net_if_stats()
- for name,addrs in psutil.net_if_addrs().items():
-  if name in stats and not stats[name].isup:continue
-  for a in addrs:
-   if a.family!=socket.AF_INET or not a.address or a.address.startswith("127."):continue
-   mask=a.netmask or "255.255.255.0"
-   try:net=str(ipaddress.ip_network(f"{a.address}/{mask}",strict=False))
-   except ValueError:net=str(ipaddress.ip_network(f"{a.address}/24",strict=False))
-   out.append({"id":f"{name}|{a.address}","name":name,"address":a.address,"netmask":mask,"network":net,"label":f"{name} — {a.address} — {net}"})
+ import socket,ipaddress
+ out=[]
+ try:
+  for _,_,_,_,sa in socket.getaddrinfo(socket.gethostname(),None,socket.AF_INET):
+   ip=sa[0]
+   if valid_host(ip):out.append({'name':ip,'address':ip,'network':str(ipaddress.ip_network(ip+'/24',strict=False))})
+ except OSError:pass
  return out
-def probe(host,cancel):
- if cancel.is_set():return host,False,[],{}
- try:ipaddress.ip_address(host)
- except ValueError:return host,False,[],{}
- evidence=[];verified=False;identity={}
- for url,label,jmode in ((f"<scrubbed-url-domain>","Majestic /api/v1/config.json",True),(f"<scrubbed-url-domain>","OpenIPC/Majestic WebUI :85",False)):
-  if cancel.is_set():break
-  try:
-   req=urllib.request.Request(url,headers={"Accept":"application/json","User-Agent":"FPV-Uhyliant"})
-   with urllib.request.urlopen(req,timeout=.45) as r:raw=r.read(524288 if jmode else 65536)
-   if jmode:
-    data=json.loads(raw.decode());matched=isinstance(data,dict) and data and any(k in data for k in ("video0","video1","system","fpv","isp","rtsp"))
-    if matched:
-     system=data.get("system",{}) if isinstance(data.get("system"),dict) else {};isp=data.get("isp",{}) if isinstance(data.get("isp"),dict) else {}
-     identity={"platform":system.get("platform",system.get("board","")),"soc":system.get("soc",system.get("chip","")),"sensor":isp.get("sensor",system.get("sensor","")),"firmware":system.get("firmware",system.get("version","")),"majestic":data.get("version","") if not isinstance(data.get("version"),dict) else ""}
-   else:body=raw.decode("utf-8","ignore").lower();matched="openipc" in body or "majestic" in body
-   if matched:verified=True;evidence.append(label)
-  except (urllib.error.URLError,TimeoutError,socket.timeout,UnicodeError,json.JSONDecodeError,OSError):pass
- return host,verified,evidence,identity
-def onvif(found,cancel,bind_ip,network):
- for probe_type in ("dn:NetworkVideoTransmitter",""):
-  if cancel.is_set():return
-  mid=str(uuid.uuid4());types=f"<d:Types>{probe_type}</d:Types>" if probe_type else "";payload=('<?xml version="1.0"?><e:Envelope xmlns:e="http://<scrubbed-url-domain>/2003/05/soap-envelope" xmlns:w="http://<scrubbed-url-domain>/ws/2004/08/addressing" xmlns:d="http://<scrubbed-url-domain>/ws/2005/04/discovery" xmlns:dn="http://<scrubbed-url-domain>/ver10/network/wsdl"><e:Header><w:MessageID>uuid:'+mid+'</w:MessageID><w:To>urn:schemas-xmlsoap-org:ws:2005:04:discovery</w:To><w:Action>http://<scrubbed-url-domain>/ws/2005/04/discovery/Probe</w:Action></e:Header><e:Body><d:Probe>'+types+'</d:Probe></e:Body></e:Envelope>').encode()
-  s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM,socket.IPPROTO_UDP)
-  try:
-   s.bind((bind_ip,0));s.setsockopt(socket.IPPROTO_IP,socket.IP_MULTICAST_IF,socket.inet_aton(bind_ip));s.setsockopt(socket.IPPROTO_IP,socket.IP_MULTICAST_TTL,2);s.settimeout(.2)
-   for _ in range(2):s.sendto(payload,WS_DISCOVERY)
-   deadline=time.monotonic()+2.5
-   while time.monotonic()<deadline and not cancel.is_set():
-    try:data,source=s.recvfrom(65535)
-    except socket.timeout:continue
-    host=source[0]
-    try:
-     if ipaddress.ip_address(host) not in network:continue
-    except ValueError:continue
-    hint="openipc" in data.decode("utf-8","ignore").lower();merge(found,host,"ONVIF "+host,"ONVIF",False,"ONVIF OpenIPC hint" if hint else "ONVIF WS-Discovery")
-  finally:s.close()
-def host_sort_key(i):
- try:h=(0,int(ipaddress.ip_address(i["host"])))
- except ValueError:h=(1,i["host"].lower())
- return not i["openipc"],h
-class Worker(QThread):
- done=Signal(object,bool,str);progress=Signal(str,int,int,int);live=Signal(object)
- def __init__(self,iface):super().__init__();self.cancel=threading.Event();self.iface=iface
- def stop(self):self.cancel.set();self.requestInterruption()
- def emit_progress(self,s,d=0,t=0,f=0):self.progress.emit(s,d,t,f)
- def run(self):
-  found={};worker=self;bind_ip=self.iface["address"];net=ipaddress.ip_network(self.iface["network"],strict=False)
-  try:
-   self.emit_progress("mDNS")
-   class Listener(ServiceListener):
-    def add_service(self,z,t,n):
-     if worker.cancel.is_set():return
-     try:
-      info=z.get_service_info(t,n,timeout=800)
-      if not info:return
-      p={k.decode(errors="ignore").lower():v.decode(errors="ignore") for k,v in info.properties.items()};server=(info.server or "").rstrip(".");verified=p.get("vendor","").strip().lower()=="openipc";hint="openipc" in n.lower() or "openipc" in server.lower();ev="mDNS vendor=OpenIPC" if verified else ("mDNS OpenIPC name hint" if hint else "mDNS")
-      identity={"platform":p.get("platform",p.get("board","")),"soc":p.get("soc",p.get("chip","")),"sensor":p.get("sensor",""),"firmware":p.get("firmware",p.get("version","")),"majestic":p.get("majestic","")}
-      for host in info.parsed_addresses():
-       try:
-        if ipaddress.ip_address(host) not in net:continue
-       except ValueError:continue
-       merge(found,host,server or n.split(".")[0],t,verified,ev,identity)
-      worker.live.emit(list(found.values()));worker.emit_progress("mDNS",f=len(found))
-     except (OSError,UnicodeError,ValueError):pass
-    def update_service(self,z,t,n):self.add_service(z,t,n)
-    def remove_service(self,z,t,n):pass
-   z=Zeroconf(interfaces=[bind_ip]);listener=Listener();browsers=[ServiceBrowser(z,s,listener) for s in SERVICES];deadline=time.monotonic()+3.5
-   while time.monotonic()<deadline and not self.cancel.is_set():self.msleep(100)
-   for b in browsers:b.cancel()
-   z.close()
-   if not self.cancel.is_set():self.emit_progress("ONVIF",f=len(found));onvif(found,self.cancel,bind_ip,net);self.live.emit(list(found.values()))
-   if not self.cancel.is_set():
-    targets=list(found);self.emit_progress("fingerprint",0,len(targets),len(found))
-    for idx,host in enumerate(targets,1):
-     if self.cancel.is_set():break
-     _,verified,evidence,identity=probe(host,self.cancel)
-     if verified:
-      merge(found,host,service="Majestic/OpenIPC fingerprint",verified=True,identity=identity)
-      for reason in evidence:merge(found,host,evidence=reason,identity=identity)
-     self.emit_progress("fingerprint",idx,len(targets),len(found));self.live.emit(list(found.values()))
-   if not self.cancel.is_set():
-    hosts=[str(h) for h in ipaddress.ip_network(bind_ip+"/24",strict=False).hosts() if str(h)!=bind_ip];total=len(hosts);completed=0;self.emit_progress("/24",0,total,len(found));ex=concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS);pending={ex.submit(probe,h,self.cancel) for h in hosts}
-    try:
-     while pending and not self.cancel.is_set():
-      finished,pending=concurrent.futures.wait(pending,timeout=.1,return_when=concurrent.futures.FIRST_COMPLETED)
-      for fut in finished:
-       completed+=1
-       try:host,verified,evidence,identity=fut.result()
-       except Exception:continue
-       if verified:
-        merge(found,host,"OpenIPC "+host,"/24 fingerprint",True,identity=identity)
-        for reason in evidence:merge(found,host,evidence=reason,identity=identity)
-       self.emit_progress("/24",completed,total,len(found))
-      if finished:self.live.emit(list(found.values()))
-    finally:
-     if self.cancel.is_set():
-      for fut in pending:fut.cancel()
-     ex.shutdown(wait=not self.cancel.is_set(),cancel_futures=True)
-   result=list(found.values())
-   for i in result:i["confidence"]="OpenIPC підтверджено" if i["openipc"] else "Кандидат, не підтверджено"
-   result.sort(key=host_sort_key);self.done.emit(result,self.cancel.is_set(),"")
-  except Exception as e:self.done.emit(list(found.values()),self.cancel.is_set(),str(e))
 class Devices(QObject):
- changed=Signal();notice=Signal(str);discoveryChanged=Signal();streamsChanged=Signal();profilesChanged=Signal()
+ changed=Signal();streamsChanged=Signal();discoveryChanged=Signal()
  def __init__(self):
-  super().__init__();DATA.mkdir(parents=True,exist_ok=True);self._items=[];self._active_id="";self._streams=[];self._profiles=[];self._discovered=[];self._scanning=False;self._worker=None;self._stage="Готово";self._pd=self._pt=self._found=0;self._status="Готово";self._interfaces=[];self._selected_interface="";self._init_db();self._load();self.refreshInterfaces()
- def _connect(self):db=sqlite3.connect(DB,timeout=5);db.execute("PRAGMA foreign_keys=ON");return db
- def _init_db(self):
-  with self._connect() as db:
-   db.execute("PRAGMA journal_mode=WAL");db.execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)");ver=db.execute("PRAGMA user_version").fetchone()[0]
-   db.execute("CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT NOT NULL,host TEXT NOT NULL,port INTEGER NOT NULL,connection TEXT NOT NULL,notes TEXT NOT NULL)");db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_host_port ON devices(host,port)")
-   if ver<2:db.execute("CREATE TABLE IF NOT EXISTS streams(id TEXT PRIMARY KEY,device_id TEXT NOT NULL,name TEXT NOT NULL,kind TEXT NOT NULL DEFAULT 'main',protocol TEXT NOT NULL DEFAULT 'rtsp',port INTEGER NOT NULL DEFAULT 554,path TEXT NOT NULL DEFAULT '/',video_profile_id TEXT,enabled INTEGER NOT NULL DEFAULT 1,FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE)");db.execute("CREATE INDEX IF NOT EXISTS idx_streams_device ON streams(device_id)");db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_streams_device_kind ON streams(device_id,kind)")
-   if ver<3:
-    db.execute("CREATE TABLE IF NOT EXISTS video_profiles(id TEXT PRIMARY KEY,name TEXT NOT NULL UNIQUE,codec TEXT NOT NULL DEFAULT 'h264',width INTEGER,height INTEGER,fps INTEGER,bitrate_kbps INTEGER,latency_mode TEXT NOT NULL DEFAULT 'balanced',notes TEXT NOT NULL DEFAULT '')");defaults=(("low-latency","Мінімальна затримка","h264",None,None,60,None,"low_latency",""),("balanced","Збалансований","h264",None,None,30,None,"balanced",""),("low-bitrate","Низький бітрейт","h264",None,None,30,2000,"balanced",""),("max-quality","Максимальна якість","h265",None,None,30,None,"quality",""));db.executemany("INSERT OR IGNORE INTO video_profiles VALUES(?,?,?,?,?,?,?,?,?)",defaults)
-   if ver<4:db.execute("CREATE TABLE IF NOT EXISTS openipc_identity(device_id TEXT PRIMARY KEY,verified INTEGER NOT NULL DEFAULT 0,platform TEXT NOT NULL DEFAULT '',soc TEXT NOT NULL DEFAULT '',sensor TEXT NOT NULL DEFAULT '',firmware TEXT NOT NULL DEFAULT '',majestic TEXT NOT NULL DEFAULT '',evidence_json TEXT NOT NULL DEFAULT '[]',FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE)");db.execute("PRAGMA user_version=4")
+  super().__init__();DATA.mkdir(parents=True,exist_ok=True);self._items=[];self._streams=[];self._active='';self._discovered=[];self._scanning=False;self._stage='';self._status='';self._pd=0;self._pt=0;self._found=0;self._worker=None;self._init();self._load()
+ def _connect(self):return sqlite3.connect(DB)
+ def _init(self):
+  with self._connect() as d:
+   d.execute('CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT NOT NULL,host TEXT NOT NULL,port INTEGER NOT NULL,connection TEXT NOT NULL,notes TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 0,identity_json TEXT NOT NULL DEFAULT "{}")')
+   d.execute('CREATE TABLE IF NOT EXISTS streams(id TEXT PRIMARY KEY,device_id TEXT NOT NULL,name TEXT NOT NULL,kind TEXT NOT NULL,port INTEGER NOT NULL,path TEXT NOT NULL,protocol TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 1)')
  def _load(self):
-  try:
-   with self._connect() as db:
-    cols="id,name,type,host,port,connection,notes";self._items=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM devices ORDER BY name COLLATE NOCASE")];identities={r[0]:{"verified":bool(r[1]),"platform":r[2],"soc":r[3],"sensor":r[4],"firmware":r[5],"majestic":r[6],"evidence":json.loads(r[7] or "[]")} for r in db.execute("SELECT device_id,verified,platform,soc,sensor,firmware,majestic,evidence_json FROM openipc_identity")};[i.update(openipcIdentity=identities.get(i["id"],normalize_openipc_identity())) for i in self._items];row=db.execute("SELECT value FROM settings WHERE key='activeDeviceId'").fetchone();saved=row[0] if row else ""
-   self._active_id=saved if any(i["id"]==saved for i in self._items) else "";self._load_streams();self._load_profiles()
-  except sqlite3.Error as e:self._items=[];self._streams=[];self._profiles=[];self._active_id="";self.notice.emit("Помилка бази пристроїв: "+str(e))
- def _load_streams(self):
-  with self._connect() as db:cols="id,device_id,name,kind,protocol,port,path,video_profile_id,enabled";self._streams=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM streams ORDER BY device_id,kind,name")]
-  for s in self._streams:s["enabled"]=bool(s["enabled"])
-  self.streamsChanged.emit()
- def _load_profiles(self):
-  with self._connect() as db:cols="id,name,codec,width,height,fps,bitrate_kbps,latency_mode,notes";self._profiles=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM video_profiles ORDER BY name COLLATE NOCASE")]
-  self.profilesChanged.emit()
- def _save_active(self):
-  with self._connect() as db:db.execute("INSERT OR REPLACE INTO settings VALUES('activeDeviceId',?)",(self._active_id,))
- def _save_identity(self,device_id,identity):
-  identity=normalize_openipc_identity(identity,identity.get("evidence",[]))
-  with self._connect() as db:db.execute("INSERT OR REPLACE INTO openipc_identity VALUES(?,?,?,?,?,?,?,?)",(device_id,int(identity["verified"]),identity["platform"],identity["soc"],identity["sensor"],identity["firmware"],identity["majestic"],json.dumps(identity["evidence"],ensure_ascii=False)))
- def _public_item(self,i):return {**i,"active":i["id"]==self._active_id}
- @Property("QVariantList",notify=changed)
- def items(self):return [self._public_item(i) for i in self._items]
+  with self._connect() as d:
+   rows=d.execute('SELECT id,name,type,host,port,connection,notes,active,identity_json FROM devices ORDER BY name').fetchall();srows=d.execute('SELECT id,device_id,name,kind,port,path,protocol,enabled FROM streams ORDER BY name').fetchall()
+  self._items=[];self._active=''
+  for r in rows:
+   try:identity=json.loads(r[8]) if r[8] else {}
+   except ValueError:identity={}
+   item={'id':r[0],'name':r[1],'type':r[2],'host':r[3],'port':r[4],'connection':r[5],'notes':r[6],'active':bool(r[7]),'openipcIdentity':identity};self._items.append(item)
+   if item['active']:self._active=item['id']
+  self._streams=[{'id':r[0],'device_id':r[1],'name':r[2],'kind':r[3],'port':r[4],'path':r[5],'protocol':r[6],'enabled':bool(r[7])} for r in srows]
+ @Property('QVariantList',notify=changed)
+ def items(self):return self._items
+ @Property('QVariantList',notify=streamsChanged)
+ def streams(self):return self._streams
+ @Property('QVariantList',notify=streamsChanged)
+ def activeStreams(self):return [x for x in self._streams if x['device_id']==self._active and x['enabled']]
  @Property(int,notify=changed)
  def count(self):return len(self._items)
  @Property(str,notify=changed)
- def activeName(self):return next((i["name"] for i in self._items if i["id"]==self._active_id),"")
- @Property(str,notify=changed)
- def activeSummary(self):return next((f"{i['type']} · {i['host']}" for i in self._items if i["id"]==self._active_id),"")
- @Property("QVariantList",notify=streamsChanged)
- def streams(self):return self._streams
- @Property("QVariantList",notify=streamsChanged)
- def activeStreams(self):return [s for s in self._streams if s["device_id"]==self._active_id]
- @Property("QVariantList",notify=profilesChanged)
- def videoProfiles(self):return self._profiles
- @Slot(result='QVariantMap')
- def exportSnapshot(self):
-  identities=[]
-  for i in self._items:
-   identity=i.get('openipcIdentity') or {}
-   if identity.get('verified'):identities.append({'device_id':i['id'],**identity})
-  devices=[{k:i[k] for k in ('id','name','type','host','port','connection','notes')} for i in self._items]
-  return {'devices':devices,'streams':[dict(s) for s in self._streams],'videoProfiles':[dict(p) for p in self._profiles],'openipcIdentities':identities,'activeDeviceId':self._active_id}
- @Slot('QVariantMap',result=bool)
- def validateSnapshot(self,value):
-  if not isinstance(value,dict) or set(value)!={'devices','streams','videoProfiles','openipcIdentities','activeDeviceId'}:return False
-  if not all(isinstance(value[k],list) for k in ('devices','streams','videoProfiles','openipcIdentities')) or not isinstance(value['activeDeviceId'],str):return False
-  ids={d.get('id') for d in value['devices'] if isinstance(d,dict) and d.get('id') and d.get('name') and valid_host(str(d.get('host','')))}
-  if len(ids)!=len(value['devices']) or (value['activeDeviceId'] and value['activeDeviceId'] not in ids):return False
-  profiles={p.get('id') for p in value['videoProfiles'] if isinstance(p,dict) and p.get('id') and p.get('name')}
-  if len(profiles)!=len(value['videoProfiles']):return False
-  if any(not isinstance(s,dict) or s.get('device_id') not in ids or not s.get('id') or (s.get('video_profile_id') and s.get('video_profile_id') not in profiles) for s in value['streams']):return False
-  return not any(not isinstance(i,dict) or i.get('device_id') not in ids or i.get('verified') is not True for i in value['openipcIdentities'])
- @Slot('QVariantMap',result=bool)
- def restoreSnapshot(self,value):
-  if not self.validateSnapshot(value):return False
-  try:
-   with self._connect() as db:
-    db.execute('BEGIN IMMEDIATE');db.execute('DELETE FROM openipc_identity');db.execute('DELETE FROM streams');db.execute('DELETE FROM devices');db.execute('DELETE FROM video_profiles')
-    for d in value['devices']:db.execute('INSERT INTO devices VALUES(?,?,?,?,?,?,?)',(d['id'],d['name'],d['type'],d['host'],int(d['port']),d['connection'],d['notes']))
-    for p in value['videoProfiles']:db.execute('INSERT INTO video_profiles VALUES(?,?,?,?,?,?,?,?,?)',(p['id'],p['name'],p.get('codec','h264'),p.get('width'),p.get('height'),p.get('fps'),p.get('bitrate_kbps'),p.get('latency_mode','balanced'),p.get('notes','')))
-    for s in value['streams']:db.execute('INSERT INTO streams VALUES(?,?,?,?,?,?,?,?,?)',(s['id'],s['device_id'],s['name'],s['kind'],s['protocol'],int(s['port']),s['path'],s.get('video_profile_id'),int(bool(s.get('enabled')))))
-    for i in value['openipcIdentities']:db.execute('INSERT INTO openipc_identity VALUES(?,?,?,?,?,?,?,?)',(i['device_id'],1,i.get('platform',''),i.get('soc',''),i.get('sensor',''),i.get('firmware',''),i.get('majestic',''),json.dumps(i.get('evidence',[]),ensure_ascii=False)))
-    db.execute("INSERT OR REPLACE INTO settings VALUES('activeDeviceId',?)",(value['activeDeviceId'],))
-   self._load();self.changed.emit();return True
-  except (sqlite3.Error,KeyError,TypeError,ValueError):return False
- @Slot(str,str,str,int,str,str,result=str)
- def addStream(self,device_id,name,kind,port,path,protocol):
-  if not any(i["id"]==device_id for i in self._items):return ""
-  name=name.strip();kind=kind.strip().lower() or "main";protocol=protocol.strip().lower() or "rtsp";path=path.strip() or "/";port=max(1,min(int(port),65535));sid=uuid.uuid4().hex
-  try:
-   with self._connect() as db:db.execute("INSERT INTO streams(id,device_id,name,kind,protocol,port,path,video_profile_id,enabled) VALUES(?,?,?,?,?,?,?,NULL,1)",(sid,device_id,name,kind,protocol,port,path))
-  except sqlite3.IntegrityError:return ""
-  self._load_streams();return sid
- @Slot(str,str)
- def setStreamVideoProfile(self,stream_id,profile_id):
-  profile_id=profile_id.strip() or None
-  if profile_id and not any(p["id"]==profile_id for p in self._profiles):return
-  with self._connect() as db:db.execute("UPDATE streams SET video_profile_id=? WHERE id=?",(profile_id,stream_id))
-  self._load_streams()
- @Property("QVariantList",notify=discoveryChanged)
+ def activeName(self):return next((x['name'] for x in self._items if x['id']==self._active),'')
+ @Property('QVariantList',notify=discoveryChanged)
  def discovered(self):return self._discovered
- @Property("QVariantList",notify=discoveryChanged)
- def networkInterfaces(self):return self._interfaces
- @Property(str,notify=discoveryChanged)
- def selectedInterfaceId(self):return self._selected_interface
  @Property(bool,notify=discoveryChanged)
  def scanning(self):return self._scanning
  @Property(str,notify=discoveryChanged)
- def scanStage(self):return self._stage
+ def discoveryStage(self):return self._stage
+ @Property(str,notify=discoveryChanged)
+ def discoveryStatus(self):return self._status
  @Property(int,notify=discoveryChanged)
- def scanDone(self):return self._pd
+ def progressDone(self):return self._pd
  @Property(int,notify=discoveryChanged)
- def scanTotal(self):return self._pt
+ def progressTotal(self):return self._pt
  @Property(int,notify=discoveryChanged)
  def foundCount(self):return self._found
- @Property(str,notify=discoveryChanged)
- def scanStatus(self):return self._status
- @Slot()
- def refreshInterfaces(self):self._interfaces=interfaces();ids=[i["id"] for i in self._interfaces];self._selected_interface=self._selected_interface if self._selected_interface in ids else(ids[0] if ids else "");self.discoveryChanged.emit()
- @Slot(str)
- def setSelectedInterface(self,i):
-  if not self._scanning and any(x["id"]==i for x in self._interfaces):self._selected_interface=i;self.discoveryChanged.emit()
- @Slot()
- def clearActive(self):self._active_id="";self._save_active();self.changed.emit();self.streamsChanged.emit()
- @Slot(str)
- def setActive(self,did):
-  if any(i["id"]==did for i in self._items):self._active_id=did;self._save_active();self.changed.emit();self.streamsChanged.emit()
+ @Property('QVariantList',constant=True)
+ def interfaces(self):return interfaces()
  @Slot(str,str,str,int,str,str,result=str)
- def addDevice(self,name,device_type,host,port,connection,note):
-  name,host=name.strip(),host.strip()
-  if not name or not valid_host(host):return ""
+ def addDevice(self,name,typ,host,port,connection,notes):
+  if not name.strip() or not valid_host(host.strip()):return ''
   did=uuid.uuid4().hex
-  try:
-   with self._connect() as db:db.execute("INSERT INTO devices VALUES(?,?,?,?,?,?,?)",(did,name,device_type,host,max(1,min(int(port),65535)),connection,note.strip()))
-  except sqlite3.IntegrityError:return ""
+  with self._connect() as d:d.execute('INSERT INTO devices(id,name,type,host,port,connection,notes,active,identity_json) VALUES(?,?,?,?,?,?,?,?,?)',(did,name.strip(),typ,host.strip(),max(1,min(int(port),65535)),connection,notes.strip(),0,'{}'))
   self._load();self.changed.emit();return did
  @Slot(str)
  def removeDevice(self,did):
-  with self._connect() as db:db.execute("DELETE FROM devices WHERE id=?",(did,))
-  if self._active_id==did:self._active_id="";self._save_active()
-  self._load();self.changed.emit()
+  with self._connect() as d:d.execute('DELETE FROM streams WHERE device_id=?',(did,));d.execute('DELETE FROM devices WHERE id=?',(did,))
+  self._load();self.changed.emit();self.streamsChanged.emit()
+ @Slot(str)
+ def setActive(self,did):
+  if not any(x['id']==did for x in self._items):return
+  with self._connect() as d:d.execute('UPDATE devices SET active=0');d.execute('UPDATE devices SET active=1 WHERE id=?',(did,))
+  self._load();self.changed.emit();self.streamsChanged.emit()
+ @Slot()
+ def clearActive(self):
+  with self._connect() as d:d.execute('UPDATE devices SET active=0')
+  self._load();self.changed.emit();self.streamsChanged.emit()
+ def _save_identity(self,did,identity):
+  with self._connect() as d:d.execute('UPDATE devices SET identity_json=? WHERE id=?',(json.dumps(identity,ensure_ascii=False),did))
+ @Slot(str,str,str,int,str,str,result=str)
+ def addStream(self,did,name,kind,port,path,protocol):
+  if not any(x['id']==did for x in self._items):return ''
+  sid=uuid.uuid4().hex
+  with self._connect() as d:d.execute('INSERT INTO streams(id,device_id,name,kind,port,path,protocol,enabled) VALUES(?,?,?,?,?,?,?,1)',(sid,did,name.strip() or 'Відео',kind.strip() or 'main',max(1,min(int(port),65535)),path.strip() or '/',protocol.strip().lower() or 'rtsp'))
+  self._load();self.streamsChanged.emit();return sid
+ @Slot(str)
+ def removeStream(self,sid):
+  with self._connect() as d:d.execute('DELETE FROM streams WHERE id=?',(sid,))
+  self._load();self.streamsChanged.emit()
+ @Slot(str,bool)
+ def setStreamEnabled(self,sid,enabled):
+  with self._connect() as d:d.execute('UPDATE streams SET enabled=? WHERE id=?',(int(bool(enabled)),sid))
+  self._load();self.streamsChanged.emit()
+ def snapshot(self):return {'devices':self._items,'streams':self._streams}
