@@ -15,7 +15,7 @@ Devices -> Camera -> Firmware
 - Python + PySide6.
 - Qt Quick/QML UI.
 - Qt Multimedia video playback.
-- SQLite devices, streams, settings and video profiles.
+- SQLite devices, streams, settings, verified OpenIPC identity and video profiles.
 - Windows per-user installation.
 - OTA with signed manifests, SHA-256 integrity, Ed25519 signatures, launcher verification and rollback.
 - GitHub Actions Windows builds/releases.
@@ -27,7 +27,7 @@ Devices -> Camera -> Firmware
 4. A camera or each stream may have its own video profile.
 5. BAT/fullflash is only for cameras already running the relevant compatible custom OpenIPC firmware, not a universal install method.
 6. OpenIPC installation should be automated as far as safely possible.
-7. Generic ONVIF devices must not be classified as OpenIPC without OpenIPC/Majestic evidence.
+7. Generic ONVIF devices and name hints must not be classified as OpenIPC without verified OpenIPC/Majestic evidence.
 8. Target flight stacks are ArduPilot, Betaflight and INAV.
 9. Target protocols include MAVLink, MSP and CRSF.
 10. Published release metadata under `releases/<version>/` is immutable.
@@ -36,15 +36,18 @@ Devices -> Camera -> Firmware
 13. New flight protocol backends start read-only.
 14. Do not display invented or stale telemetry as live.
 15. Protocol-specific parsing belongs below the normalized telemetry-provider boundary; FPV UI consumes the vehicle model rather than duplicating protocol-specific telemetry UI.
+16. OpenIPC platform/SoC, sensor, firmware and Majestic fields remain empty unless actually observed from verified evidence.
 
 ## Current development state
-MAVLink phase 1 and the normalized vehicle/diagnostics foundation exist. Read-only MSP and passive CRSF parsing/runtime foundations now also exist behind normalized providers, with software tests. The app is still wired to MAVLink by default, so MSP/CRSF transport and provider selection remain integration work. All real FC/radio validation is hardware-validation-pending and must not block software-only progress.
+MAVLink phase 1 and the normalized vehicle/diagnostics foundation exist. Read-only MSP and passive CRSF parsing/runtime foundations exist behind normalized providers, with serial transports, persistent provider selection and software tests. FPV OSD consumes the selected normalized provider. All real FC/radio validation is hardware-validation-pending and must not block software-only progress.
+
+OpenIPC discovery now distinguishes generic ONVIF candidates from verified OpenIPC devices and persists normalized verified identity separately in SQLite schema version 4. Platform/SoC, sensor, firmware and Majestic version are retained only when observed. Real SSC30KQ / IMX335 validation remains hardware-validation-pending.
 
 RTSP recovery/diagnostics exist but still require real OpenIPC validation.
 
 ## Current implementation order
 ### P0. Protocol integration
-Add safe provider selection and serial transport/device handling for MSP and CRSF, while keeping new paths read-only and preserving a single vehicle/UI model.
+Software integration of provider selection and unavailable semantics is complete enough to move forward; keep MAVLink/MSP/CRSF read-only and maintain one vehicle/UI contract. Real hardware validation remains hardware-validation-pending.
 
 ### P1. Vehicle model and diagnostics
 Continue strengthening structured diagnostics so telemetry, video, network and external-navigation health share consistent unavailable/stale/error semantics.
@@ -56,7 +59,7 @@ Detect -> Identify -> Select firmware -> Pre-check -> Flash -> Reboot -> Redisco
 Initial supported hardware should include SSC30KQ / IMX335. Keep primary installation, upgrade and recovery/fullflash paths separate. Before destructive writes, identify hardware/flash layout, validate compatibility, preserve a recovery path and verify images.
 
 ### P3. OpenIPC device integration and video
-Make OpenIPC cameras first-class devices with verified identity/platform/sensor, firmware, network, Majestic state, streams and diagnostics. Continue stream discovery, main/sub streams, codec/resolution/FPS visibility where available, latency diagnostics, stream switching, fullscreen and preparation for secondary/thermal/PiP. TCP port reachability is not proof of healthy RTSP playback.
+Verified OpenIPC identity persistence exists. Next expose verified identity, main/sub streams and diagnostics in the device UI. Continue stream discovery, codec/resolution/FPS visibility where available, latency diagnostics, stream switching, fullscreen and preparation for secondary/thermal/PiP. TCP port reachability is not proof of healthy RTSP playback.
 
 ### P4. Presets and profiles
 Keep versioned camera presets separate from per-stream video profiles. Video profiles must not silently participate in firmware flashing.
