@@ -5,7 +5,7 @@ from diagnostics_bundle import diagnostic_bundle,export_bundle
 from network_remediation import classify_network,remediation
 class DiagnosticsRuntime(QObject):
  changed=Signal()
- def __init__(self,version,devices,links,telemetry,updater,events,data_dir,video=None):super().__init__();self.version=version;self.devices=devices;self.links=links;self.telemetry=telemetry;self.updater=updater;self.events=events;self.data_dir=Path(data_dir);self.video=video
+ def __init__(self,version,devices,links,telemetry,updater,events,data_dir,video=None):super().__init__();self.version=version;self.devices=devices;self.links=links;self.telemetry=telemetry;self.updater=updater;self.events=events;self.data_dir=Path(data_dir);self.video=video;self._last_remediation={}
  def _devices(self):return deepcopy(getattr(self.devices,'_items',[]) or [])
  def _video(self):
   v=self.video
@@ -14,9 +14,22 @@ class DiagnosticsRuntime(QObject):
  def _network_health(self,network,video,devices):
   finding=classify_network(network,(video.get('primary') or {}).get('state'),bool(devices));finding['remediation']=remediation(finding.get('action'));return finding
  def build(self):
-  devices=self._devices();network=dict(self.links.snapshot);video=self._video();bundle=diagnostic_bundle(self.version,devices=devices,network=network,video=video,protocols={'active':self.telemetry.name,'available':self.telemetry.available,'error':self.telemetry.error,'telemetry':dict(self.telemetry.telemetry)},updater={'state':self.updater.updateState,'status':self.updater.updateStatus,'availableVersion':self.updater.availableVersion,'progress':self.updater.progress},events=self.events.snapshot());bundle['networkHealth']=self._network_health(network,video,devices);return bundle
+  devices=self._devices();network=dict(self.links.snapshot);video=self._video();bundle=diagnostic_bundle(self.version,devices=devices,network=network,video=video,protocols={'active':self.telemetry.name,'available':self.telemetry.available,'error':self.telemetry.error,'telemetry':dict(self.telemetry.telemetry)},updater={'state':self.updater.updateState,'status':self.updater.updateStatus,'availableVersion':self.updater.availableVersion,'progress':self.updater.progress},events=self.events.snapshot());bundle['networkHealth']=self._network_health(network,video,devices);bundle['lastRemediation']=deepcopy(self._last_remediation);return bundle
+ def _run_safe(self,action):
+  if action=='rediscover' and hasattr(self.devices,'discoverOpenIPC'):self.devices.discoverOpenIPC();return True
+  if action=='reconnect-video' and self.video is not None:
+   primary=getattr(self.video,'primary',None)
+   return bool(primary and hasattr(primary,'reconnect') and primary.reconnect())
+  if action=='refresh-network':self.links.changed.emit();return True
+  return False
  @Property('QVariantMap',notify=changed)
  def snapshot(self):return self.build()
+ @Slot(str,result=bool)
+ def applyRemediation(self,action):
+  allowed=remediation(action)
+  if not allowed or allowed.get('mutating'):return False
+  before=self.build().get('networkHealth',{});ok=self._run_safe(action);after=self.build().get('networkHealth',{})
+  self._last_remediation={'action':action,'ok':bool(ok),'before':before.get('state'),'after':after.get('state')};self.events.record('diagnostics','info' if ok else 'warning','safe remediation executed',detail=deepcopy(self._last_remediation));self.changed.emit();return bool(ok)
  @Slot(result=str)
  def export(self):
   path=self.data_dir/'diagnostics'/'diagnostic-bundle.json';export_bundle(path,self.build());self.events.record('diagnostics','info','diagnostic bundle exported',detail={'path':str(path)});self.changed.emit();return str(path)
