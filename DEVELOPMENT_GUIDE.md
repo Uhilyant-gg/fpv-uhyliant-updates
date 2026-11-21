@@ -10,6 +10,8 @@ Primary and secondary `VideoRuntime` instances are isolated. A single stream mus
 
 A prepared runtime is valid only while its active-device membership, canonical stream metadata, backing device metadata and referenced video profile still match the detached snapshots captured at prepare time. Normalize RTSP paths identically before storing and comparing snapshots; normalization itself must never make an unchanged source appear stale. Stream/device/profile change signals must reconcile both runtimes. Deletion, disable, active-device changes, endpoint edits and profile edits invalidate the affected runtime and clear old diagnostics metadata. Secondary invalidation disables PiP without stopping a valid primary. Reconnect must fail closed after any such change until the stream is prepared again. Invalid/missing RTSP host, port or path is unavailable and must not trigger a probe. Late player callbacks after stop or source invalidation must not resurrect runtime state. Endpoint check time is reachability timing only, never video latency.
 
+`StreamWorkspace.autoSelect()` is reconciliation, not an unconditional reset: preserve explicit valid selections, replace only missing/disabled roles with actual active streams, and keep role IDs distinct. Backend `VideoWorkspaceRuntime.pipEnabled` is the authoritative PiP state; QML must observe it rather than maintaining an independent writable copy. Backend PiP invalidation must stop UI-side secondary playback/recovery without affecting a valid primary.
+
 Physical dual-decoder capability and performance remain Windows hardware-validation-pending.
 
 ## Pairing and links
