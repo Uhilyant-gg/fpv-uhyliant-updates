@@ -9,7 +9,7 @@ class OpenIPCUpgradeAdapter:
   initial=upgrade_candidate(self._device(device_id))
   if not initial.get('ready'):return False
   authenticate=getattr(self.transport,'authenticate',None)
-  if authenticate is not None and not authenticate(initial['host']):return False
+  if not callable(authenticate) or not authenticate(initial['host']):return False
   # Re-read observed identity after authentication and immediately before the destructive command.
   current=self._device(device_id);ready=upgrade_candidate(current)
   if not ready.get('ready') or ready['host']!=initial['host'] or ready.get('platform')!=initial.get('platform') or ready.get('sensor')!=initial.get('sensor'):return False
