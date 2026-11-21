@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 import devices as devices_module
 import devices_routeaware as module
 
@@ -28,4 +29,14 @@ class Tests(unittest.TestCase):
     def test_discovered_add_requires_real_openipc_candidate(self):
         d=module.Devices();d._discovered=[{'host':'192.168.1.50','name':'Generic','openipc':False}]
         self.assertEqual(d.addDiscovered('192.168.1.50','Generic',True),'');self.assertEqual(d.count,0)
+    @patch('devices_routeaware.fingerprint')
+    def test_authenticated_add_requires_verified_identity(self,fingerprint):
+        d=module.Devices();fingerprint.return_value={'host':'192.168.1.50','camera':True,'openipc':True,'identityVerified':False,'identity':{'verified':True},'evidence':[],'streams':[]}
+        self.assertEqual(d.authenticateAndAdd('192.168.1.50','Camera','root','secret'),'');self.assertEqual(d.count,0);self.assertIn('OpenIPC не підтверджено',d.manualError)
+    @patch('devices_routeaware.fingerprint')
+    def test_authenticated_add_passes_credentials_only_to_probe_and_persists_no_secret(self,fingerprint):
+        d=module.Devices();fingerprint.return_value={'host':'192.168.1.50','camera':True,'openipc':True,'identityVerified':True,'identity':{'verified':True,'platform':'ssc30kq','soc':'','sensor':'imx335','firmware':'v1','majestic':'','evidence':['observed']},'evidence':['observed'],'streams':[]}
+        did=d.authenticateAndAdd('192.168.1.50','Camera','root','session-secret')
+        self.assertTrue(did);fingerprint.assert_called_once();args=fingerprint.call_args.args;self.assertEqual(args[2:4],('root','session-secret'))
+        saved=next(item for item in d.items if item['id']==did);self.assertNotIn('password',saved);self.assertNotIn('username',saved);self.assertNotIn('session-secret',repr(saved));self.assertNotIn('session-secret',repr(d.manualResult))
 if __name__=='__main__':unittest.main()
