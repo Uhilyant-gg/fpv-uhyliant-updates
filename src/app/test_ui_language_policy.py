@@ -14,13 +14,12 @@ class UiLanguagePolicyTests(unittest.TestCase):
                 "DevicesPanel.qml",
                 "PairingPanel.qml",
                 "Main.qml",
+                "MavlinkDiagnostics.qml",
             )
         }
 
     def visible(self, source):
-        return "\n".join(
-            re.findall(r'(?:text|placeholderText|title)\s*:\s*"([^"]*)"', source)
-        )
+        return "\n".join(re.findall(r'(?:text|placeholderText|title)\s*:\s*"([^"]*)"', source))
 
     def hover_hint_count(self, source):
         return len(re.findall(r"\bHoverHint\s*\{", source))
@@ -47,6 +46,13 @@ class UiLanguagePolicyTests(unittest.TestCase):
         for expected in ("СЕРВІСНИЙ РЕЖИМ", "ВІДЕО", "Основний", "Додатковий", "Поміняти місцями", "Прошивка", "Телеметрія: ", "Мережа: "):
             self.assertIn(expected, visible)
         for obsolete in ("SERVICE MODE", "VIDEO WORKSPACE", "Primary", "Secondary", "Swap", "Firmware", "Telemetry: ", "Network: "):
+            self.assertNotIn(obsolete, visible)
+
+    def test_mavlink_diagnostics_surface_is_ukrainian(self):
+        visible = self.visible(self.sources["MavlinkDiagnostics.qml"])
+        for expected in ("ІДЕНТИФІКАЦІЯ", "Система / компонент", "Літальний апарат", "Стан системи", "ДІАГНОСТИКА КАНАЛУ", "Частота повідомлень", "Оцінка втрат", "Помилки зв’язку", "Завантаження контролера"):
+            self.assertIn(expected, visible)
+        for obsolete in ("IDENTITY", "System / Component", "Vehicle", "System state", "LINK DIAGNOSTICS", "Health", "Message rate", "Last packet", "Estimated lost", "Bad data", "Comm errors", "Controller load", "not broadcast"):
             self.assertNotIn(obsolete, visible)
 
     def test_update_surface_has_delayed_help(self):
