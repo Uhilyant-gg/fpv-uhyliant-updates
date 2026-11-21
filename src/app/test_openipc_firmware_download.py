@@ -33,4 +33,12 @@ class Tests(unittest.TestCase):
   data=b'firmware'
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
    service,center=self.selected_service(td,data,lambda *a,**k:Response(data));center.accept=False;self.assertFalse(service.downloadSelected('cam'));self.assertEqual(service.status['state'],'error')
+ def test_cache_directory_failure_is_reported_without_network_or_center_handoff(self):
+  data=b'firmware'
+  with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
+   cache=Path(td)/'cache';cache.write_bytes(b'not-a-directory');calls=[];service,center=self.selected_service(cache,data,lambda *a,**k:calls.append(1));self.assertFalse(service.downloadSelected('cam'));self.assertEqual(service.status['state'],'error');self.assertIn('кеш прошивки',service.status['reason']);self.assertEqual(calls,[]);self.assertEqual(center.calls,[])
+ def test_temp_file_failure_is_reported_without_network_or_center_handoff(self):
+  data=b'firmware'
+  with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True),patch('openipc_firmware_acquisition.tempfile.mkstemp',side_effect=OSError('denied')):
+   calls=[];service,center=self.selected_service(td,data,lambda *a,**k:calls.append(1));self.assertFalse(service.downloadSelected('cam'));self.assertEqual(service.status['state'],'error');self.assertIn('тимчасовий файл',service.status['reason']);self.assertEqual(calls,[]);self.assertEqual(center.calls,[])
 if __name__=='__main__':unittest.main()
