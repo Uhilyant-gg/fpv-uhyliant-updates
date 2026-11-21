@@ -1,7 +1,6 @@
-import socket,time
-from datetime import datetime, timezone
-from PySide6.QtCore import QObject, Property, Signal, Slot
-
+import math,socket,time
+from datetime import datetime,timezone
+from PySide6.QtCore import QObject,Property,Signal,Slot
 class VideoRuntime(QObject):
  changed=Signal();notice=Signal(str)
  def __init__(self,devices):super().__init__();self.devices=devices;self._state='stopped';self._error='';self._stream_id='';self._url='';self._host='';self._port=0;self._attempts=0;self._last_event='';self._stream={};self._check_ms=None
@@ -33,41 +32,49 @@ class VideoRuntime(QObject):
   self._check_ms=round((time.monotonic()-start)*1000);return True
  @Slot(str,result=bool)
  def prepare(self,stream_id):
-  stream=next((s for s in self.devices.streams if s['id']==stream_id and s.get('enabled')),None)
+  stream=next((s for s in self.devices.streams if s.get('id')==stream_id and s.get('enabled')),None)
   if not stream:self._clear_selection();self._set('error','Відеопотік не знайдено або вимкнений');return False
-  device=next((d for d in self.devices.items if d['id']==stream['device_id']),None)
+  device=next((d for d in self.devices.items if d.get('id')==stream.get('device_id')),None)
   if not device:self._clear_selection();self._set('error','Камеру для відеопотоку не знайдено');return False
-  if stream['protocol'].lower()!='rtsp':self._clear_selection();self._stream=dict(stream);self._set('error','Поточний runtime підтримує лише RTSP');return False
-  self._stream=dict(stream);self._host=device['host'];self._port=int(stream['port']);path=stream['path'] if stream['path'].startswith('/') else '/'+stream['path'];self._stream['path']=path;self._stream_id=stream_id;self._url=f'rtsp://{self._host}:{self._port}{path}';self._attempts=1;self._set('checking')
+  if str(stream.get('protocol','')).lower()!='rtsp':self._clear_selection();self._stream=dict(stream);self._set('error','Поточний runtime підтримує лише RTSP');return False
+  try:port=int(stream.get('port'))
+  except (TypeError,ValueError):port=0
+  host=str(device.get('host','')).strip();path=str(stream.get('path','')).strip()
+  if not host or port<1 or port>65535 or not path:self._clear_selection();self._stream=dict(stream);self._set('error','RTSP endpoint metadata incomplete or invalid');return False
+  self._stream=dict(stream);self._host=host;self._port=port;path=path if path.startswith('/') else '/'+path;self._stream['path']=path;self._stream_id=stream_id;self._url=f'rtsp://{self._host}:{self._port}{path}';self._attempts=1;self._set('checking')
   if not self._check_endpoint():return False
   self._set('ready');return True
  @Slot(result=bool)
  def reconnect(self):
   if not self._url or not self._host or not self._port:self._set('error','Немає підготовленого RTSP-потоку для перепідключення');return False
+  current=next((s for s in self.devices.streams if s.get('id')==self._stream_id and s.get('enabled')),None)
+  if not current:self._clear_selection();self._set('error','Підготовлений RTSP-потік більше не існує або вимкнений');return False
   self._attempts+=1;self._set('reconnecting')
   if not self._check_endpoint():return False
   self._set('ready');return True
  @Slot()
  def markPlaying(self):
-  if self._url:self._set('playing')
+  if self._url and self._state in ('ready','reconnecting'):self._set('playing')
  @Slot(str)
- def playbackError(self,message):self._set('error',message or 'Помилка відтворення RTSP')
+ def playbackError(self,message):
+  if self._stream_id:self._set('error',message or 'Помилка відтворення RTSP')
  @Slot(str)
- def markStalled(self,message=''):self._set('stalled',message or 'RTSP-потік зупинився або перестав віддавати кадри')
+ def markStalled(self,message=''):
+  if self._stream_id:self._set('stalled',message or 'RTSP-потік зупинився або перестав віддавати кадри')
  @Slot()
  def stop(self):self._clear_selection();self._set('stopped')
-
 class VideoWorkspaceRuntime(QObject):
- """Owns two isolated runtimes and enforces PiP decoder lifecycle."""
  changed=Signal()
  def __init__(self,devices):super().__init__();self.primary=VideoRuntime(devices);self.secondary=VideoRuntime(devices);self._pip=False
  @Property(bool,notify=changed)
  def pipEnabled(self):return self._pip
  @Slot(str,result=bool)
- def preparePrimary(self,stream_id):return self.primary.prepare(stream_id)
+ def preparePrimary(self,stream_id):
+  if stream_id and stream_id==self.secondary.streamId:self.secondary.stop()
+  return self.primary.prepare(stream_id)
  @Slot(str,result=bool)
  def prepareSecondary(self,stream_id):
-  if not self._pip:return False
+  if not self._pip or not stream_id or stream_id==self.primary.streamId:return False
   return self.secondary.prepare(stream_id)
  @Slot(bool)
  def setPipEnabled(self,enabled):
@@ -77,5 +84,4 @@ class VideoWorkspaceRuntime(QObject):
   if not enabled:self.secondary.stop()
   self.changed.emit()
  @Slot()
- def stopAll(self):
-  self._pip=False;self.primary.stop();self.secondary.stop();self.changed.emit()
+ def stopAll(self):self._pip=False;self.primary.stop();self.secondary.stop();self.changed.emit()
