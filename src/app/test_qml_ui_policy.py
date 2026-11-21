@@ -22,6 +22,7 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
                 "DevicesPanel.qml",
                 "DiagnosticsPanel.qml",
                 "FirmwareCenter.qml",
+                "HardwareE2EPanel.qml",
                 "HomePanel.qml",
                 "HoverHint.qml",
                 "Main.qml",
