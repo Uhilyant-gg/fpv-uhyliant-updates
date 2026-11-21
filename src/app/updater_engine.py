@@ -40,6 +40,10 @@ def load_ready(expected_manifest=None):
   pkg=expected_manifest.get('package') or {};expected=str(pkg.get('sha256','')).lower()
   if r['version']!=expected_manifest.get('version') or package.name!=pkg.get('file') or r['sha256'].lower()!=expected:raise RuntimeError('Завантажений пакет не відповідає перевіреному маніфесту')
  return {'version':r['version'],'package':str(package),'sha256':r['sha256'].lower()}
+def validate_install_root(root):
+ if root is None:return None
+ r=Path(root).resolve();helper=r/'FPV-Uhyliant-Update.exe';launcher=r/'FPV-Uhyliant-Launcher.exe';current=r/'app'/'current'/'FPV-Uhyliant.exe'
+ return r if helper.is_file() and launcher.is_file() and current.is_file() else None
 class W(QThread):
  done=Signal(bool,object);progress=Signal(int,str)
  def __init__(self,a,p):super().__init__();self.a=a;self.p=p
@@ -65,7 +69,7 @@ class W(QThread):
   except Exception as e:self.done.emit(False,str(e))
 class Updater(QObject):
  changed=Signal();progressChanged=Signal()
- def __init__(self,root=None,guard=None):super().__init__();self.root=Path(root).resolve() if root else None;self.guard=guard or (lambda:(True,''));self.url=DEFAULT;self.state='idle';self.status='Готово';self.available='';self.notes=[];self.p=0;self.m={};self.w=None
+ def __init__(self,root=None,guard=None):super().__init__();self.root=validate_install_root(root);self.guard=guard or (lambda:(True,''));self.url=DEFAULT;self.state='idle';self.status='Готово';self.available='';self.notes=[];self.p=0;self.m={};self.w=None
  @Property(str,constant=True)
  def currentVersion(self):return VERSION
  @Property(str,notify=changed)
@@ -83,7 +87,7 @@ class Updater(QObject):
  @Property(bool,notify=changed)
  def busy(self):return self.w is not None and self.w.isRunning()
  @Property(bool,notify=changed)
- def installReady(self):return self.state=='ready' and self.root is not None and (self.root/'FPV-Uhyliant-Update.exe').exists()
+ def installReady(self):return self.state=='ready' and self.root is not None
  @Slot()
  def check(self):self._start('check',{'url':self.url},'Перевірка підписаного маніфесту')
  @Slot()
@@ -94,7 +98,7 @@ class Updater(QObject):
   if self.busy:self.status='Дочекайтеся завершення поточної операції';self.changed.emit();return
   ok,why=self.guard()
   if not ok:self.state='blocked';self.status=why;self.changed.emit();return
-  if not self.installReady:self.state='error';self.status='Компонент оновлення недоступний';self.changed.emit();return
+  if not self.installReady:self.state='error';self.status='Компонент оновлення недоступний: запустіть встановлену програму через FPV-Uhyliant-Launcher.exe';self.changed.emit();return
   try:r=load_ready(self.m)
   except RuntimeError as e:self.state='error';self.status=str(e);self.changed.emit();return
   helper=self.root/'FPV-Uhyliant-Update.exe';subprocess.Popen([str(helper),'--root',str(self.root),'--package',r['package'],'--version',r['version'],'--sha256',r['sha256'],'--wait-pid',str(os.getpid())],cwd=self.root,creationflags=getattr(subprocess,'DETACHED_PROCESS',0));QTimer.singleShot(300,QCoreApplication.quit)
