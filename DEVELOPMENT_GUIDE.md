@@ -5,35 +5,22 @@ Read this file and `PROJECT_STATE.md` from current `main` before development. `m
 ## Invariants
 Windows ground station: Python + PySide6 + Qt Quick/QML. FPV remains video-first. Unknown telemetry stays unavailable. Camera presets, video profiles and firmware remain separate. Generic ONVIF is not verified OpenIPC. Recovery/fullflash is not a generic install path. Secrets/private signing keys are not repository data.
 
-## UI language and help
-All user-facing UI copy is Ukrainian when a natural Ukrainian equivalent exists. Preserve technical/protocol/product identifiers such as FPV, RTSP, OpenIPC, MAVLink, MSP, CRSF, StabX, Starlink and WireGuard. Interactive controls should use the shared `HoverHint` where explanatory help is useful. Hints appear only after 5000 ms of continuous mouse/touchpad hover, disappear when hover ends, and must describe the actual control behavior without claiming unobserved capability or state.
+## Discovery safety
+Camera discovery is route-aware but not an Internet scanner. Expand only bounded RFC1918 networks with specific acceptable prefixes; never expand default, public, loopback, multicast, link-local, oversized or virtual-adapter routes. Saved and explicitly entered addresses may be checked directly without implying that their subnet is safe to sweep. Keep concurrency, response size and timeouts bounded. Discovery must not depend on ICMP.
 
-## UI navigation
-Keep the product route explicit: Home exposes Devices, Quick Connect, Firmware, Update and Diagnostics; connecting a saved device enters FPV. Quick Connect may enable only saved devices with an actual enabled video stream, but configured stream existence is not evidence of network availability; FPV entry must still use the runtime endpoint check. Service Mode is a separate route for existing management and diagnostic surfaces. Quick Connect must not imply discovery, identity, trust or connectivity that was not observed. Service Mode must not add placeholder StabX, Starlink/WireGuard, pairing peer or hardware-adapter observations. Update UI must delegate to the existing guarded updater instead of bypassing its signature/hash/install gates. UI transitions that stop a decoder must also clear its `MediaPlayer.source`; do not leave a stopped runtime paired with a stale displayed/source binding.
+Preserve the evidence ladder: reachable service -> camera candidate -> verified OpenIPC -> separately evidenced R2D2 compatibility -> observed hardware identity -> observed streams. A generic ONVIF response, hostname hint or open TCP port must never become verified OpenIPC. Do not create a device for an address that supplied no camera/service evidence. OpenIPC identity fields must contain only values actually returned by Majestic/OpenIPC endpoints; absent values stay absent.
+
+## UI language and workflow
+All user-facing UI copy is Ukrainian when a natural Ukrainian equivalent exists. Preserve product/protocol identifiers. Devices should lead with `Знайти камери`; manual IP is a secondary escape hatch that runs the same fingerprint pipeline. Network routes, metrics, fingerprints and raw evidence belong in progressive disclosure, not the primary workflow. Keep the visual language compact, dark, high-contrast and video-first.
 
 ## Telemetry lifecycle
-Normalized telemetry is tri-state where the protocol observation can be absent. Provider/router fallback must expose every normalized field as unavailable (`None`), not synthesize `connected=false`, `health=unavailable`, numeric zero or another plausible value. Protocol runtimes must make the same distinction: before any valid MSP/CRSF frame, `connected` and `health` remain unknown; only after a real previously-observed source ages out may the runtime report disconnected/stale. Stale measurement values are removed. Vehicle diagnostics may warn when connectivity is not confirmed, but must preserve whether `connected` was explicitly false or unknown and must leave missing telemetry health nullable.
+Normalized telemetry is tri-state where the protocol observation can be absent. Provider/router fallback must expose every normalized field as unavailable (`None`), not synthesize plausible values. Stale measurement values are removed.
 
 ## Video lifecycle
-Primary and secondary `VideoRuntime` instances are isolated. A single stream must not be prepared in both decoder roles simultaneously. Primary selection wins conflicts by stopping secondary first; secondary preparation rejects the current primary stream. Disabling PiP stops secondary only.
+Primary and secondary `VideoRuntime` instances are isolated. A single stream must not be prepared in both decoder roles simultaneously. Prepared runtime metadata snapshots fail closed when device, stream or profile data changes. Endpoint check time is reachability timing only, never video latency.
 
-A prepared runtime is valid only while its active-device membership, canonical stream metadata, backing device metadata and referenced video profile still match the detached snapshots captured at prepare time. Normalize RTSP paths identically before storing and comparing snapshots; normalization itself must never make an unchanged source appear stale. Stream/device/profile change signals must reconcile both runtimes. Deletion, disable, active-device changes, endpoint edits and profile edits invalidate the affected runtime and clear old diagnostics metadata. Secondary invalidation disables PiP without stopping a valid primary. Reconnect must fail closed after any such change until the stream is prepared again. Invalid/missing RTSP host, port or path is unavailable and must not trigger a probe. Late player callbacks after stop or source invalidation must not resurrect runtime state. Endpoint check time is reachability timing only, never video latency.
-
-`StreamWorkspace.autoSelect()` is reconciliation, not an unconditional reset: preserve explicit valid selections, replace only missing/disabled roles with actual active streams, and keep role IDs distinct. Backend `VideoWorkspaceRuntime.pipEnabled` is the authoritative PiP state; QML must observe it rather than maintaining an independent writable copy. Backend PiP invalidation must stop UI-side secondary playback/recovery without affecting a valid primary.
-
-Physical dual-decoder capability and performance remain Windows hardware-validation-pending.
-
-## Pairing and links
-Pairing secrets and metadata remain separated and fail-closed; peer proof/exchange requires a verified protocol contract. `LinkDiagnostics` accepts real observations only. Do not infer StabX or Starlink/WireGuard state from names/configuration.
-
-## Firmware and preset execution
-Destructive firmware execution requires prepared approval, unchanged SHA-256 and current verified compatible hardware. Camera presets are separate device configuration, reject video-profile mutation, and require post-apply observation. No generic destructive hardware adapter is permitted before physical validation.
-
-## Next work
-1. Run physical Windows dual-decoder/RTSP validation when target hardware is available.
-2. Connect real StabX and Starlink/WireGuard observers when observations/contracts are available.
-3. Validate firmware/preset executors on physical SSC30KQ / IMX335 targets.
-4. Add Authenticode only when real signing credentials are available.
+## Pairing, links, firmware and presets
+Pairing secrets and metadata remain separated and fail-closed; peer proof/exchange requires a verified protocol contract. `LinkDiagnostics` accepts real observations only. Destructive firmware execution requires prepared approval, unchanged SHA-256 and current verified compatible hardware. Camera presets remain separate from video profiles and require post-apply observation.
 
 ## Workflow
-Inspect actual `main`, test software/tooling paths, synchronize canonical docs after material changes, and never claim CI success without evidence.
+Inspect actual `main`, test software/tooling paths, synchronize canonical docs after material changes, and never claim CI success without evidence. Hardware-dependent validation remains explicit.
