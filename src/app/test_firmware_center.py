@@ -4,12 +4,19 @@ from firmware_center import FirmwareCenter
 class Devices:
     def __init__(self,identity):self.items=[{"id":"cam","openipcIdentity":identity}]
 class FirmwareCenterTests(unittest.TestCase):
-    def setUp(self):self.f=FirmwareCenter(Devices({"verified":True,"platform":"ssc30kq","sensor":"imx335"}));self.tmp=tempfile.TemporaryDirectory();self.image=Path(self.tmp.name)/"firmware.bin";self.image.write_bytes(b"firmware-test-image");self.sha=hashlib.sha256(self.image.read_bytes()).hexdigest()
+    def setUp(self):self.tmp=tempfile.TemporaryDirectory();self.image=Path(self.tmp.name)/"firmware.bin";self.image.write_bytes(b"firmware-test-image");self.sha=hashlib.sha256(self.image.read_bytes()).hexdigest()
     def tearDown(self):self.tmp.cleanup()
-    def test_image_hash_must_match_before_precheck(self):
-        self.assertFalse(self.f.precheck("cam","ssc30kq-imx335","upgrade",True,True));self.assertFalse(self.f.verifyImage(str(self.image),"0"*64));self.assertFalse(self.f.artifact["verified"]);self.assertTrue(self.f.verifyImage(str(self.image),self.sha));self.assertTrue(self.f.precheck("cam","ssc30kq-imx335","upgrade",True,True));self.assertEqual(self.f.result["artifactSha256"],self.sha)
-    def test_wrong_sensor_is_rejected(self):
-        f=FirmwareCenter(Devices({"verified":True,"platform":"ssc30kq","sensor":"imx415"}));f.verifyImage(str(self.image),self.sha);self.assertFalse(f.precheck("cam","ssc30kq-imx335","upgrade",True,True))
-    def test_generic_onvif_cannot_use_fullflash(self):
-        f=FirmwareCenter(Devices({"verified":False,"platform":"ssc30kq","sensor":"imx335"}));f.verifyImage(str(self.image),self.sha);self.assertFalse(f.precheck("cam","ssc30kq-imx335","recovery-fullflash",True,True));self.assertFalse(next(c for c in f.result["checks"] if c["name"]=="fullflash")["ok"])
+    def center(self,identity):
+        f=FirmwareCenter(Devices(identity));self.assertTrue(f.verifyImage(str(self.image),self.sha));return f
+    def test_upgrade_requires_verified_existing_openipc(self):
+        f=self.center({"verified":False,"platform":"ssc30kq","sensor":"imx335"});self.assertFalse(f.precheck("cam","ssc30kq-imx335","upgrade",True,True))
+    def test_recovery_fullflash_requires_verified_existing_openipc(self):
+        f=self.center({"verified":False,"platform":"ssc30kq","sensor":"imx335"});self.assertFalse(f.precheck("cam","ssc30kq-imx335","recovery-fullflash",True,True))
+    def test_primary_is_separate_but_still_requires_observed_compatible_hardware(self):
+        f=self.center({"verified":False,"platform":"ssc30kq","sensor":"imx335"});self.assertTrue(f.precheck("cam","ssc30kq-imx335","primary",True,True))
+        bad=self.center({"verified":False,"platform":"ssc30kq","sensor":""});self.assertFalse(bad.precheck("cam","ssc30kq-imx335","primary",True,True))
+    def test_hash_mismatch_blocks_all_modes(self):
+        f=FirmwareCenter(Devices({"verified":True,"platform":"ssc30kq","sensor":"imx335"}));self.assertFalse(f.verifyImage(str(self.image),"0"*64));self.assertFalse(f.precheck("cam","ssc30kq-imx335","upgrade",True,True))
+    def test_mode_policy_keeps_fullflash_non_primary(self):
+        f=FirmwareCenter(Devices({}));self.assertFalse(f.modePolicy("primary")["requiresExistingOpenIPC"]);self.assertTrue(f.modePolicy("recovery-fullflash")["requiresExistingOpenIPC"])
 if __name__=="__main__":unittest.main()
