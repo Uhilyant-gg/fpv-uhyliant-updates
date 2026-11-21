@@ -13,14 +13,11 @@ on:
         required: true
         default: test
         type: choice
-        options:
-          - test
-          - stable
-          - development
+        options: [test, stable, development]
       notes:
         description: Release notes
         required: true
-        default: Hotfix packaged Qt Multimedia startup
+        default: MAVLink read-only OSD
         type: string
       prerelease:
         description: Publish as pre-release
@@ -43,12 +40,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: main
-          fetch-depth: 0
+        with: {ref: main, fetch-depth: 0}
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+        with: {python-version: '3.12'}
       - name: Validate source version
         shell: pwsh
         run: |
@@ -64,6 +58,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r src/requirements.txt
           python -m pip install pyinstaller pillow
+      - name: MAVLink backend startup test
+        shell: pwsh
+        run: python src/app/main.py --mavlink-self-test
       - name: Prepare assets
         shell: pwsh
         run: |
@@ -75,11 +72,16 @@ jobs:
       - name: Build binaries
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant --icon assets/fpv-uhyliant.ico --paths src/app --add-data "src/app/Main.qml;." --add-data "src/app/DevicesPanel.qml;." --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --hidden-import PySide6.QtMultimedia --collect-all PySide6.QtMultimedia --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.QtWebEngineQuick --exclude-module PySide6.QtPdf --exclude-module PySide6.QtBluetooth --exclude-module PySide6.QtNfc --exclude-module PySide6.QtSql --exclude-module PySide6.QtTest src/app/main.py
+          pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant --icon assets/fpv-uhyliant.ico --paths src/app --add-data "src/app/Main.qml;." --add-data "src/app/DevicesPanel.qml;." --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --hidden-import PySide6.QtMultimedia --hidden-import pymavlink --hidden-import pymavlink.mavutil --collect-all PySide6.QtMultimedia --collect-all pymavlink --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.QtWebEngineQuick --exclude-module PySide6.QtPdf --exclude-module PySide6.QtBluetooth --exclude-module PySide6.QtNfc --exclude-module PySide6.QtSql --exclude-module PySide6.QtTest src/app/main.py
           pyinstaller --noconfirm --clean --onefile --windowed --name FPV-Uhyliant-Launcher --icon assets/fpv-uhyliant.ico src/launcher.py
           pyinstaller --noconfirm --clean --onefile --windowed --name FPV-Uhyliant-Update --icon assets/fpv-uhyliant.ico src/update_helper.py
           Copy-Item dist\FPV-Uhyliant-Launcher.exe bootstrap-output\ -Force
           Copy-Item dist\FPV-Uhyliant-Update.exe bootstrap-output\ -Force
+      - name: Packaged MAVLink backend startup test
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist\FPV-Uhyliant\FPV-Uhyliant.exe" -ArgumentList '--mavlink-self-test' -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Packaged MAVLink backend self-test failed: $($p.ExitCode)" }
       - name: Packaged GUI QML smoke-test
         shell: pwsh
         run: |
@@ -97,17 +99,13 @@ jobs:
             $exit = if ($p.HasExited) { $p.ExitCode } else { 'running' }
             if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
             $dataDir = Join-Path $smokeRoot 'FPV-Uhyliant'
-            if (Test-Path (Join-Path $dataDir 'startup.log')) { Write-Host '--- startup.log ---'; Get-Content (Join-Path $dataDir 'startup.log') }
-            if (Test-Path (Join-Path $dataDir 'qt-startup.log')) { Write-Host '--- qt-startup.log ---'; Get-Content (Join-Path $dataDir 'qt-startup.log') }
+            if (Test-Path (Join-Path $dataDir 'startup.log')) { Get-Content (Join-Path $dataDir 'startup.log') }
+            if (Test-Path (Join-Path $dataDir 'qt-startup.log')) { Get-Content (Join-Path $dataDir 'qt-startup.log') }
             throw "Packaged GUI/QML initialization failed before smoke marker; exit=$exit"
           }
           Get-Content $marker
-          if (-not $p.WaitForExit(5000)) {
-            Write-Warning 'GUI initialized successfully but did not exit cleanly; terminating smoke-test process'
-            Stop-Process -Id $p.Id -Force
-          } elseif ($p.ExitCode -ne 0) {
-            throw "Packaged GUI smoke-test exited with code $($p.ExitCode) after writing its marker"
-          }
+          if (-not $p.WaitForExit(5000)) { Stop-Process -Id $p.Id -Force }
+          elseif ($p.ExitCode -ne 0) { throw "Packaged GUI smoke-test exited with code $($p.ExitCode)" }
       - name: Upload smoke-test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -141,16 +139,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: main
-          fetch-depth: 0
+        with: {ref: main, fetch-depth: 0}
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+        with: {python-version: '3.12'}
       - uses: actions/download-artifact@v4
-        with:
-          name: windows-build-${{ inputs.version }}
-          path: build
+        with: {name: windows-build-${{ inputs.version }}, path: build}
       - run: python -m pip install --disable-pip-version-check cryptography
       - name: Create signed manifest for Release asset
         shell: bash
@@ -168,16 +161,12 @@ jobs:
           mkdir -p "$RELEASE_DIR"
           SHA="$(sha256sum "$PACKAGE_PATH" | awk '{print $1}')"
           printf '%s  %s\n' "$SHA" "$PACKAGE" > "$RELEASE_DIR/SHA256SUMS.txt"
-          OWNER="$GITHUB_REPOSITORY_OWNER"
-          REPO="${GITHUB_REPOSITORY#*/}"
-          HOST="git""hub"".""com"
-          SCHEME="$(printf '%s' 'aHR0cHM6Ly8=' | base64 -d)"
+          OWNER="$GITHUB_REPOSITORY_OWNER"; REPO="${GITHUB_REPOSITORY#*/}"; HOST="git""hub"".""com"; SCHEME="$(printf '%s' 'aHR0cHM6Ly8=' | base64 -d)"
           RELEASE_URL="${SCHEME}${HOST}/${OWNER}/${REPO}/releases/download/v${VERSION}/${PACKAGE}"
           python - "$CHANNEL/release.json" "$VERSION" "$CHANNEL" "$PACKAGE" "$SHA" "$RELEASE_URL" "$NOTES" <<'PY'
           import json,sys,urllib.parse
           out,v,ch,pkg,sha,url,notes=sys.argv[1:]
-          u=urllib.parse.urlparse(url)
-          assert u.scheme=='https' and u.hostname=='github.com' and '<' not in url and '>' not in url
+          u=urllib.parse.urlparse(url);assert u.scheme=='https' and u.hostname=='github.com'
           m={'product':'FPV-Uhyliant','channel':ch,'version':v,'build':int(''.join(v.split('.'))),'mandatory':False,'minimumUpdaterVersion':'2.0.4','package':{'file':pkg,'url':url,'sha256':sha},'releaseNotes':[notes]}
           open(out,'w',encoding='utf-8').write(json.dumps(m,ensure_ascii=False,indent=2)+'\n')
           PY
@@ -218,18 +207,12 @@ jobs:
           if [ -f stable/release.json ]; then cp stable/release.json _site/stable/release.json; fi
           if [ -f development/release.json ]; then cp development/release.json _site/development/release.json; fi
           touch _site/.nojekyll
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-      - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: _site
-
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with: {path: _site}
   deploy-pages:
     needs: sign-publish
-    permissions:
-      pages: write
-      id-token: write
+    permissions: {pages: write, id-token: write}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

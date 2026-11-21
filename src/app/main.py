@@ -13,7 +13,7 @@ def log_startup():
  try:(DATA/'startup.log').write_text(traceback.format_exc(),encoding='utf-8')
  except Exception:pass
 def main():
- a=argparse.ArgumentParser(add_help=False);a.add_argument('--self-test',action='store_true');a.add_argument('--smoke-test',action='store_true');a.add_argument('--smoke-marker');a.add_argument('--install-root');a.add_argument('--startup-token');x,_=a.parse_known_args();here=Path(__file__).resolve().parent
+ a=argparse.ArgumentParser(add_help=False);a.add_argument('--self-test',action='store_true');a.add_argument('--mavlink-self-test',action='store_true');a.add_argument('--smoke-test',action='store_true');a.add_argument('--smoke-marker');a.add_argument('--install-root');a.add_argument('--startup-token');x,_=a.parse_known_args();here=Path(__file__).resolve().parent
  if x.self_test:print(json.dumps({'status':'ok','version':VERSION}));return 0
  from PySide6.QtCore import QUrl,QTimer,qInstallMessageHandler
  from PySide6.QtGui import QGuiApplication,QIcon
@@ -30,12 +30,16 @@ def main():
  from devices import Devices
  from updater_engine import Updater
  from video import VideoRuntime
+ from mavlink_runtime import MavlinkRuntime
  app=QGuiApplication(sys.argv);app.setApplicationName('FPV-Uhyliant');app.setApplicationVersion(VERSION)
+ m=MavlinkRuntime()
+ if x.mavlink_self_test:
+  QTimer.singleShot(350,app.quit);rc=app.exec();m.shutdown();print(json.dumps({'status':'ok','backend':'mavlink','telemetry':'not simulated'}));return rc
  icon=here/'fpv-uhyliant.ico'
  if icon.exists():app.setWindowIcon(QIcon(str(icon)))
- QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();v=VideoRuntime(d);u=Updater(x.install_root,s.canInstallUpdate);e.rootContext().setContextProperty('station',s);e.rootContext().setContextProperty('devicesModel',d);e.rootContext().setContextProperty('videoRuntime',v);e.rootContext().setContextProperty('updater',u);e.rootContext().setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
+ QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();v=VideoRuntime(d);u=Updater(x.install_root,s.canInstallUpdate);e.rootContext().setContextProperty('station',s);e.rootContext().setContextProperty('devicesModel',d);e.rootContext().setContextProperty('videoRuntime',v);e.rootContext().setContextProperty('mavlinkRuntime',m);e.rootContext().setContextProperty('updater',u);e.rootContext().setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
  if not e.rootObjects():raise RuntimeError('QML root object failed to load')
- root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized)
+ app.aboutToQuit.connect(m.shutdown);root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized)
  if x.smoke_test:
   marker=x.smoke_marker or str(DATA/'smoke-test-ok.json');signal_smoke(marker)
   QTimer.singleShot(1500,lambda:os._exit(0))
