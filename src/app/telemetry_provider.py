@@ -1,5 +1,5 @@
 """Normalized read-only telemetry provider boundary and provider selection."""
-from PySide6.QtCore import QObject, Property, Signal, Slot
+from PySide6.QtCore import QObject, Property, QSettings, Signal, Slot
 
 NORMALIZED_FIELDS = (
     "connected", "armed", "flightMode", "batteryVoltage", "current",
@@ -34,8 +34,10 @@ class CrsfProvider(TelemetryProvider):
 class TelemetryRouter(QObject):
     """Stable QML/vehicle-facing provider that can switch read-only backends."""
     changed=Signal()
-    def __init__(self,providers,active="MAVLink"):
-        super().__init__();self._providers={p.name:p for p in providers};self._active=active if active in self._providers else next(iter(self._providers),"")
+    SETTINGS_KEY="telemetry/provider"
+    def __init__(self,providers,active="MAVLink",settings=None):
+        super().__init__();self._providers={p.name:p for p in providers};self._settings=settings or QSettings("FPV-Uhyliant","FPV-Uhyliant")
+        saved=str(self._settings.value(self.SETTINGS_KEY,active) or active);self._active=saved if saved in self._providers else (active if active in self._providers else next(iter(self._providers),""))
         for provider in self._providers.values():provider.changed.connect(self._provider_changed)
     @Property("QStringList",constant=True)
     def providerNames(self):return list(self._providers)
@@ -55,7 +57,7 @@ class TelemetryRouter(QObject):
     @Slot(str,result=bool)
     def select(self,name):
         if name not in self._providers:return False
-        if name!=self._active:self._active=name;self.changed.emit()
+        if name!=self._active:self._active=name;self._settings.setValue(self.SETTINGS_KEY,name);self._settings.sync();self.changed.emit()
         return True
     def _provider_changed(self):
         provider=self.sender()
