@@ -1,6 +1,9 @@
 ---
 on:
   workflow_dispatch:
+concurrency:
+  group: fpv-uhyliant-autonomous-developer
+  cancel-in-progress: false
 permissions:
   contents: read
   issues: read
@@ -12,6 +15,7 @@ tools:
   github:
     toolsets: [default]
 safe-outputs:
+  concurrency-group: fpv-uhyliant-autonomous-safe-outputs
   create-pull-request:
   create-issue:
 ---
