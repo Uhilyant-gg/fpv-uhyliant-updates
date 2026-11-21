@@ -18,12 +18,36 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install cryptography
+          cache: pip
+          cache-dependency-path: src/requirements.txt
+      - name: Install application dependencies
+        run: pip install -r src/requirements.txt
       - name: Compile all Python sources
         run: python -m compileall -q -f src tools
       - name: Run application self-test
         working-directory: src/app
         run: python main.py --self-test
+      - name: Run MAVLink backend self-test
+        working-directory: src/app
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python main.py --mavlink-self-test
+      - name: Load full QML application offscreen
+        working-directory: src/app
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+        run: |
+          marker="$RUNNER_TEMP/fpv-uhyliant-smoke.json"
+          python main.py --smoke-test --smoke-marker "$marker"
+          python - "$marker" <<'PY'
+          import json, pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          payload = json.loads(path.read_text(encoding='utf-8'))
+          if payload.get('status') != 'ok':
+              raise SystemExit(f'invalid smoke marker: {payload}')
+          print('QML smoke test: OK')
+          PY
       - name: Check project version consistency
         shell: python
         run: |
