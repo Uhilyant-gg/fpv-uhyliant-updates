@@ -125,13 +125,17 @@ class OpenIPCFirmwareAcquisition(QObject):
   try:size=int(artifact.get('size'))
   except (TypeError,ValueError):size=0
   if not _official_url(artifact.get('url')) or not expected or size<=0 or size>MAX_FIRMWARE_BYTES:self._set('error','Невалідні метадані прошивки',selection=selection);return False
-  self._set('downloading',selection=selection);self.cache.mkdir(parents=True,exist_ok=True);target=self.cache/('openipc-'+expected[:16]+'.tgz')
+  self._set('downloading',selection=selection)
+  try:self.cache.mkdir(parents=True,exist_ok=True)
+  except OSError as exc:self._set('error','Не вдалося підготувати кеш прошивки: '+str(exc),selection=selection);return False
+  target=self.cache/('openipc-'+expected[:16]+'.tgz')
   if target.is_file() and verify_download(target,artifact):
    if self._selection_current(selection) and self.center.verifyImage(str(target),expected):selection['path']=str(target);self._set('verified',selection=selection);return True
    self._set('stale','Ідентичність пристрою змінилася під час перевірки кешу',selection=selection);return False
   try:target.unlink(missing_ok=True)
   except OSError:pass
-  fd,tmp=tempfile.mkstemp(prefix='openipc-',suffix='.part',dir=self.cache);os.close(fd)
+  try:fd,tmp=tempfile.mkstemp(prefix='openipc-',suffix='.part',dir=self.cache);os.close(fd)
+  except OSError as exc:self._set('error','Не вдалося створити тимчасовий файл прошивки: '+str(exc),selection=selection);return False
   try:
    request=urllib.request.Request(artifact['url'],headers={'Accept':'application/octet-stream','User-Agent':'FPV-Uhyliant/firmware-acquisition'})
    with self.opener(request,timeout=NETWORK_TIMEOUT) as response:data=_read_response(response,size)
