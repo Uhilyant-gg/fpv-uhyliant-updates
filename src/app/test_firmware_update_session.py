@@ -14,6 +14,8 @@ class Credentials:
  def __init__(self,username='root',password='pw'):self.username=username;self.password=password
  def secret(self):return self.password
  def snapshot(self):return {'username':self.username,'hasPassword':bool(self.password)}
+class Preflight:
+ def __init__(self,ready=True):self.readiness={'ready':bool(ready)}
 class SessionTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();image=Path(self.tmp.name)/'fw.bin';image.write_bytes(b'x');self.devices=Devices();center=FirmwareCenter(self.devices);center.verifyImage(str(image),hashlib.sha256(b'x').hexdigest());center.precheck('cam','ssc30kq-imx335','upgrade',True,True);center.prepareExecution('cam','ssc30kq-imx335','upgrade');self.executor=FirmwareExecutor(center);self.probe_calls=[];self.candidate_calls=[]
@@ -23,9 +25,11 @@ class SessionTests(unittest.TestCase):
  def tearDown(self):self.tmp.cleanup()
  def test_disabled_session_cannot_execute(self):self.assertFalse(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.session.result['state'],'hardware-validation-pending')
  def test_authenticated_activation_requires_session_credentials(self):
-  self.assertFalse(self.session.enableAuthenticatedTransport(Credentials(password='')));self.assertFalse(self.session.result['enabled'])
+  preflight=Preflight();self.assertFalse(self.session.enableAuthenticatedTransport(Credentials(password=''),preflight));self.assertFalse(self.session.result['enabled'])
   with patch('firmware_update_session.AuthenticatedCameraTransport') as factory:
-   transport=Transport();factory.return_value=transport;credentials=Credentials();self.assertTrue(self.session.enableAuthenticatedTransport(credentials));factory.assert_called_once_with(credentials);self.assertTrue(self.session.result['enabled']);self.assertNotIn('password',repr(self.session.result).lower())
+   transport=Transport();factory.return_value=transport;credentials=Credentials();self.assertTrue(self.session.enableAuthenticatedTransport(credentials,preflight));factory.assert_called_once_with(credentials);self.assertTrue(self.session.result['enabled']);self.assertNotIn('password',repr(self.session.result).lower())
+ def test_authenticated_activation_requires_ready_preflight(self):
+  credentials=Credentials();self.assertFalse(self.session.enableAuthenticatedTransport(credentials));self.assertFalse(self.session.enableAuthenticatedTransport(credentials,Preflight(False)));self.assertFalse(self.session.result['enabled'])
  def test_disable_transport_returns_to_hardware_pending(self):
   self.assertTrue(self.session.configure_transport(Transport()));self.assertTrue(self.session.disableTransport());self.assertFalse(self.session.result['enabled']);self.assertEqual(self.session.result['state'],'hardware-validation-pending')
  def test_opt_in_transport_authenticates_then_fixed_upgrade(self):
