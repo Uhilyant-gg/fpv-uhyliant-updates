@@ -10,10 +10,11 @@ Item {
  ColumnLayout{anchors.fill:parent;anchors.margins:20;spacing:12
   RowLayout{Layout.fillWidth:true;spacing:10
    Text{text:"ФПВ УХИЛЯНТ";color:fg;font.pixelSize:24;font.bold:true;font.letterSpacing:1}
-   Text{text:"v"+updater.currentVersion;color:sub;font.pixelSize:11}
+   Text{text:"Версія "+updater.currentVersion;color:sub;font.pixelSize:11}
+   Button{visible:updater.updateState==="available"||updater.updateState==="ready";text:updater.updateState==="ready"?"Встановити "+updater.availableVersion:"Оновити до "+updater.availableVersion;font.bold:true;onClicked:root.openUpdate();HoverHint{text:"Доступна нова версія програми."}}
+   Text{visible:updater.busy;text:updater.updateStatus;color:sub;font.pixelSize:11}
    Item{Layout.fillWidth:true}
    Button{text:"Прошивка";flat:true;onClicked:root.openFirmware();HoverHint{text:"Безпечне керування прошивкою камери."}}
-   Button{text:"Оновлення";flat:true;onClicked:root.openUpdate();HoverHint{text:"Перевірити оновлення програми."}}
    Button{text:"Діагностика";flat:true;onClicked:root.openDiagnostics();HoverHint{text:"Переглянути фактично доступну діагностику."}}
   }
   RowLayout{Layout.fillWidth:true;spacing:8
@@ -39,5 +40,6 @@ Item {
     }
    }
   }
+  Component.onCompleted:updater.check()
  }
 }
