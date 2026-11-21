@@ -6,7 +6,6 @@ permissions:
   issues: read
   pull-requests: read
   actions: read
-  copilot-requests: write
 model: router
 network: defaults
 tools:
