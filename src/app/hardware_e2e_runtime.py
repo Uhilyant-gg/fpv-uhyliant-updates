@@ -13,10 +13,10 @@ class HardwareE2ERuntime(QObject):
   if self._selected_device_id:return next((dict(x) for x in items if x.get('id')==self._selected_device_id),{})
   return next((dict(x) for x in items if x.get('active')),next((dict(x) for x in items),{}))
  def _network(self):return ((self.diagnostics.build().get('network') or {}).get('evidence') or {})
- def _firmware(self):return {'artifact':dict(getattr(self.firmware,'artifact',{}) or {}),'plan':dict(getattr(self.firmware,'executionPlan',{}) or {})} if self.firmware is not None else {}
+ def _firmware(self):return {'artifact':dict(getattr(self.firmware,'artifact',{}) or {}),'plan':dict(getattr(self.firmware,'executionPlan',{}) or {}),'approval':dict(getattr(self.firmware,'result',{}) or {})} if self.firmware is not None else {}
  def _identity_key(self):
-  device=self._selected();identity=dict(device.get('openipcIdentity') or {});fw=self._firmware();artifact=fw.get('artifact') or {};plan=fw.get('plan') or {}
-  return (device.get('id') or '',device.get('host') or '',identity.get('platform') or '',identity.get('sensor') or '',artifact.get('sha256') or '',artifact.get('size') or 0,plan.get('approvalToken') or '')
+  device=self._selected();identity=dict(device.get('openipcIdentity') or {});fw=self._firmware();artifact=fw.get('artifact') or {};plan=fw.get('plan') or {};approval=fw.get('approval') or {}
+  return (device.get('id') or '',device.get('host') or '',identity.get('platform') or '',identity.get('sensor') or '',artifact.get('sha256') or '',artifact.get('size') or 0,plan.get('approvalToken') or '',approval.get('approvalToken') or '')
  def _source_changed(self):
   current=self._identity_key()
   if self._host_key_accepted and current!=self._accepted_identity:self._host_key_accepted=False;self._accepted_identity=None
