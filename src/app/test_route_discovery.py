@@ -12,6 +12,9 @@ class RouteDiscoveryTests(unittest.TestCase):
  def test_known_private_host_is_direct_even_without_sweep(self):self.assertEqual(plan_targets([],[],["192.168.1.50"]),["192.168.1.50"])
  def test_real_endpoint_builder_uses_observed_ipv4_and_fixed_paths(self):
   self.assertTrue(_http_url("192.168.1.50","/api/v1/config.json").endswith("192.168.1.50/api/v1/config.json"));self.assertTrue(_http_url("192.168.1.50","/cgi-bin/status.cgi").endswith("192.168.1.50/cgi-bin/status.cgi"));self.assertNotIn("scrubbed",_http_url("192.168.1.50","/cgi-bin/status.cgi"))
+ def test_endpoint_builder_rejects_non_private_reconnect_hosts(self):
+  for host in ("8.8.8.8","100.64.1.2","127.0.0.1","169.254.2.3","224.0.0.1"):
+   with self.assertRaises(ValueError,msg=host):_http_url(host,"/cgi-bin/status.cgi")
  @patch("route_discovery._fetch")
  def test_generic_onvif_or_reachable_host_is_not_openipc(self,fetch):
   fetch.return_value=b"<html>generic camera</html>";r=fingerprint("192.168.1.50",threading.Event());self.assertTrue(r["reachable"]);self.assertFalse(r["openipc"]);self.assertFalse(r["camera"])

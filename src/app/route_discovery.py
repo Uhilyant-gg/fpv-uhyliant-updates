@@ -43,7 +43,7 @@ def system_routes():
  return routes
 def _http_url(host,path):
  address=ipaddress.ip_address(str(host).strip())
- if address.version!=4 or address.is_unspecified or address.is_loopback or address.is_multicast:raise ValueError("unsafe host")
+ if not _private_ipv4(str(address)):raise ValueError("unsafe host")
  scheme=''.join(map(chr,[104,116,116,112,58,47,47]));return scheme+str(address)+path
 def _fetch(url,accept,limit,cancel):
  if cancel.is_set():return None
