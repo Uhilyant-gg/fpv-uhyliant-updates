@@ -1,9 +1,20 @@
 # FPV Uhyliant development guide
 
-Read this file and `PROJECT_STATE.md` from current `main` before development. `main` is the single source of truth.
+Read this file, `PROJECT_STATE.md` and `PRODUCT_UX.md` from current `main` before development. `main` is the single source of truth.
 
 ## Invariants
 Windows ground station: Python + PySide6 + Qt Quick/QML. FPV remains video-first. Unknown telemetry stays unavailable. Camera presets, video profiles and firmware remain separate. Generic ONVIF is not verified OpenIPC. Recovery/fullflash is not a generic install path. Secrets/private signing keys are not repository data.
+
+## Product implementation contract
+Build around user tasks rather than internal subsystems. Once a usable camera is known, FPV/video is the operational home. The normal path targets `launch -> automatic discover/restore -> verified usable camera -> video -> operate`.
+
+Prefer one contextually useful Next Best Action over exposing a subsystem toolbar. User-facing health uses ready / attention / problem / unknown; detailed subsystem states remain internal or progressively disclosed.
+
+Apply the automation budget to every new prompt or control: if trustworthy observed evidence can determine a value or decision safely and unambiguously, automate it instead of asking the operator. Never automate by guessing unknown identity, telemetry, compatibility or success.
+
+Manual IP is fallback to automatic discovery. Advanced contains additional controls for otherwise normal operation. Service Mode contains recovery, manual firmware, fullflash, low-level/developer diagnostics and Hardware E2E validation.
+
+Normal firmware UX exposes the practical device/update decision while catalog, integrity, binding, reboot rediscovery and verification stay internal unless intervention is required. Diagnostics presents the practical problem before technical evidence and offers Fix only for known deterministic non-destructive remediation.
 
 ## Discovery safety
 Camera discovery is route-aware but not an Internet scanner. Expand only bounded RFC1918 networks with specific acceptable prefixes; never expand default, public, loopback, multicast, link-local, oversized or virtual-adapter routes. Saved and explicitly entered addresses may be checked directly without implying that their subnet is safe to sweep. Keep concurrency, response size and timeouts bounded. Discovery must not depend on ICMP. Preserve the evidence ladder: reachable service -> camera candidate -> verified OpenIPC -> separately evidenced R2D2 compatibility -> observed hardware identity -> observed streams.
@@ -17,4 +28,6 @@ A completed SSH/sysupgrade invocation is only `reboot-pending`. Success requires
 Normalized telemetry is tri-state and fallback synthesizes no values. Video runtimes remain isolated and prepared snapshots fail closed after input changes. Pairing secrets and metadata remain separated. Camera presets remain separate from video profiles and require post-apply observation.
 
 ## Workflow
-Inspect actual `main`, test software/tooling paths, synchronize canonical docs after material changes, and never claim CI success without evidence. Hardware-dependent validation remains explicit.
+Inspect actual `main` and all three canonical documents before material product work. Test software/tooling paths and synchronize canonical docs after requirement changes.
+
+Work in one substantial, logically complete batch at a time. After each batch, stop for CI evidence. If CI fails, repair that batch before accumulating further product work. Never claim CI or physical hardware success without evidence. Hardware-dependent validation remains explicit.
