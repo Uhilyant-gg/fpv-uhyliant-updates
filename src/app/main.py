@@ -10,6 +10,19 @@ def log_startup():
  DATA.mkdir(parents=True,exist_ok=True)
  try:(DATA/'startup.log').write_text(traceback.format_exc(),encoding='utf-8')
  except Exception:pass
+def load_main_qml(engine,here,smoke,QUrl):
+ path=here/'Main.qml'
+ if not smoke:engine.load(QUrl.fromLocalFile(str(path)));return
+ source=path.read_text(encoding='utf-8')
+ replacements={
+  'AudioOutput{id:audioOut;muted:true}':'QtObject{id:audioOut;property bool muted:true}',
+  'MediaPlayer{id:player;videoOutput:videoOut;audioOutput:audioOut;onPlayingChanged:{if(playing){videoRecovery.stop();videoRecoveryCount=0;videoRuntime.markPlaying()}else if(videoRuntime.state==="playing"){videoRuntime.markStalled("Основний RTSP несподівано зупинився");videoRecovery.restart()}}onErrorOccurred:function(error,errorString){videoRuntime.playbackError(errorString);if(videoRuntime.streamId!=="")videoRecovery.restart()}}':'QtObject{id:player;property url source:"";readonly property int playbackState:0;function stop(){} function play(){}}',
+  'MediaPlayer{id:secondaryPlayer;videoOutput:secondaryVideoOut;onPlayingChanged:{if(playing){secondaryRecovery.stop();secondaryRecoveryCount=0;secondaryVideoRuntime.markPlaying()}else if(pipEnabled&&secondaryVideoRuntime.state==="playing"){secondaryVideoRuntime.markStalled("Додатковий RTSP несподівано зупинився");secondaryRecovery.restart()}}onErrorOccurred:function(error,errorString){secondaryVideoRuntime.playbackError(errorString);if(pipEnabled&&secondaryVideoRuntime.streamId!=="")secondaryRecovery.restart()}}':'QtObject{id:secondaryPlayer;property url source:"";readonly property int playbackState:0;function stop(){} function play(){}}',
+ }
+ for production,headless in replacements.items():
+  if source.count(production)!=1:raise RuntimeError('QML smoke multimedia boundary is out of sync with Main.qml')
+  source=source.replace(production,headless)
+ engine.loadData(source.encode('utf-8'),QUrl.fromLocalFile(str(here)+os.sep))
 def main():
  a=argparse.ArgumentParser(add_help=False);a.add_argument('--self-test',action='store_true');a.add_argument('--mavlink-self-test',action='store_true');a.add_argument('--smoke-test',action='store_true');a.add_argument('--smoke-marker');a.add_argument('--install-root');a.add_argument('--startup-token');x,_=a.parse_known_args();here=Path(__file__).resolve().parent
  if x.self_test:print(json.dumps({'status':'ok','version':VERSION}));return 0
@@ -52,7 +65,7 @@ def main():
  QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();video=VideoWorkspaceRuntime(d);v=video.primary;secondary=video.secondary;streams=StreamWorkspace(d);fw=FirmwareCenter(d);fwexec=FirmwareExecutor(fw);fwsession=FirmwareUpdateSession(fwexec,d);credentials=CameraCredentials();presets=CameraPresets(d);presetexec=CameraPresetExecutor(presets);links=LinkDiagnostics();backup=StationBackup(d);pairing=PairingRegistry(metadata_store=JsonMetadataStore(DATA/'pairing-trust.json'));telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate)
  d.streamsChanged.connect(streams.autoSelect);streams.autoSelect();pairing.reconcile();ctx=e.rootContext()
  for name,obj in [('station',s),('devicesModel',d),('videoRuntime',v),('secondaryVideoRuntime',secondary),('videoWorkspaceRuntime',video),('streamWorkspace',streams),('firmwareCenter',fw),('firmwareExecutor',fwexec),('firmwareUpdateSession',fwsession),('cameraCredentials',credentials),('cameraPresets',presets),('cameraPresetExecutor',presetexec),('linkDiagnostics',links),('stationBackup',backup),('pairingRegistry',pairing),('mavlinkRuntime',m),('mspSerial',msp_serial),('crsfSerial',crsf_serial),('telemetryRuntime',telemetry),('vehicleRuntime',vehicle),('updater',u)]:ctx.setContextProperty(name,obj)
- ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
+ ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);load_main_qml(e,here,x.smoke_test,QUrl)
  def shutdown():credentials.clear();video.stopAll();links.clear();pairing.clearPending();m.shutdown();msp_serial.stop();crsf_serial.stop()
  if not e.rootObjects():shutdown();raise RuntimeError('QML root object failed to load')
  app.aboutToQuit.connect(shutdown);root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized)
