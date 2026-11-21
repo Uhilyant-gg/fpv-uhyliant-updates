@@ -30,7 +30,7 @@ jobs:
         run: python -m compileall -q -f src tools
       - name: Run application unit tests
         working-directory: src/app
-        run: python -m unittest -v test_telemetry_provider.py test_msp_runtime.py test_crsf_runtime.py test_devices.py
+        run: python -m unittest -v test_*.py
       - name: Run application self-test
         working-directory: src/app
         run: python main.py --self-test

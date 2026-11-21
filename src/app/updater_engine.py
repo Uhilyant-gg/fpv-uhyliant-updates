@@ -30,6 +30,16 @@ def sha(p):
  with p.open('rb') as f:
   for b in iter(lambda:f.read(1048576),b''):h.update(b)
  return h.hexdigest()
+def load_ready(expected_manifest=None):
+ try:r=json.loads((UP/'ready.json').read_text(encoding='utf-8'))
+ except (OSError,ValueError,TypeError) as e:raise RuntimeError('Некоректний стан завантаженого оновлення') from e
+ if not isinstance(r,dict) or not isinstance(r.get('version'),str) or not isinstance(r.get('package'),str):raise RuntimeError('Некоректний стан завантаженого оновлення')
+ vt(r['version']);package=Path(r['package']).resolve()
+ if expected_manifest:
+  pkg=expected_manifest.get('package') or {}
+  if r['version']!=expected_manifest.get('version') or package.name!=pkg.get('file'):raise RuntimeError('Завантажений пакет не відповідає перевіреному manifest')
+  if not package.is_file() or sha(package).lower()!=str(pkg.get('sha256','')).lower():raise RuntimeError('Завантажений пакет змінився після перевірки')
+ return {'version':r['version'],'package':str(package)}
 class W(QThread):
  done=Signal(bool,object);progress=Signal(int,str)
  def __init__(self,a,p):super().__init__();self.a=a;self.p=p
@@ -84,7 +94,9 @@ class Updater(QObject):
   ok,why=self.guard()
   if not ok:self.state='blocked';self.status=why;self.changed.emit();return
   if not self.installReady:self.state='error';self.status='Компонент оновлення недоступний';self.changed.emit();return
-  r=json.loads((UP/'ready.json').read_text(encoding='utf-8'));helper=self.root/'FPV-Uhyliant-Update.exe';subprocess.Popen([str(helper),'--root',str(self.root),'--package',r['package'],'--version',r['version'],'--wait-pid',str(os.getpid())],cwd=self.root,creationflags=getattr(subprocess,'DETACHED_PROCESS',0));QTimer.singleShot(300,QCoreApplication.quit)
+  try:r=load_ready(self.m)
+  except RuntimeError as e:self.state='error';self.status=str(e);self.changed.emit();return
+  helper=self.root/'FPV-Uhyliant-Update.exe';subprocess.Popen([str(helper),'--root',str(self.root),'--package',r['package'],'--version',r['version'],'--wait-pid',str(os.getpid())],cwd=self.root,creationflags=getattr(subprocess,'DETACHED_PROCESS',0));QTimer.singleShot(300,QCoreApplication.quit)
  def _start(self,a,p,s):
   if self.busy:self.status='Операція оновлення вже виконується';self.changed.emit();return
   self.state=a;self.status=s;self.p=0;self.changed.emit();self.progressChanged.emit();w=W(a,p);self.w=w;w.progress.connect(self._prog);w.done.connect(lambda ok,d,current=w:self._done(a,current,ok,d));w.finished.connect(lambda current=w:self._finished(current));w.start()

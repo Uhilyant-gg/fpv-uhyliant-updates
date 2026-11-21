@@ -13,14 +13,17 @@ A vehicle-level runtime and structured diagnostics foundation exists. Protocol t
 
 MAVLink, MSP and CRSF provider adapters now share this boundary. The current application wiring still uses MAVLink by default; selecting and transporting MSP/CRSF is the next integration step.
 
-## MSP
-A read-only MSP v1/v2 parsing/runtime foundation exists for Betaflight/INAV. It uses an explicit telemetry-command allowlist, validates checksums, tracks freshness, decodes received identity/attitude/altitude/analog/GPS telemetry and has parser/runtime CI tests. Serial transport/device selection and hardware validation remain pending.
-
-## CRSF
-A passive read-only CRSF parsing/runtime foundation exists. It validates CRC, tracks freshness, decodes received battery/GPS/link-quality fields and has parser/runtime CI tests. It never transmits CRSF frames. Transport/device integration and hardware validation remain pending.
+## MSP and CRSF
+Read-only MSP v1/v2 and passive CRSF parsing/runtime foundations exist with freshness/checksum/CRC tests. MSP/CRSF serial transport/device selection and hardware validation remain pending.
 
 ## VideoRuntime status
 RTSP runtime tracks checking, ready, playing, reconnecting, stalled and error states, connection attempts and last-event time. Bounded UI recovery and manual reconnect/diagnostics exist. Real-camera validation remains pending.
+
+## Persistence and startup
+SQLite persists devices, streams, video profiles and the active device. CI includes a regression test that reloads the database and verifies active-device persistence/removal. QML startup failures now emit Qt diagnostics to CI and shut down MAVLink cleanly; smoke tests use normal Qt shutdown.
+
+## Updater integrity
+Signed manifest and package SHA-256 verification remain required. Immediately before install, the updater now binds `ready.json` to the currently verified manifest and re-hashes the downloaded package so a changed/stale package is rejected. CI auto-discovers all `test_*.py` unit tests.
 
 ## Camera preset vs video profile
 Camera preset is device/firmware configuration. Video profile belongs to a stream. Video profile is not applied as part of camera flashing.
@@ -37,7 +40,7 @@ BAT/fullflash is only for cameras already running a compatible custom OpenIPC se
 6. Hardware-validate MAVLink, MSP, CRSF, RTSP/OpenIPC, StabX and network behavior when equipment is available.
 
 ## Validation status
-CI is configured to compile Python, run normalized-provider plus MSP/CRSF protocol tests, run application/MAVLink self-tests, load QML offscreen, check version consistency and validate signed test metadata when present. Hardware-dependent validation remains explicitly pending.
+CI compiles Python, automatically runs all application `test_*.py` unit tests, runs application/MAVLink self-tests, loads QML offscreen, checks version consistency and validates signed test metadata when present. Hardware-dependent validation remains explicitly pending. The most recent CI result must still be confirmed independently before it is called successful.
 
 ## Acceptance rule
 No decorative telemetry in production UI. Unknown, absent or stale values are unavailable. New protocol backends begin read-only.
