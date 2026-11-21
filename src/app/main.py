@@ -30,6 +30,7 @@ def main():
  from devices import Devices
  from updater_engine import Updater
  from video import VideoRuntime
+ from firmware_center import FirmwareCenter
  from mavlink_runtime import MavlinkRuntime
  from msp_runtime import MspRuntime
  from crsf_runtime import CrsfRuntime
@@ -42,8 +43,8 @@ def main():
   QTimer.singleShot(350,app.quit);rc=app.exec();m.shutdown();msp_serial.stop();crsf_serial.stop();print(json.dumps({'status':'ok','backend':'mavlink','telemetry':'not simulated'}));return rc
  icon=here/'fpv-uhyliant.ico'
  if icon.exists():app.setWindowIcon(QIcon(str(icon)))
- QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();v=VideoRuntime(d);telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate)
- ctx=e.rootContext();ctx.setContextProperty('station',s);ctx.setContextProperty('devicesModel',d);ctx.setContextProperty('videoRuntime',v);ctx.setContextProperty('mavlinkRuntime',m);ctx.setContextProperty('mspSerial',msp_serial);ctx.setContextProperty('crsfSerial',crsf_serial);ctx.setContextProperty('telemetryRuntime',telemetry);ctx.setContextProperty('vehicleRuntime',vehicle);ctx.setContextProperty('updater',u);ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
+ QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();v=VideoRuntime(d);fw=FirmwareCenter(d);telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate)
+ ctx=e.rootContext();ctx.setContextProperty('station',s);ctx.setContextProperty('devicesModel',d);ctx.setContextProperty('videoRuntime',v);ctx.setContextProperty('firmwareCenter',fw);ctx.setContextProperty('mavlinkRuntime',m);ctx.setContextProperty('mspSerial',msp_serial);ctx.setContextProperty('crsfSerial',crsf_serial);ctx.setContextProperty('telemetryRuntime',telemetry);ctx.setContextProperty('vehicleRuntime',vehicle);ctx.setContextProperty('updater',u);ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
  def shutdown():m.shutdown();msp_serial.stop();crsf_serial.stop()
  if not e.rootObjects():
   shutdown()
