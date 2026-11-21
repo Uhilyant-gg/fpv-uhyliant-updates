@@ -15,6 +15,8 @@ class FirmwareCenterTests(unittest.TestCase):
   f=self.center({"verified":True,"platform":"ssc30kq","sensor":"imx335","firmware":"v1"});r=f.upgradeReadiness("cam");self.assertTrue(r["ready"]);self.assertEqual(r["currentFirmware"],"v1");self.assertEqual(r["argv"],["sysupgrade","-k","-r"])
  def test_approval_bound_to_inputs(self):
   f=self.center({"verified":True,"platform":"ssc30kq","sensor":"imx335"});self.assertTrue(f.precheck("cam","ssc30kq-imx335","upgrade",True,True));self.assertTrue(f.approvalMatches("cam","ssc30kq-imx335","upgrade"));self.assertFalse(f.approvalMatches("cam","ssc30kq-imx335","primary"))
+ def test_host_change_invalidates_approval_and_execution_plan(self):
+  f=self.center({"verified":True,"platform":"ssc30kq","sensor":"imx335"});self.assertTrue(f.precheck("cam","ssc30kq-imx335","upgrade",True,True));f.devices.items[0]["host"]="192.168.1.99";self.assertFalse(f.approvalMatches("cam","ssc30kq-imx335","upgrade"));self.assertFalse(f.prepareExecution("cam","ssc30kq-imx335","upgrade"));self.assertFalse(f.executionPlan["ready"])
  def test_execution_plan_requires_matching_approval(self):
   f=self.center({"verified":True,"platform":"ssc30kq","sensor":"imx335"});self.assertFalse(f.prepareExecution("cam","ssc30kq-imx335","upgrade"));self.assertTrue(f.precheck("cam","ssc30kq-imx335","upgrade",True,True));self.assertTrue(f.prepareExecution("cam","ssc30kq-imx335","upgrade"));self.assertTrue(f.executionPlan["ready"]);self.assertIn("Повторно виявити пристрій",f.executionPlan["steps"]);self.assertIn("Перевірити ідентичність OpenIPC і прошивку",f.executionPlan["steps"])
  def test_fullflash_plan_explicitly_requires_verified_custom_openipc(self):
