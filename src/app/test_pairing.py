@@ -26,7 +26,9 @@ class Meta(MetadataStore):
 class Clock:
  def __call__(self):return 100
 class Tests(unittest.TestCase):
- def test_pairing_requires_both_stores(self):self.assertEqual(PairingRegistry(Store()).begin('Ground','peer'),{});self.assertEqual(PairingRegistry(metadata_store=Meta()).begin('Ground','peer'),{})
+ def test_pairing_requires_both_stores(self):
+  self.assertEqual(PairingRegistry(secret_store=Store(),metadata_store=MetadataStore()).begin('Ground','peer'),{})
+  self.assertEqual(PairingRegistry(secret_store=SecretStore(),metadata_store=Meta()).begin('Ground','peer'),{})
  def test_confirm_failure_preserves_pending_for_retry(self):
   s=Store();m=Meta();r=PairingRegistry(s,m);p=r.begin('Ground','peer');m.fail=True;self.assertFalse(r.confirm(p['id'],True));self.assertEqual(len(r.pending),1);self.assertEqual(s.data,{})
  def test_confirm_persists_metadata_without_secret_bytes(self):
