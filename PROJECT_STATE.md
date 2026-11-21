@@ -6,12 +6,15 @@
 Windows FPV ground station using Python + PySide6 + Qt Quick/QML. Target stacks: ArduPilot, Betaflight and INAV; target telemetry protocols: MAVLink, MSP and CRSF. FPV remains video-first.
 
 ## Runtime architecture
-Normalized telemetry preserves unknown/stale state. Verified OpenIPC identity stays distinct from generic ONVIF. Firmware remains guarded with no generic destructive adapter. Independent primary/secondary video, real-stream-only PiP, camera presets, AES-GCM backup and transactional restore are implemented software-side.
+Normalized telemetry preserves unknown/stale state. Verified OpenIPC identity stays distinct from generic ONVIF. Independent primary/secondary video, real-stream-only PiP, camera presets, AES-GCM backup and transactional restore are implemented software-side.
 
-Read-only link diagnostics now harden the observation boundary itself: network state can be observed without an RTT measurement; malformed, negative, NaN or infinite RTT remains unknown instead of becoming zero or crashing the observer; invalid states discard untrusted measurement fields; stale observations remain explicitly stale while preserving the last actually observed value. StabX and Starlink/WireGuard still require real observers/evidence before their state can be populated.
+Read-only link diagnostics preserve unknown measurements and reject invalid numeric observations. StabX and Starlink/WireGuard still require real observers/evidence before their state can be populated.
+
+## Firmware safety
+Firmware remains guarded with no generic destructive adapter. The executor now revalidates immutable approval, execution-plan identity, artifact SHA-256, device existence and current verified OpenIPC platform/sensor immediately before adapter handoff. The adapter receives detached artifact/plan snapshots rather than live mutable center objects. Post-operation verification remains required. Camera preset execution remains separate from firmware and video profiles.
 
 ## Station pairing
-Pairing has durable non-secret trust metadata persistence through an atomic, versioned JSON metadata store and Windows Credential Manager protected secrets. The dedicated Windows CI integration path has passed. Pairing lifecycle recovery is fail-closed, and reconciliation has explicit success/failure semantics. `PairingPanel.qml` remains trust-management only; peer proof/exchange remains unimplemented because no real protocol contract exists.
+Pairing has durable non-secret trust metadata persistence and Windows Credential Manager protected secrets. Windows CI integration has passed. Pairing recovery is fail-closed. `PairingPanel.qml` remains trust-management only; peer proof/exchange remains unimplemented because no real protocol contract exists.
 
 ## Remaining platform/hardware boundaries
 1. Define/obtain a real pairing peer proof/exchange protocol contract before enabling new-pairing UI.
