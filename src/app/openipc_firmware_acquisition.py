@@ -74,9 +74,9 @@ def _read_response(response,limit):
  if not _official_url(final):raise ValueError('redirected outside official OpenIPC hosts')
  declared=response.headers.get('Content-Length')
  if declared:
-  try:
-   if int(declared)>limit:raise ValueError('response is too large')
+  try:declared_size=int(declared)
   except ValueError as exc:raise ValueError('invalid response size') from exc
+  if declared_size<0 or declared_size>limit:raise ValueError('response is too large')
  data=response.read(limit+1)
  if len(data)>limit:raise ValueError('response is too large')
  return data
@@ -89,7 +89,9 @@ class OpenIPCFirmwareAcquisition(QObject):
  def status(self):return deepcopy(self._status)
  @Property('QVariantList',notify=changed)
  def catalog(self):return deepcopy(self._catalog)
- def _set(self,state,reason='',**extra):self._status={'state':state,'reason':reason,'count':len(self._catalog),'selection':{},**extra};self.changed.emit()
+ def _set(self,state,reason='',selection=None,**extra):
+  if selection is None:selection={}
+  self._status={'state':state,'reason':reason,'count':len(self._catalog),'selection':deepcopy(selection),**extra};self.changed.emit()
  @Slot(result=bool)
  def refresh(self):
   self._set('loading')
@@ -110,7 +112,7 @@ class OpenIPCFirmwareAcquisition(QObject):
   try:size=int(artifact.get('size'))
   except (TypeError,ValueError):size=0
   if not expected or size<=0 or size>MAX_FIRMWARE_BYTES:self._set('error','Невалідні метадані прошивки');return False
-  self._set('downloading',selection={'ready':True,'artifact':deepcopy(artifact)});self.cache.mkdir(parents=True,exist_ok=True);fd,tmp=tempfile.mkstemp(prefix='openipc-',suffix='.part',dir=self.cache);os.close(fd);target=self.cache/('openipc-'+expected[:16]+'.tgz')
+  selection={'ready':True,'artifact':deepcopy(artifact)};self._set('downloading',selection=selection);self.cache.mkdir(parents=True,exist_ok=True);fd,tmp=tempfile.mkstemp(prefix='openipc-',suffix='.part',dir=self.cache);os.close(fd);target=self.cache/('openipc-'+expected[:16]+'.tgz')
   try:
    request=urllib.request.Request(artifact['url'],headers={'Accept':'application/octet-stream','User-Agent':'FPV-Uhyliant/firmware-acquisition'})
    with self.opener(request,timeout=NETWORK_TIMEOUT) as response:data=_read_response(response,size)
@@ -121,7 +123,7 @@ class OpenIPCFirmwareAcquisition(QObject):
   except (OSError,urllib.error.URLError,ValueError,TypeError) as exc:
    try:Path(tmp).unlink(missing_ok=True)
    except OSError:pass
-   self._set('error',str(exc));return False
-  self._set('verified',selection={'ready':True,'artifact':deepcopy(artifact),'path':str(target)});return True
+   self._set('error',str(exc),selection=selection);return False
+  selection['path']=str(target);self._set('verified',selection=selection);return True
  @Slot()
  def reset(self):self._catalog=[];self._set('idle')
