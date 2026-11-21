@@ -8,8 +8,7 @@ class FirmwareUpdateLifecycle:
  def verify_after_reboot(self,attempts=30,interval=2.0):
   started=self.executor.beginRediscovery()
   if not started:return False
-  context,nonce=started
-  before=context.get('before') or {}
+  context,nonce=started;before=context.get('before') or {}
   if not _private_candidate(context.get('host','')):return self.executor.failRediscovery(nonce)
   if not str(before.get('platform','')).strip() or not str(before.get('sensor','')).strip():return self.executor.failRediscovery(nonce)
   try:result=self.rediscovery.wait(context['host'],attempts,interval,before)
@@ -19,7 +18,7 @@ class FirmwareUpdateLifecycle:
   if not _private_candidate(host):return self.executor.failRediscovery(nonce)
   profile=SUPPORTED_PROFILES.get(context['profile'])
   if not isinstance(profile,dict) or not profile:return self.executor.failRediscovery(nonce)
-  try:verification=verify_post_flash(before,result.get('identity') or {},profile,'')
+  try:verification=verify_post_flash(before,result.get('identity') or {},profile,context.get('expectedFirmware',''))
   except Exception:return self.executor.failRediscovery(nonce)
   verification['rediscoveredHost']=host
   return self.executor.acceptRediscoveredVerification(result,verification,nonce)

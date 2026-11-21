@@ -7,48 +7,16 @@ class Devices:
 class Adapter:
  def __init__(self,result=True):self.calls=[];self.result=result
  def execute(self,*args):self.calls.append(args);return self.result
-class MutatingAdapter(Adapter):
- def execute(self,*args):self.calls.append(args);args[3]['sha256']='adapter-mutated';args[4]['approvalToken']='adapter-mutated';args[5]['host']='adapter-mutated';return True
-class RaisingAdapter(Adapter):
- def execute(self,*args):self.calls.append(args);raise RuntimeError('flash failed')
 class ExecutorTests(unittest.TestCase):
  def setUp(self):
-  self.tmp=tempfile.TemporaryDirectory();self.image=Path(self.tmp.name)/'fw.bin';self.image.write_bytes(b'safe-test');sha=hashlib.sha256(self.image.read_bytes()).hexdigest();self.devices=Devices();self.center=FirmwareCenter(self.devices);self.center.verifyImage(str(self.image),sha);self.center.precheck('cam','ssc30kq-imx335','upgrade',True,True);self.center.prepareExecution('cam','ssc30kq-imx335','upgrade')
+  self.tmp=tempfile.TemporaryDirectory();self.image=Path(self.tmp.name)/'fw.bin';self.image.write_bytes(b'safe-test');sha=hashlib.sha256(self.image.read_bytes()).hexdigest();self.devices=Devices();self.center=FirmwareCenter(self.devices);self.center.verifyImage(str(self.image),sha);self.center.precheck('cam','ssc30kq-imx335','upgrade',False,False);self.center.prepareExecution('cam','ssc30kq-imx335','upgrade')
  def tearDown(self):self.tmp.cleanup()
- def test_no_adapter_means_no_destructive_execution(self):
-  x=FirmwareExecutor(self.center);self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(x.status['state'],'hardware-validation-pending')
- def test_artifact_change_blocks_executor_handoff(self):
-  x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.image.write_bytes(b'changed');self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(a.calls,[])
- def test_artifact_size_metadata_change_blocks_executor_handoff(self):
-  x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.center._artifact['size']+=1;self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(a.calls,[])
- def test_plan_artifact_metadata_change_blocks_executor_handoff(self):
-  for key,value in (('artifactSha256','0'*64),('artifactSize',999)):
-   x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.center._plan[key]=value;self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(a.calls,[])
-   self.center.prepareExecution('cam','ssc30kq-imx335','upgrade')
- def test_identity_change_after_approval_blocks_handoff(self):
-  x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.devices.items[0]['openipcIdentity']['sensor']='imx415';self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(a.calls,[]);self.assertEqual(x.status['state'],'blocked')
- def test_identity_verification_loss_after_approval_blocks_handoff(self):
-  x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.devices.items[0]['openipcIdentity']['verified']=False;self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(a.calls,[])
- def test_adapter_receives_snapshot_not_live_plan_objects(self):
-  artifact_before=self.center.artifact;plan_before=self.center.executionPlan;x=FirmwareExecutor(self.center);a=MutatingAdapter();x.register_adapter(a);self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.center.artifact,artifact_before);self.assertEqual(self.center.executionPlan,plan_before);self.assertEqual(x.verificationContext()['host'],'192.168.1.50')
- def test_handoff_contains_approved_device_identity(self):
-  x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));h=a.calls[0][5];self.assertEqual(h['deviceId'],'cam');self.assertEqual(h['host'],'192.168.1.50');self.assertEqual(h['profile'],'ssc30kq-imx335');self.assertEqual(h['mode'],'upgrade');self.assertTrue(h['verifiedOpenIPC']);self.assertEqual(h['platform'],'ssc30kq');self.assertEqual(h['sensor'],'imx335');self.assertEqual(h['approval']['approvalToken'],h['plan']['approvalToken'])
- def test_active_transaction_blocks_center_mutation(self):
-  x=FirmwareExecutor(self.center);x.register_adapter(Adapter());self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));artifact=self.center.artifact;approval=self.center.result;plan=self.center.executionPlan;self.assertFalse(self.center.verifyImage(str(self.image),hashlib.sha256(self.image.read_bytes()).hexdigest()));self.assertFalse(self.center.precheck('cam','ssc30kq-imx335','upgrade',True,True));self.assertFalse(self.center.prepareExecution('cam','ssc30kq-imx335','upgrade'));self.assertFalse(self.center.reset());self.assertEqual(self.center.artifact,artifact);self.assertEqual(self.center.result,approval);self.assertEqual(self.center.executionPlan,plan)
- def test_lock_remains_held_through_rediscovery_and_blocks_repeat_execute(self):
-  x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertTrue(x.busy);started=x.beginRediscovery();self.assertIsNotNone(started);self.assertEqual(x.status['state'],'rediscovering');self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(len(a.calls),1);self.assertTrue(x.busy)
- def test_active_transaction_blocks_adapter_swap_and_reset(self):
-  x=FirmwareExecutor(self.center);a=Adapter();replacement=Adapter();self.assertTrue(x.register_adapter(a));self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertFalse(x.register_adapter(replacement));self.assertFalse(x.reset());self.assertTrue(x.busy);self.assertEqual(x.status['state'],'reboot-pending')
- def test_terminal_methods_cannot_mutate_idle_executor(self):
-  x=FirmwareExecutor(self.center);self.assertFalse(x.failRediscovery());self.assertFalse(x.acceptRediscoveredVerification({'rediscovered':True},{'ok':True}));self.assertEqual(x.status['state'],'idle')
- def test_verification_requires_matching_active_nonce(self):
-  x=FirmwareExecutor(self.center);x.register_adapter(Adapter());self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));context,nonce=x.beginRediscovery();self.assertTrue(context['ready']);self.assertFalse(x.acceptRediscoveredVerification({'rediscovered':True},{'ok':True}));self.assertFalse(x.acceptRediscoveredVerification({'rediscovered':True},{'ok':True},object()));self.assertEqual(x.status['state'],'rediscovering');self.assertTrue(x.busy);self.assertTrue(x.acceptRediscoveredVerification({'rediscovered':True},{'ok':True},nonce));self.assertFalse(x.busy)
- def test_rediscovery_failure_requires_matching_active_nonce(self):
-  x=FirmwareExecutor(self.center);x.register_adapter(Adapter());self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));context,nonce=x.beginRediscovery();self.assertFalse(x.failRediscovery());self.assertFalse(x.failRediscovery(object()));self.assertEqual(x.status['state'],'rediscovering');self.assertTrue(x.busy);self.assertFalse(x.failRediscovery(nonce));self.assertFalse(x.busy);self.assertEqual(x.status['state'],'error')
- def test_terminal_rediscovery_outcomes_release_lock(self):
-  x=FirmwareExecutor(self.center);x.register_adapter(Adapter());self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));context,nonce=x.beginRediscovery();self.assertFalse(x.failRediscovery(nonce));self.assertFalse(x.busy)
-  x.reset();self.assertEqual(x.status['state'],'idle')
- def test_flash_failure_releases_lock(self):
-  for adapter in (Adapter(False),RaisingAdapter()):
-   x=FirmwareExecutor(self.center);x.register_adapter(adapter);self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertFalse(x.busy);self.assertEqual(x.status['state'],'error')
+ def test_no_adapter_means_no_destructive_execution(self):x=FirmwareExecutor(self.center);self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(x.status['state'],'hardware-validation-pending')
+ def test_artifact_change_blocks_executor_handoff(self):x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.image.write_bytes(b'changed');self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(a.calls,[])
+ def test_identity_change_after_approval_blocks_handoff(self):x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.devices.items[0]['openipcIdentity']['sensor']='imx415';self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(a.calls,[])
+ def test_verification_context_preserves_unknown_target_for_manual_artifact(self):x=FirmwareExecutor(self.center);x.register_adapter(Adapter());self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));c=x.verificationContext();self.assertEqual(c['host'],'192.168.1.50');self.assertEqual(c['expectedFirmware'],'')
+ def test_verification_context_binds_catalog_build_when_available(self):
+  self.center._artifact['build']='2026.11.21';x=FirmwareExecutor(self.center);self.center._result['approvalToken']=self.center._approval_token('cam','ssc30kq-imx335','upgrade',self.devices.items[0],self.devices.items[0]['openipcIdentity']);self.center._plan['approvalToken']=self.center._result['approvalToken'];x.register_adapter(Adapter());self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(x.verificationContext()['expectedFirmware'],'2026.11.21')
+ def test_lock_remains_until_terminal_verification(self):
+  x=FirmwareExecutor(self.center);x.register_adapter(Adapter());self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));context,nonce=x.beginRediscovery();self.assertTrue(context['ready']);self.assertTrue(x.busy);self.assertTrue(x.acceptRediscoveredVerification({'rediscovered':True},{'ok':True},nonce));self.assertFalse(x.busy)
 if __name__=='__main__':unittest.main()

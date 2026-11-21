@@ -47,16 +47,14 @@ class FirmwareExecutor(QObject):
   if self._adapter is None:self._set('hardware-validation-pending',deviceId=device_id,profile=profile,mode=mode,step='executor',error='Апаратний адаптер виконавця не підключений');return False
   handoff['host']=str(device.get('host','')).strip();handoff['platform']=str(identity.get('platform','')).strip().lower();handoff['sensor']=str(identity.get('sensor','')).strip().lower();handoff['verifiedOpenIPC']=True
   self._handoff=deepcopy(handoff);self._locked_device=device_id;self._set('executing',deviceId=device_id,profile=profile,mode=mode,step='flash',error='',verification={})
-  try:
-   ok=bool(self._adapter.execute(device_id,profile,mode,deepcopy(handoff['artifact']),deepcopy(handoff['plan']),deepcopy(handoff)))
-  except Exception:
-   self._set('error',step='flash',error='Виконавець повідомив про помилку');self._release_lock();return False
+  try:ok=bool(self._adapter.execute(device_id,profile,mode,deepcopy(handoff['artifact']),deepcopy(handoff['plan']),deepcopy(handoff)))
+  except Exception:self._set('error',step='flash',error='Виконавець повідомив про помилку');self._release_lock();return False
   if not ok:self._set('error',step='flash',error='Виконавець повідомив про помилку');self._release_lock();return False
   self._set('reboot-pending',step='rediscover',error='');return True
  def verificationContext(self):
   if self._state.get('state')!='reboot-pending' or not self._handoff:return {'ready':False}
-  host=str(self._handoff.get('host','')).strip()
-  return {'ready':bool(host),'host':host,'profile':self._handoff.get('profile',''),'before':deepcopy(self._before)}
+  host=str(self._handoff.get('host','')).strip();artifact=self._handoff.get('artifact') or {};target=str(artifact.get('build','')).strip()
+  return {'ready':bool(host),'host':host,'profile':self._handoff.get('profile',''),'before':deepcopy(self._before),'expectedFirmware':target}
  def beginRediscovery(self):
   if not self._locked_device or self._state.get('state')!='reboot-pending' or not self._handoff:return None
   context=self.verificationContext()
