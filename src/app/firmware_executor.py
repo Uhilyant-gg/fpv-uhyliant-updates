@@ -3,7 +3,6 @@ import hashlib
 from copy import deepcopy
 from PySide6.QtCore import QObject,Property,Signal,Slot
 from firmware_center import SUPPORTED_PROFILES
-from post_flash_verify import verify_post_flash
 class FirmwareExecutor(QObject):
  changed=Signal()
  def __init__(self,firmware_center):super().__init__();self.center=firmware_center;self._adapter=None;self._locked_device='';self._before={};self._handoff={};self._state=self._idle()
@@ -27,8 +26,7 @@ class FirmwareExecutor(QObject):
   plan=deepcopy(self.center.executionPlan);artifact=deepcopy(self.center.artifact);approval=deepcopy(self.center.result)
   if not plan.get('ready') or not self.center.approvalMatches(device_id,profile,mode):return None
   if approval.get('deviceId')!=device_id or approval.get('profile')!=profile or approval.get('mode')!=mode:return None
-  if plan.get('approvalToken')!=approval.get('approvalToken') or not plan.get('approvalToken'):return None
-  if not self._rehash():return None
+  if plan.get('approvalToken')!=approval.get('approvalToken') or not plan.get('approvalToken') or not self._rehash():return None
   return {'deviceId':device_id,'profile':profile,'mode':mode,'artifact':artifact,'plan':plan,'approval':approval}
  @Slot(str,str,str,result=bool)
  def execute(self,device_id,profile,mode):
@@ -45,16 +43,17 @@ class FirmwareExecutor(QObject):
   self._handoff=handoff;self._locked_device=device_id;self._set('executing',deviceId=device_id,profile=profile,mode=mode,step='flash',error='',verification={})
   try:
    ok=bool(self._adapter.execute(device_id,profile,mode,deepcopy(handoff['artifact']),deepcopy(handoff['plan'])));self._set('reboot-pending' if ok else 'error',step='rediscover' if ok else 'flash',error='' if ok else 'Виконавець повідомив про помилку');return ok
-  except Exception as exc:self._set('error',step='flash',error=str(exc));return False
+  except Exception:self._set('error',step='flash',error='Виконавець повідомив про помилку');return False
   finally:self._locked_device='';self.changed.emit()
- @Slot('QVariantMap',str,result=bool)
- def verifyObserved(self,observed,expected_firmware=''):
-  if self._state.get('state')!='reboot-pending' or not self._handoff:return False
-  profile=SUPPORTED_PROFILES.get(self._handoff.get('profile'),{});result=verify_post_flash(self._before,dict(observed or {}),profile,expected_firmware);self._set('verified' if result['ok'] else 'error',step='verify',verification=result,error='' if result['ok'] else 'Перевірка після операції не пройдена');return bool(result['ok'])
- @Slot(bool,bool,result=bool)
- def completeVerification(self,rediscovered,identity_verified):
-  if self._state.get('state')!='reboot-pending':return False
-  ok=bool(rediscovered and identity_verified);self._set('verified' if ok else 'error',step='verify',error='' if ok else 'Перевірка після операції не пройдена');return ok
+ def verificationContext(self):
+  if self._state.get('state')!='reboot-pending' or not self._handoff:return {'ready':False}
+  device=self._device(self._handoff.get('deviceId'));host=str((device or {}).get('host','')).strip()
+  return {'ready':bool(host),'host':host,'profile':self._handoff.get('profile',''),'before':deepcopy(self._before)}
+ def failRediscovery(self):self._set('error',step='rediscover',error='Підтверджену OpenIPC не виявлено після перезапуску',verification={});return False
+ def acceptRediscoveredVerification(self,rediscovery,verification):
+  if self._state.get('state')!='reboot-pending' or not rediscovery.get('rediscovered'):return False
+  result=deepcopy(verification or {});result['rediscoveryAttempts']=rediscovery.get('attempts',0)
+  ok=bool(result.get('ok'));self._set('verified' if ok else 'error',step='verify',verification=result,error='' if ok else 'Перевірка після операції не пройдена');return ok
  @Slot()
  def reset(self):
   if not self._locked_device:self._before={};self._handoff={};self._state=self._idle();self.changed.emit()
