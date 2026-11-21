@@ -24,12 +24,16 @@ class FirmwareUpdateSession(QObject):
  @Slot(QObject,QObject,result=bool)
  def enableAuthenticatedTransport(self,credentials,preflight=None):
   if self.executor.busy or credentials is None or preflight is None:return False
-  try:
-   readiness=preflight.readiness
-   snapshot=credentials.snapshot()
+  try:readiness=preflight.readiness;snapshot=credentials.snapshot()
   except Exception:return False
   if not isinstance(readiness,dict) or readiness.get('ready') is not True:return False
   if not isinstance(snapshot,dict) or not str(snapshot.get('username','')).strip() or snapshot.get('hasPassword') is not True:return False
+  expected=(readiness.get('host'),readiness.get('platform'),readiness.get('sensor'))
+  device=next((dict(d) for d in self.devices.items if d.get('active')),None)
+  if device is None:return False
+  identity=dict(device.get('openipcIdentity') or {})
+  current=(device.get('host'),identity.get('platform'),identity.get('sensor'))
+  if current!=expected or identity.get('verified') is not True:return False
   return self.configure_transport(AuthenticatedCameraTransport(credentials))
  @Slot(result=bool)
  def disableTransport(self):return self.configure_transport(None)

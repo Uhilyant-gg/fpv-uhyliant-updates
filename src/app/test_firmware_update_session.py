@@ -5,7 +5,7 @@ from firmware_center import FirmwareCenter
 from firmware_executor import FirmwareExecutor
 from firmware_update_session import FirmwareUpdateSession
 class Devices:
- def __init__(self):self.items=[{'id':'cam','host':'192.168.1.50','openipcIdentity':{'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'old','evidence':['Majestic /api/v1/config.json']}}]
+ def __init__(self):self.items=[{'id':'cam','active':True,'host':'192.168.1.50','openipcIdentity':{'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'old','evidence':['Majestic /api/v1/config.json']}}]
 class Transport:
  def __init__(self,auth=True):self.auth=auth;self.calls=[]
  def authenticate(self,host):self.calls.append(('auth',host));return self.auth
@@ -15,7 +15,7 @@ class Credentials:
  def secret(self):return self.password
  def snapshot(self):return {'username':self.username,'hasPassword':bool(self.password)}
 class Preflight:
- def __init__(self,ready=True):self.readiness={'ready':bool(ready)}
+ def __init__(self,ready=True,host='192.168.1.50',platform='ssc30kq',sensor='imx335'):self.readiness={'ready':bool(ready),'host':host,'platform':platform,'sensor':sensor}
 class SessionTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();image=Path(self.tmp.name)/'fw.bin';image.write_bytes(b'x');self.devices=Devices();center=FirmwareCenter(self.devices);center.verifyImage(str(image),hashlib.sha256(b'x').hexdigest());center.precheck('cam','ssc30kq-imx335','upgrade',True,True);center.prepareExecution('cam','ssc30kq-imx335','upgrade');self.executor=FirmwareExecutor(center);self.probe_calls=[];self.candidate_calls=[]
@@ -30,6 +30,8 @@ class SessionTests(unittest.TestCase):
    transport=Transport();factory.return_value=transport;credentials=Credentials();self.assertTrue(self.session.enableAuthenticatedTransport(credentials,preflight));factory.assert_called_once_with(credentials);self.assertTrue(self.session.result['enabled']);self.assertNotIn('password',repr(self.session.result).lower())
  def test_authenticated_activation_requires_ready_preflight(self):
   credentials=Credentials();self.assertFalse(self.session.enableAuthenticatedTransport(credentials));self.assertFalse(self.session.enableAuthenticatedTransport(credentials,Preflight(False)));self.assertFalse(self.session.result['enabled'])
+ def test_preflight_identity_must_still_match_live_device(self):
+  credentials=Credentials();self.assertFalse(self.session.enableAuthenticatedTransport(credentials,Preflight(host='192.168.1.99')));self.assertFalse(self.session.result['enabled']);self.devices.items[0]['openipcIdentity']['sensor']='imx415';self.assertFalse(self.session.enableAuthenticatedTransport(credentials,Preflight()));self.assertFalse(self.session.result['enabled'])
  def test_disable_transport_returns_to_hardware_pending(self):
   self.assertTrue(self.session.configure_transport(Transport()));self.assertTrue(self.session.disableTransport());self.assertFalse(self.session.result['enabled']);self.assertEqual(self.session.result['state'],'hardware-validation-pending')
  def test_opt_in_transport_authenticates_then_fixed_upgrade(self):
