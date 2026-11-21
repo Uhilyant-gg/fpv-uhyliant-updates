@@ -91,13 +91,14 @@ class Devices(LegacyDevices):
     def addDiscovered(self,host,name,verified):
         candidate=next((x for x in self._discovered if x.get("host")==host),None)
         if not candidate and self._manual_result.get("host")==host:candidate=self._manual_result
-        if not candidate or not candidate.get("openipc") or not verified:return ""
+        identity=normalize_openipc_identity(candidate.get("identity",{}),candidate.get("evidence",[])) if candidate else normalize_openipc_identity()
+        if not candidate or not candidate.get("openipc") or not candidate.get("identityVerified") or not identity.get("verified"):return ""
         self._remember_host(host,True)
         existing=next((x for x in self._items if x.get("host")==host),None)
         if existing:return existing["id"]
         did=self.addDevice(name or "OpenIPC "+host,"OpenIPC",host,80,"Network","")
         if not did:return ""
-        identity=normalize_openipc_identity(candidate.get("identity",{}),candidate.get("evidence",[]));self._save_identity(did,identity)
+        self._save_identity(did,identity)
         for stream in candidate.get("streams",[]):self.addStream(did,stream.get("name","Відео"),stream.get("name","main"),int(stream.get("port",554)),stream.get("path","/"),stream.get("protocol","rtsp"))
         self._load();self.changed.emit();return did
 
