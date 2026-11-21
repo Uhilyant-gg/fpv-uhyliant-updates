@@ -15,23 +15,25 @@ class Credentials(Obj):
  def __init__(self):super().__init__();self.password=True
  def snapshot(self):return {'hasPassword':self.password}
 class Devices(Obj):
- def __init__(self):
-  super().__init__();self._items=[{'id':'cam','active':True,'host':'192.168.1.50','openipcIdentity':{'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'old','evidence':['OpenIPC status.cgi']}},{'id':'cam2','active':False,'host':'192.168.1.51','openipcIdentity':{'verified':True,'platform':'ssc30kq','sensor':'imx415','firmware':'old','evidence':['OpenIPC status.cgi']}}]
+ def __init__(self):super().__init__();self._items=[{'id':'cam','active':True,'host':'192.168.1.50','openipcIdentity':{'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'old','evidence':['OpenIPC status.cgi']}},{'id':'cam2','active':False,'host':'192.168.1.51','openipcIdentity':{'verified':True,'platform':'ssc30kq','sensor':'imx415','firmware':'old','evidence':['OpenIPC status.cgi']}}]
+class Firmware(Obj):
+ def __init__(self):super().__init__();self.artifact={'verified':True,'sha256':'a'*64,'size':100,'build':'new'};self.executionPlan={'ready':True,'deviceId':'cam','profile':'ssc30kq-imx335','mode':'upgrade','approvalToken':'approval'}
 class Tests(unittest.TestCase):
  def make(self):
-  devices=Devices();diagnostics=Diagnostics();credentials=Credentials();return HardwareE2ERuntime(devices,diagnostics,credentials),devices,diagnostics,credentials
+  devices=Devices();diagnostics=Diagnostics();credentials=Credentials();firmware=Firmware();return HardwareE2ERuntime(devices,diagnostics,credentials,firmware),devices,diagnostics,credentials,firmware
  def test_host_key_is_explicit_last_gate(self):
-  r,_,_,_=self.make();self.assertFalse(r.readiness['ready']);self.assertIn('hostKeyAccepted',r.readiness['missing']);r.setHostKeyAccepted(True);self.assertTrue(r.readiness['ready'])
- def test_preflight_export_uses_sanitized_diagnostics_boundary(self):
-  r,_,_,_=self.make();self.assertEqual(r.exportPreflight(),'bundle.json')
+  r,_,_,_,_=self.make();self.assertFalse(r.readiness['ready']);self.assertIn('hostKeyAccepted',r.readiness['missing']);r.setHostKeyAccepted(True);self.assertTrue(r.readiness['ready'])
+ def test_preflight_export_uses_sanitized_diagnostics_boundary(self):r,_,_,_,_=self.make();self.assertEqual(r.exportPreflight(),'bundle.json')
  def test_host_key_confirmation_is_bound_to_selected_device_identity(self):
-  r,devices,_,_=self.make();r.setHostKeyAccepted(True);self.assertTrue(r.hostKeyAccepted);devices._items[0]['host']='192.168.1.51';devices.changed.emit();self.assertFalse(r.hostKeyAccepted);self.assertFalse(r.readiness['ready'])
+  r,devices,_,_,_=self.make();r.setHostKeyAccepted(True);self.assertTrue(r.hostKeyAccepted);devices._items[0]['host']='192.168.1.51';devices.changed.emit();self.assertFalse(r.hostKeyAccepted);self.assertFalse(r.readiness['ready'])
  def test_platform_or_sensor_change_invalidates_confirmation(self):
-  r,devices,_,_=self.make();r.setHostKeyAccepted(True);devices._items[0]['openipcIdentity']['sensor']='imx415';devices.changed.emit();self.assertFalse(r.hostKeyAccepted);self.assertIn('hostKeyAccepted',r.readiness['missing'])
+  r,devices,_,_,_=self.make();r.setHostKeyAccepted(True);devices._items[0]['openipcIdentity']['sensor']='imx415';devices.changed.emit();self.assertFalse(r.hostKeyAccepted);self.assertIn('hostKeyAccepted',r.readiness['missing'])
  def test_explicit_firmware_selection_binds_preflight_to_same_device(self):
-  r,_,_,_=self.make();r.selectDevice('cam2');self.assertEqual(r.readiness['host'],'192.168.1.51');self.assertEqual(r.readiness['sensor'],'imx415');r.setHostKeyAccepted(True);self.assertTrue(r.readiness['ready'])
+  r,_,_,_,firmware=self.make();firmware.executionPlan['deviceId']='cam2';r.selectDevice('cam2');self.assertEqual(r.readiness['host'],'192.168.1.51');r.setHostKeyAccepted(True);self.assertTrue(r.readiness['ready'])
  def test_changing_firmware_selection_revokes_host_key_confirmation(self):
-  r,_,_,_=self.make();r.selectDevice('cam2');r.setHostKeyAccepted(True);self.assertTrue(r.hostKeyAccepted);r.selectDevice('cam');self.assertFalse(r.hostKeyAccepted);self.assertFalse(r.readiness['ready'])
+  r,_,_,_,firmware=self.make();r.setHostKeyAccepted(True);self.assertTrue(r.hostKeyAccepted);firmware.artifact['sha256']='b'*64;firmware.changed.emit();self.assertFalse(r.hostKeyAccepted);self.assertFalse(r.readiness['ready'])
+ def test_execution_plan_change_revokes_host_key_confirmation(self):
+  r,_,_,_,firmware=self.make();r.setHostKeyAccepted(True);firmware.executionPlan['approvalToken']='changed';firmware.changed.emit();self.assertFalse(r.hostKeyAccepted)
  def test_unknown_explicit_selection_fails_closed(self):
-  r,_,_,_=self.make();r.selectDevice('missing');self.assertFalse(r.readiness['ready']);self.assertIsNone(r.readiness['host'])
+  r,_,_,_,_=self.make();r.selectDevice('missing');self.assertFalse(r.readiness['ready']);self.assertIsNone(r.readiness['host'])
 if __name__=='__main__':unittest.main()
