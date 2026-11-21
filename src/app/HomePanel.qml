@@ -9,7 +9,7 @@ Item {
  Rectangle{anchors.fill:parent;color:"#08111b"}
  ColumnLayout{anchors.fill:parent;anchors.margins:28;spacing:22
   RowLayout{Layout.fillWidth:true
-   ColumnLayout{spacing:3;Text{text:"ФПВ УХИЛЯНТ";color:fg;font.pixelSize:28;font.bold:true;letterSpacing:1}Text{text:"Відео передусім";color:sub;font.pixelSize:13}}
+   ColumnLayout{spacing:3;Text{text:"ФПВ УХИЛЯНТ";color:fg;font.pixelSize:28;font.bold:true;font.letterSpacing:1}Text{text:"Відео передусім";color:sub;font.pixelSize:13}}
    Item{Layout.fillWidth:true}
    Rectangle{width:110;height:32;radius:16;color:surface;Text{anchors.centerIn:parent;text:"v"+updater.currentVersion;color:sub;font.pixelSize:12}}
   }
@@ -21,10 +21,10 @@ Item {
    Button{id:updateButton;text:"Оновлення";flat:true;onClicked:root.openUpdate();HoverHint{text:"Перевірити оновлення програми."}}
    Button{id:diagnosticsButton;text:"Діагностика";flat:true;onClicked:root.openDiagnostics();HoverHint{text:"Переглянути фактично доступну діагностику."}}
   }
-  RowLayout{Layout.fillWidth:true;Text{text:"МОЇ КАМЕРИ";color:sub;font.bold:true;font.pixelSize:12;letterSpacing:1}Item{Layout.fillWidth:true}Text{text:devicesModel.count===0?"":devicesModel.count+" збережено";color:sub;font.pixelSize:12}}
+  RowLayout{Layout.fillWidth:true;Text{text:"МОЇ КАМЕРИ";color:sub;font.bold:true;font.pixelSize:12;font.letterSpacing:1}Item{Layout.fillWidth:true}Text{text:devicesModel.count===0?"":devicesModel.count+" збережено";color:sub;font.pixelSize:12}}
   Rectangle{Layout.fillWidth:true;Layout.fillHeight:true;radius:18;color:surface;border.color:line
    ListView{id:list;anchors.fill:parent;anchors.margins:12;clip:true;spacing:8;model:devicesModel.items
-    delegate:Rectangle{required property var modelData;width:list.width;height:82;radius:13;color:mouse.containsMouse?elevated:"transparent";border.color:modelData.active?green:"transparent"
+    delegate:Rectangle{required property var modelData;width:list.width;height:82;radius:13;color:mouse.hovered?elevated:"transparent";border.color:modelData.active?green:"transparent"
      HoverHandler{id:mouse}
      RowLayout{anchors.fill:parent;anchors.margins:13;spacing:12
       Rectangle{width:42;height:42;radius:12;color:modelData.openipcIdentity.verified?"#15392f":"#172334";Text{anchors.centerIn:parent;text:"●";color:modelData.openipcIdentity.verified?green:sub;font.pixelSize:16}}

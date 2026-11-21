@@ -25,7 +25,7 @@ Item {
   SplitView{Layout.fillWidth:true;Layout.fillHeight:true;orientation:Qt.Horizontal
    Rectangle{SplitView.preferredWidth:310;SplitView.minimumWidth:250;color:surface;radius:16
     ColumnLayout{anchors.fill:parent;anchors.margins:12;spacing:10
-     RowLayout{Layout.fillWidth:true;Text{text:"МОЇ КАМЕРИ";color:muted;font.bold:true;font.pixelSize:11;letterSpacing:1}Item{Layout.fillWidth:true}Text{text:devicesModel.count;color:muted}}
+     RowLayout{Layout.fillWidth:true;Text{text:"МОЇ КАМЕРИ";color:muted;font.bold:true;font.pixelSize:11;font.letterSpacing:1}Item{Layout.fillWidth:true}Text{text:devicesModel.count;color:muted}}
      ListView{id:savedList;Layout.fillWidth:true;Layout.fillHeight:true;spacing:7;clip:true;model:devicesModel.items
       delegate:Rectangle{required property var modelData;width:savedList.width;height:72;radius:12;color:selectedSaved&&selectedSaved.id===modelData.id?raised:"transparent";border.color:modelData.active?accent:"transparent"
        MouseArea{anchors.fill:parent;onClicked:selectedSaved=modelData}
@@ -38,7 +38,7 @@ Item {
    Item{SplitView.preferredWidth:12}
    Rectangle{SplitView.fillWidth:true;color:surface;radius:16
     ColumnLayout{anchors.fill:parent;anchors.margins:14;spacing:10
-     RowLayout{Layout.fillWidth:true;Text{text:"ЗНАЙДЕНІ";color:muted;font.bold:true;font.pixelSize:11;letterSpacing:1}Item{Layout.fillWidth:true}Text{text:devicesModel.discovered.length===0?"":"Оберіть камеру для продовження";color:muted;font.pixelSize:11}}
+     RowLayout{Layout.fillWidth:true;Text{text:"ЗНАЙДЕНІ";color:muted;font.bold:true;font.pixelSize:11;font.letterSpacing:1}Item{Layout.fillWidth:true}Text{text:devicesModel.discovered.length===0?"":"Оберіть камеру для продовження";color:muted;font.pixelSize:11}}
      ListView{id:foundList;Layout.fillWidth:true;Layout.fillHeight:true;spacing:8;clip:true;model:devicesModel.discovered
       delegate:Rectangle{required property var modelData;width:foundList.width;height:78;radius:13;color:selectedFound&&selectedFound.host===modelData.host?raised:"#0a141f";border.color:selectedFound&&selectedFound.host===modelData.host?blue:"transparent"
        MouseArea{anchors.fill:parent;onClicked:root.selectFound(modelData)}
@@ -52,7 +52,7 @@ Item {
      ColumnLayout{visible:devicesModel.discovered.length===0&&!devicesModel.scanning;Layout.alignment:Qt.AlignHCenter|Qt.AlignVCenter;spacing:8;Text{text:"Нічого не знайдено";color:fg;font.pixelSize:18;font.bold:true;horizontalAlignment:Text.AlignHCenter;Layout.fillWidth:true}Text{text:"Запустіть пошук або вкажіть IP камери";color:muted;horizontalAlignment:Text.AlignHCenter;Layout.fillWidth:true}}
      RowLayout{Layout.fillWidth:true
       Button{text:"Додати камеру";font.bold:true;enabled:selectedFound&&selectedFound.openipc;onClicked:{devicesModel.addDiscovered(selectedFound.host,selectedFound.name,true);selectedSaved=null}HoverHint{text:"Зберегти камеру лише після підтвердження OpenIPC."}}
-      Button{text:"Відомості";flat:true;enabled:selectedFound!==null;onClicked:detailsPopup.open();HoverHint{text:"Показати отримані технічні відомості та evidence."}}
+      Button{text:"Відомості";flat:true;enabled:selectedFound!==null;onClicked:detailsPopup.open();HoverHint{text:"Показати отримані технічні відомості та підтвердження."}}
       Item{Layout.fillWidth:true}
       Text{visible:selectedFound!==null;text:selectedFound&&selectedFound.r2d2?"R2D2 підтверджено":"";color:accent;font.bold:true;font.pixelSize:11}
      }
