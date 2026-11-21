@@ -14,8 +14,6 @@ NORMALIZED_FIELDS = (
 
 
 class TelemetryProvider(QObject):
-    """Read-only adapter from a protocol runtime to normalized vehicle telemetry."""
-
     changed = Signal()
 
     def __init__(self, name, runtime):
@@ -25,12 +23,10 @@ class TelemetryProvider(QObject):
         runtime.changed.connect(self.changed)
 
     @Property(str, constant=True)
-    def name(self):
-        return self._name
+    def name(self): return self._name
 
     @Property(bool, constant=True)
-    def readOnly(self):
-        return True
+    def readOnly(self): return True
 
     @Property("QVariantMap", notify=changed)
     def telemetry(self):
@@ -40,21 +36,19 @@ class TelemetryProvider(QObject):
         return normalized
 
     @Property(str, notify=changed)
-    def error(self):
-        return str(self._runtime.error or "")
+    def error(self): return str(self._runtime.error or "")
 
     @Property(bool, notify=changed)
-    def available(self):
-        return bool(self.telemetry.get("connected"))
+    def available(self): return bool(self.telemetry.get("connected"))
 
 
 class MavlinkProvider(TelemetryProvider):
-    def __init__(self, runtime):
-        super().__init__("MAVLink", runtime)
+    def __init__(self, runtime): super().__init__("MAVLink", runtime)
 
 
 class MspProvider(TelemetryProvider):
-    """Normalized read-only provider for Betaflight/INAV MSP telemetry."""
+    def __init__(self, runtime): super().__init__("MSP", runtime)
 
-    def __init__(self, runtime):
-        super().__init__("MSP", runtime)
+
+class CrsfProvider(TelemetryProvider):
+    def __init__(self, runtime): super().__init__("CRSF", runtime)
