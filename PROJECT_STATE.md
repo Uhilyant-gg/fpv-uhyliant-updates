@@ -5,28 +5,24 @@
 ## Product direction
 Windows FPV ground station using Python + PySide6 + Qt Quick/QML. ArduPilot, Betaflight and INAV are target stacks; MAVLink, MSP and CRSF are target telemetry protocols. FPV remains video-first.
 
-## Telemetry
-Normalized read-only providers sit behind `TelemetryRouter`; unknown/stale/missing telemetry is unavailable. Real FC/radio validation is `hardware-validation-pending`.
-
-## OpenIPC / firmware
-Verified OpenIPC identity stays distinct from generic ONVIF. Firmware Center remains guarded; no destructive hardware adapter is registered by default.
-
-## Video / diagnostics
-Independent primary/secondary video runtimes and real-stream-only PiP are implemented. Playback health is observational. `LinkDiagnostics` keeps external-navigation and network observations separate; real StabX/Starlink/WireGuard adapters remain `hardware-validation-pending`.
+## Telemetry / OpenIPC / video
+Normalized read-only telemetry providers preserve unknown/stale state. Verified OpenIPC identity stays distinct from generic ONVIF. Firmware remains guarded with no destructive hardware adapter enabled by default. Independent primary/secondary video runtimes and real-stream-only PiP are implemented; hardware validation remains pending where documented.
 
 ## Station backup and restore
-Station backup v2 is password-encrypted and authenticated before parsing the station snapshot. The envelope records its schema/version and fixed scrypt parameters; payload confidentiality/integrity use the stdlib authenticated stream construction implemented in `station_backup.py`. Import first authenticates and validates schema plus entity references, then creates an in-memory restore plan. No live data changes until explicit confirmation.
+Station backup v3 now uses the repository's existing `cryptography` dependency: scrypt derives an AES-256 key and AES-GCM provides authenticated encryption. Envelope schema/version, KDF/cipher identifiers, KDF parameters, salt and nonce are authenticated as associated data. Wrong passwords or modified ciphertext/metadata are rejected before a snapshot can become pending restore state.
 
-Confirmed restore runs through a single SQLite transaction. Devices, streams, per-stream video profiles, verified OpenIPC identities and active-device selection are replaced atomically; validation failure or SQL/type failure leaves the previous live database state intact. Pairing secrets and signing keys are not part of the snapshot.
+Portable snapshots are strictly allow-listed and type/range/reference validated before restore. They contain devices, streams, per-stream video profiles, verified OpenIPC identities and active-device selection only. Pairing secrets and signing keys are excluded.
 
-## Presets / profiles
-Camera presets remain separate from video profiles and firmware operations.
+Restore stays two-phase and explicit. Inspection never changes live SQLite state; confirmed restore performs the replacement in one transaction, so validation or write failures preserve the prior database.
+
+## External navigation / link diagnostics
+`LinkDiagnostics` remains a read-only observation boundary. Real StabX and Starlink/WireGuard adapters remain `hardware-validation-pending`.
 
 ## Next implementation order
-1. Hardware-only firmware/preset and real target-device validation remain pending physical hardware.
+1. Hardware-only firmware/preset and real target-device validation when physical hardware is available.
 2. Validate dual-decoder and RTSP recovery on target Windows hardware.
-3. Connect verified read-only StabX/external-navigation and Starlink/VPN observers when hardware/protocol evidence is available.
-4. Add station pairing and distribution hardening; mature backup cryptography toward a platform/library AEAD when dependency policy permits.
+3. Connect verified read-only external-navigation/network observers when protocol evidence is available.
+4. Add station pairing with OS-protected secrets and explicit trust/revocation lifecycle, then continue distribution hardening.
 
 ## Acceptance rule
 No invented telemetry, hardware state, stream metadata or latency. Hardware-dependent validation is `hardware-validation-pending`.

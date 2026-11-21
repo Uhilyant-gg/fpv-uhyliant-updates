@@ -13,17 +13,19 @@ Windows ground station: Python + PySide6 + Qt Quick/QML. FPV remains video-first
 - Private signing keys and pairing secrets are never committed or exported in station snapshots.
 
 ## Backup/restore security boundary
-Portable station backup v2 requires a password of at least eight characters. `station_backup.py` derives independent encryption/authentication material with scrypt, encrypts the serialized snapshot, and authenticates the complete envelope metadata plus ciphertext before decrypting. This is a dependency-free application format, not a claim of platform-backed secret storage; moving to an established AEAD implementation remains preferred when dependency policy permits it.
+Portable station backup v3 uses `cryptography` AES-256-GCM with a password-derived scrypt key. The envelope metadata required to interpret the ciphertext is authenticated as AES-GCM associated data. Do not add unauthenticated envelope fields that affect decryption/restore semantics.
 
-Import is two-phase. Inspection only decrypts/authenticates, validates schema and referential integrity, and retains an in-memory pending snapshot. Restore requires explicit confirmation. The confirmed database replacement is one SQLite transaction; exceptions roll it back. Never add silent restore, partial table replacement, or import of signing/pairing secrets.
+Snapshot validation is strict and allow-listed: exact entity fields, scalar types/ranges, unique IDs/names/device-kind pairs, host/port uniqueness, active-device membership, stream-to-device/profile references and verified OpenIPC identity references must pass before restore. Unknown fields are rejected so future secret-bearing state is not silently imported.
+
+Import remains two-phase. Inspection decrypts/authenticates and validates, but does not mutate live state. Restore requires explicit confirmation and uses a single SQLite transaction. Never add silent restore, partial replacement, signing keys or pairing secrets to portable snapshots.
 
 ## Current architecture
-Telemetry, guarded firmware lifecycle, dual-video/PiP, camera presets, read-only link diagnostics, encrypted backup export and transactional restore are implemented software-side. Hardware validation remains pending where noted in `PROJECT_STATE.md`.
+Telemetry, guarded firmware lifecycle, dual-video/PiP, camera presets, read-only link diagnostics, authenticated encrypted backup and transactional restore are implemented software-side. Hardware validation remains pending where noted in `PROJECT_STATE.md`.
 
 ## Next work
 1. Hardware validation when target devices are available.
-2. Station pairing with OS-protected secret storage and explicit trust lifecycle.
-3. Distribution hardening and migration of portable backup encryption to a vetted AEAD dependency when available.
+2. Station pairing with OS-protected secret storage and explicit trust/revocation lifecycle.
+3. Continue installer/update distribution hardening without committing private keys.
 
 ## Workflow
 Inspect actual `main`, test software paths, synchronize canonical docs after material changes, and never claim CI/write success without evidence.
