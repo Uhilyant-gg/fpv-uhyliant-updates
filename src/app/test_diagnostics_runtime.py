@@ -1,5 +1,6 @@
 import tempfile,unittest
 from pathlib import Path
+from unittest.mock import patch
 from diagnostic_events import DiagnosticEvents
 from diagnostics_runtime import DiagnosticsRuntime
 class Obj:pass
@@ -10,6 +11,10 @@ class Tests(unittest.TestCase):
   d,links,t,u=self.base();d._items=[{'id':'1','firmware':None,'password':'secret'}];links.snapshot={'network':{'state':'ready'}};t.name='MAVLink';t.telemetry={'connected':None}
   with tempfile.TemporaryDirectory() as root:
    r=DiagnosticsRuntime('2.0.12',d,links,t,u,DiagnosticEvents(),root);b=r.build();self.assertIsNone(b['devices'][0]['firmware']);self.assertEqual(b['devices'][0]['password'],'[redacted]');self.assertIsNone(b['protocols']['telemetry']['connected'])
+ def test_manual_probe_contributes_fresh_device_evidence(self):
+  d,links,t,u=self.base();d._items=[{'id':'1','host':'192.168.1.50','openipcIdentity':{'verified':True}}];d._discovered=[];d._manual_result={'host':'192.168.1.50','reachable':True,'openipc':True,'identity':{'verified':True}}
+  with tempfile.TemporaryDirectory() as root, patch('diagnostics_runtime.interfaces',return_value=[]), patch('diagnostics_runtime.system_routes',return_value=[]):
+   evidence=DiagnosticsRuntime('2.0.12',d,links,t,u,DiagnosticEvents(),root)._network_evidence(d._items);item=next(x for x in evidence['devices'] if x['host']=='192.168.1.50');self.assertTrue(item['reachable']);self.assertTrue(item['openipcVerified']);self.assertTrue(item['discovered'])
  def test_export_creates_bundle(self):
   d,links,t,u=self.base()
   with tempfile.TemporaryDirectory() as root:
