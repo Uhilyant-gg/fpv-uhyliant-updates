@@ -15,25 +15,26 @@ class FirmwareExecutor(QObject):
  def _device(self,did):return next((d for d in self.center.devices.items if d.get('id')==did),None)
  def _set(self,state,**extra):self._state={**self._state,'state':state,**extra};self.changed.emit()
  def _release_lock(self):self._locked_device='';self.changed.emit()
- def _rehash(self):
-  a=self.center.artifact
+ def _rehash(self,artifact):
   try:
-   h=hashlib.sha256()
-   with open(a.get('path',''),'rb') as f:
-    for chunk in iter(lambda:f.read(1024*1024),b''):h.update(chunk)
-   return bool(a.get('sha256') and h.hexdigest()==a['sha256'])
+   h=hashlib.sha256();size=0
+   with open(artifact.get('path',''),'rb') as f:
+    for chunk in iter(lambda:f.read(1024*1024),b''):h.update(chunk);size+=len(chunk)
+   return bool(artifact.get('sha256') and h.hexdigest()==artifact['sha256'] and size==artifact.get('size'))
   except OSError:return False
  def _approved_handoff(self,device_id,profile,mode):
   plan=deepcopy(self.center.executionPlan);artifact=deepcopy(self.center.artifact);approval=deepcopy(self.center.result)
   if not plan.get('ready') or not self.center.approvalMatches(device_id,profile,mode):return None
   if approval.get('deviceId')!=device_id or approval.get('profile')!=profile or approval.get('mode')!=mode:return None
-  if plan.get('approvalToken')!=approval.get('approvalToken') or not plan.get('approvalToken') or not self._rehash():return None
+  if plan.get('approvalToken')!=approval.get('approvalToken') or not plan.get('approvalToken'):return None
+  if plan.get('artifactSha256')!=artifact.get('sha256') or plan.get('artifactSize')!=artifact.get('size') or approval.get('artifactSha256')!=artifact.get('sha256'):return None
+  if not self._rehash(artifact):return None
   return {'deviceId':device_id,'profile':profile,'mode':mode,'artifact':artifact,'plan':plan,'approval':approval}
  @Slot(str,str,str,result=bool)
  def execute(self,device_id,profile,mode):
   if self._locked_device:self._set('blocked',error='Інша операція з прошивкою вже активна');return False
   handoff=self._approved_handoff(device_id,profile,mode)
-  if handoff is None:self._set('blocked',error='План виконання, незмінне схвалення або SHA-256 прошивки невалідні');return False
+  if handoff is None:self._set('blocked',error='План виконання, незмінне схвалення або SHA-256/розмір прошивки невалідні');return False
   device=self._device(device_id)
   if not device:self._set('blocked',error='Схвалений пристрій більше не існує');return False
   identity=dict(device.get('openipcIdentity') or {});self._before=identity

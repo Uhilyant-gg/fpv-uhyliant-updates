@@ -19,6 +19,12 @@ class ExecutorTests(unittest.TestCase):
   x=FirmwareExecutor(self.center);self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(x.status['state'],'hardware-validation-pending')
  def test_artifact_change_blocks_executor_handoff(self):
   x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.image.write_bytes(b'changed');self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(a.calls,[])
+ def test_artifact_size_metadata_change_blocks_executor_handoff(self):
+  x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.center._artifact['size']+=1;self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(a.calls,[])
+ def test_plan_artifact_metadata_change_blocks_executor_handoff(self):
+  for key,value in (('artifactSha256','0'*64),('artifactSize',999)):
+   x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.center._plan[key]=value;self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(a.calls,[])
+   self.center.prepareExecution('cam','ssc30kq-imx335','upgrade')
  def test_identity_change_after_approval_blocks_handoff(self):
   x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.devices.items[0]['openipcIdentity']['sensor']='imx415';self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(a.calls,[]);self.assertEqual(x.status['state'],'blocked')
  def test_identity_verification_loss_after_approval_blocks_handoff(self):
