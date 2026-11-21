@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 Item {
- signal closeRequested();property var ready:hardwareE2ERuntime.readiness;property var captures:hardwareE2ERuntime.captures
+ signal closeRequested();property var ready:hardwareE2ERuntime.readiness;property var captures:hardwareE2ERuntime.captures;property var evidenceReady:hardwareE2ERuntime.evidenceReadiness
  function mark(v){return v?"✓":"○"}
  ColumnLayout{anchors.fill:parent;spacing:8
   RowLayout{Layout.fillWidth:true;Text{text:"ПЕРЕВІРКА OPENIPC НА ОБЛАДНАННІ";color:"#f4f7fb";font.pixelSize:18;font.bold:true;Layout.fillWidth:true}Button{text:"Закрити";onClicked:closeRequested()}}
@@ -18,9 +18,11 @@ Item {
   Text{text:(ready.artifact&&ready.artifact.sha256)?("Artifact: "+ready.artifact.sha256.substring(0,12)+"… / "+(ready.artifact.build||"build невідомий")):"Artifact: не готовий";color:"#8fa1b7"}
   CheckBox{text:"SSH host key перевірено та прийнято";checked:hardwareE2ERuntime.hostKeyAccepted;onToggled:hardwareE2ERuntime.setHostKeyAccepted(checked);HoverHint{text:"Підтвердження прив'язане до камери, hardware identity, artifact і execution plan. Будь-яка зміна скидає його."}}
   Text{text:"E2E evidence";color:"#f4f7fb";font.bold:true}
-  RowLayout{Layout.fillWidth:true;Button{text:"Зберегти preflight";onClicked:hardwareE2ERuntime.capture("preflight")}Text{Layout.fillWidth:true;text:captures.preflight||"ще не збережено";color:captures.preflight?"#27d59a":"#8fa1b7";elide:Text.ElideMiddle}}
-  RowLayout{Layout.fillWidth:true;Button{text:"Зберегти post-update";onClicked:hardwareE2ERuntime.capture("post-update")}Text{Layout.fillWidth:true;text:captures["post-update"]||"ще не збережено";color:captures["post-update"]?"#27d59a":"#8fa1b7";elide:Text.ElideMiddle}}
-  RowLayout{Layout.fillWidth:true;Button{text:"Зберегти failure";onClicked:hardwareE2ERuntime.capture("failure")}Text{Layout.fillWidth:true;text:captures.failure||"ще не збережено";color:captures.failure?"#ffb84d":"#8fa1b7";elide:Text.ElideMiddle}}
+  RowLayout{Layout.fillWidth:true;Button{text:"Зберегти preflight";enabled:evidenceReady.preflight;onClicked:hardwareE2ERuntime.capture("preflight")}Text{Layout.fillWidth:true;text:captures.preflight||"доступно після готового preflight";color:captures.preflight?"#27d59a":"#8fa1b7";elide:Text.ElideMiddle}}
+  RowLayout{Layout.fillWidth:true;Button{text:"Зберегти post-update";enabled:evidenceReady.postUpdate;onClicked:hardwareE2ERuntime.capture("post-update")}Text{Layout.fillWidth:true;text:captures["post-update"]||(evidenceReady.postUpdate?"готово до збереження":"доступно лише після verified update");color:captures["post-update"]?"#27d59a":"#8fa1b7";elide:Text.ElideMiddle}}
+  RowLayout{Layout.fillWidth:true;Button{text:"Зберегти failure";enabled:evidenceReady.failure;onClicked:hardwareE2ERuntime.capture("failure")}Text{Layout.fillWidth:true;text:captures.failure||(evidenceReady.failure?"готово до збереження":"доступно після blocked/error outcome");color:captures.failure?"#ffb84d":"#8fa1b7";elide:Text.ElideMiddle}}
+  Text{text:evidenceReady.state?"Lifecycle state: "+evidenceReady.state:"Lifecycle state: ще не розпочато";color:"#8fa1b7"}
+  Text{text:evidenceReady.observedFirmware?"Observed firmware: "+evidenceReady.observedFirmware:"Observed firmware: ще не підтверджено";color:evidenceReady.postUpdate?"#27d59a":"#8fa1b7"}
   Item{Layout.fillHeight:true}
   Text{text:"Цей екран лише фіксує evidence. Destructive update залишається в окремому контрольованому workflow.";color:"#ffb84d";wrapMode:Text.Wrap;Layout.fillWidth:true}
  }
