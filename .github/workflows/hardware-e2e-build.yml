@@ -1,0 +1,78 @@
+name: FPV Uhyliant Hardware E2E Build
+on:
+  workflow_dispatch:
+permissions: {contents: read}
+env:
+  SOURCE_SHA: ${{ github.sha }}
+jobs:
+  windows-hardware-e2e:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: "${{ github.sha }}", fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: Verify immutable source
+        shell: pwsh
+        run: |
+          if ((git rev-parse HEAD).Trim() -ne $env:SOURCE_SHA) { throw 'Checked out source differs from workflow source SHA' }
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r src/requirements.txt
+          python -m pip install pyinstaller pillow
+      - name: Run source validation
+        shell: pwsh
+        run: |
+          python -m compileall -q -f src tools
+          Push-Location src\app; python -m unittest -v test_*.py; Pop-Location
+          Push-Location tools; python -m unittest -v test_*.py; Pop-Location
+          python src/app/main.py --mavlink-self-test
+      - name: Prepare package assets
+        shell: pwsh
+        run: |
+          python tools/build_icon.py
+          New-Item -ItemType Directory -Force src\app\security | Out-Null
+          Copy-Item test\release-public-key.pem src\app\security\production-v1-public.pem -Force
+          Copy-Item assets\fpv-uhyliant.ico src\app\fpv-uhyliant.ico -Force
+      - name: Build Hardware E2E application
+        shell: pwsh
+        run: |
+          $qmlArgs = Get-ChildItem src\app\*.qml | Sort-Object Name | ForEach-Object { @('--add-data', "$($_.FullName);.") }
+          & pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant-Hardware-E2E --icon assets/fpv-uhyliant.ico --paths src/app @qmlArgs --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --hidden-import PySide6.QtMultimedia --hidden-import PySide6.QtSerialPort --hidden-import pymavlink --hidden-import pymavlink.mavutil --hidden-import paramiko --collect-all PySide6.QtMultimedia --collect-all pymavlink --collect-all paramiko src/app/main.py
+      - name: Verify packaged QML and smoke tests
+        shell: pwsh
+        run: |
+          $expected = @(Get-ChildItem src\app\*.qml | ForEach-Object Name | Sort-Object)
+          $packaged = @(Get-ChildItem dist\FPV-Uhyliant-Hardware-E2E -Recurse -File -Filter *.qml | ForEach-Object Name | Sort-Object -Unique)
+          $missing = @($expected | Where-Object { $_ -notin $packaged })
+          if ($missing.Count) { throw "Required application QML missing from package: $($missing -join ', ')" }
+          $backend = Start-Process -FilePath "dist\FPV-Uhyliant-Hardware-E2E\FPV-Uhyliant-Hardware-E2E.exe" -ArgumentList '--mavlink-self-test' -PassThru -Wait
+          if ($backend.ExitCode -ne 0) { throw "Packaged backend test failed: $($backend.ExitCode)" }
+          $root = Join-Path $env:RUNNER_TEMP 'hardware-e2e-smoke'; $marker = Join-Path $root 'smoke-test-ok.json'; New-Item -ItemType Directory -Force $root | Out-Null; $env:LOCALAPPDATA = $root
+          $p = Start-Process -FilePath "dist\FPV-Uhyliant-Hardware-E2E\FPV-Uhyliant-Hardware-E2E.exe" -ArgumentList "--smoke-test --smoke-marker `"$marker`"" -PassThru
+          $deadline = (Get-Date).AddSeconds(20)
+          while ((Get-Date) -lt $deadline -and -not (Test-Path $marker) -and -not $p.HasExited) { Start-Sleep -Milliseconds 250; $p.Refresh() }
+          if (-not (Test-Path $marker)) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }; throw 'Hardware E2E smoke marker not created' }
+          if (-not $p.WaitForExit(5000)) { Stop-Process -Id $p.Id -Force } elseif ($p.ExitCode -ne 0) { throw "Hardware E2E smoke-test failed: $($p.ExitCode)" }
+      - name: Package immutable Hardware E2E artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force hardware-e2e-output | Out-Null
+          $archive = "FPV-Uhyliant-Hardware-E2E-$env:SOURCE_SHA.zip"
+          Compress-Archive -Path dist\FPV-Uhyliant-Hardware-E2E\* -DestinationPath "hardware-e2e-output\$archive" -CompressionLevel Optimal
+          $sha = (Get-FileHash "hardware-e2e-output\$archive" -Algorithm SHA256).Hash.ToLowerInvariant()
+          $meta = Get-Content VERSION.json -Raw | ConvertFrom-Json
+          $payload = [ordered]@{schemaVersion=1;sourceSha=$env:SOURCE_SHA;version=$meta.version;purpose='physical-openipc-hardware-e2e';package=$archive;packageSha256=$sha;publish=$false}
+          $payload | ConvertTo-Json -Depth 4 | Set-Content hardware-e2e-output\hardware-e2e-build.json -Encoding utf8
+          Set-Content hardware-e2e-output\package.sha256 -Value $sha -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hardware-e2e-${{ github.sha }}
+          path: |
+            hardware-e2e-output/*.zip
+            hardware-e2e-output/package.sha256
+            hardware-e2e-output/hardware-e2e-build.json
+          if-no-files-found: error
+          retention-days: 7
