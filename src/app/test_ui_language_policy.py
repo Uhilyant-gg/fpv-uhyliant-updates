@@ -9,12 +9,8 @@ class UiLanguagePolicyTests(unittest.TestCase):
         self.sources = {
             name: (here / name).read_text(encoding="utf-8")
             for name in (
-                "FirmwareCenter.qml",
-                "UpdatePanel.qml",
-                "DevicesPanel.qml",
-                "DiagnosticsPanel.qml",
-                "PairingPanel.qml",
-                "Main.qml",
+                "FirmwareCenter.qml", "UpdatePanel.qml", "DevicesPanel.qml",
+                "DiagnosticsPanel.qml", "PairingPanel.qml", "Main.qml",
                 "MavlinkDiagnostics.qml",
             )
         }
@@ -27,7 +23,7 @@ class UiLanguagePolicyTests(unittest.TestCase):
 
     def test_firmware_surface_is_ukrainian(self):
         visible = self.visible(self.sources["FirmwareCenter.qml"])
-        for text in ("ЦЕНТР ПРОШИВКИ", "Попередня перевірка", "Підготувати план виконання", "ПРЕСЕТ КАМЕРИ"):
+        for text in ("ЦЕНТР ПРОШИВКИ", "Перевірити оновлення", "Оновити камеру", "Додатково"):
             self.assertIn(text, visible)
         for obsolete in ("FIRMWARE CENTER", "IMAGE VERIFIED", "PRE-CHECK APPROVED", "EXECUTION PLAN READY", "Expected SHA-256", "Flash layout verified", "Recovery path verified"):
             self.assertNotIn(obsolete, visible)
@@ -66,8 +62,10 @@ class UiLanguagePolicyTests(unittest.TestCase):
     def test_update_surface_has_delayed_help(self):
         self.assertGreaterEqual(self.hover_hint_count(self.sources["UpdatePanel.qml"]), 3)
 
-    def test_firmware_surface_has_delayed_help(self):
-        self.assertGreaterEqual(self.hover_hint_count(self.sources["FirmwareCenter.qml"]), 8)
+    def test_firmware_surface_keeps_explanatory_copy(self):
+        visible = self.visible(self.sources["FirmwareCenter.qml"])
+        for expected in ("Безпечне автоматичне оновлення OpenIPC-камери", "Дані потрібні лише для цього сеансу й не зберігаються.", "Це окремий експертний сценарій, не рекомендоване автоматичне оновлення."):
+            self.assertIn(expected, visible)
 
     def test_devices_and_pairing_have_delayed_help(self):
         self.assertGreaterEqual(self.hover_hint_count(self.sources["DevicesPanel.qml"]), 8)
