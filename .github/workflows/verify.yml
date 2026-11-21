@@ -33,7 +33,7 @@ jobs:
         run: python -m unittest -v test_*.py
       - name: Run launcher and updater boundary tests
         working-directory: src
-        run: python -m unittest -v test_launcher.py test_updater_handoff.py
+        run: python -m unittest -v test_launcher.py test_updater_handoff.py test_rollback_plan.py
       - name: Run tooling unit tests
         working-directory: tools
         run: python -m unittest -v test_*.py

@@ -1,6 +1,7 @@
 import json,os,subprocess,sys,time,shutil,re
 from pathlib import Path
 from startup_ack import pending_ack
+from rollback_plan import rollback_preconditions,rolled_back_state
 R=Path(sys.executable).resolve().parent if getattr(sys,'frozen',False) else Path(__file__).resolve().parent
 A=R/'app';C=A/'current';B=A/'rollback'/'previous';S=A/'launcher-state.json';D=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';OK=D/'startup-ok.json';LOG=D/'updater.log';SHA_RE=re.compile(r'^[0-9a-f]{64}$')
 def note(msg):
@@ -21,11 +22,12 @@ def run_current(token=None):
  if token:args+=['--startup-token',token]
  return subprocess.Popen(args,cwd=C)
 def rollback(st,reason):
- note(reason+'; rollback');failed=A/'staging'/'failed';shutil.rmtree(failed,ignore_errors=True)
- if C.exists():os.replace(C,failed)
- if B.exists():os.replace(B,C)
- else:raise RuntimeError('rollback copy missing')
- st['pendingStartup']=False;st['rollbackAt']=int(time.time());save_state(st);return subprocess.call([str(C/'FPV-Uhyliant.exe'),'--install-root',str(R)],cwd=C)
+ note(reason+'; rollback');action=rollback_preconditions(C.exists(),B.exists())
+ if action=='missing-rollback':raise RuntimeError('rollback copy missing')
+ failed=A/'staging'/'failed';shutil.rmtree(failed,ignore_errors=True)
+ if action=='replace-current':os.replace(C,failed)
+ os.replace(B,C)
+ save_state(rolled_back_state(st,int(time.time())));return subprocess.call([str(C/'FPV-Uhyliant.exe'),'--install-root',str(R)],cwd=C)
 def main():
  st=load_state();pending=bool(st.get('pendingStartup'));token=os.urandom(16).hex();D.mkdir(parents=True,exist_ok=True);OK.unlink(missing_ok=True)
  if pending and not valid_pending(st):return rollback(st,'invalid pending startup state')
