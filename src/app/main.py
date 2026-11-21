@@ -17,15 +17,6 @@ def main():
  from PySide6.QtGui import QGuiApplication,QIcon
  from PySide6.QtQml import QQmlApplicationEngine
  from PySide6.QtQuickControls2 import QQuickStyle
- from PySide6 import QtMultimedia
- DATA.mkdir(parents=True,exist_ok=True);qtlog=DATA/'qt-startup.log'
- def qt_message(kind,context,message):
-  line=f'{time.strftime("%Y-%m-%d %H:%M:%S")} {int(kind)} {message}'
-  try:
-   with qtlog.open('a',encoding='utf-8') as f:f.write(line+'\n')
-  except Exception:pass
-  print(line,file=sys.stderr,flush=True)
- qInstallMessageHandler(qt_message)
  from backend import Station
  from devices import Devices
  from updater_engine import Updater
@@ -36,30 +27,33 @@ def main():
  from camera_presets import CameraPresets
  from link_diagnostics import LinkDiagnostics
  from station_backup import StationBackup
+ from pairing import PairingRegistry
  from mavlink_runtime import MavlinkRuntime
  from msp_runtime import MspRuntime
  from crsf_runtime import CrsfRuntime
  from serial_telemetry import MspSerialTransport,CrsfSerialTransport
  from telemetry_provider import CrsfProvider,MavlinkProvider,MspProvider,TelemetryRouter
  from vehicle import VehicleRuntime
- app=QGuiApplication(sys.argv);app.setApplicationName('FPV-Uhyliant');app.setApplicationVersion(VERSION)
+ DATA.mkdir(parents=True,exist_ok=True);qtlog=DATA/'qt-startup.log'
+ def qt_message(kind,context,message):
+  line=f'{time.strftime("%Y-%m-%d %H:%M:%S")} {int(kind)} {message}'
+  try:
+   with qtlog.open('a',encoding='utf-8') as f:f.write(line+'\n')
+  except Exception:pass
+  print(line,file=sys.stderr,flush=True)
+ qInstallMessageHandler(qt_message);app=QGuiApplication(sys.argv);app.setApplicationName('FPV-Uhyliant');app.setApplicationVersion(VERSION)
  m=MavlinkRuntime();msp=MspRuntime();crsf=CrsfRuntime();msp_serial=MspSerialTransport(msp);crsf_serial=CrsfSerialTransport(crsf)
- if x.mavlink_self_test:
-  QTimer.singleShot(350,app.quit);rc=app.exec();m.shutdown();msp_serial.stop();crsf_serial.stop();print(json.dumps({'status':'ok','backend':'mavlink','telemetry':'not simulated'}));return rc
+ if x.mavlink_self_test:QTimer.singleShot(350,app.quit);rc=app.exec();m.shutdown();msp_serial.stop();crsf_serial.stop();print(json.dumps({'status':'ok','backend':'mavlink','telemetry':'not simulated'}));return rc
  icon=here/'fpv-uhyliant.ico'
  if icon.exists():app.setWindowIcon(QIcon(str(icon)))
- QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();video=VideoWorkspaceRuntime(d);v=video.primary;secondary=video.secondary;streams=StreamWorkspace(d);fw=FirmwareCenter(d);fwexec=FirmwareExecutor(fw);presets=CameraPresets(d);links=LinkDiagnostics();backup=StationBackup(d);telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate)
- d.streamsChanged.connect(streams.autoSelect);streams.autoSelect()
- ctx=e.rootContext();ctx.setContextProperty('station',s);ctx.setContextProperty('devicesModel',d);ctx.setContextProperty('videoRuntime',v);ctx.setContextProperty('secondaryVideoRuntime',secondary);ctx.setContextProperty('videoWorkspaceRuntime',video);ctx.setContextProperty('streamWorkspace',streams);ctx.setContextProperty('firmwareCenter',fw);ctx.setContextProperty('firmwareExecutor',fwexec);ctx.setContextProperty('cameraPresets',presets);ctx.setContextProperty('linkDiagnostics',links);ctx.setContextProperty('stationBackup',backup);ctx.setContextProperty('mavlinkRuntime',m);ctx.setContextProperty('mspSerial',msp_serial);ctx.setContextProperty('crsfSerial',crsf_serial);ctx.setContextProperty('telemetryRuntime',telemetry);ctx.setContextProperty('vehicleRuntime',vehicle);ctx.setContextProperty('updater',u);ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
- def shutdown():video.stopAll();links.clear();m.shutdown();msp_serial.stop();crsf_serial.stop()
- if not e.rootObjects():
-  shutdown()
-  try:tail='\n'.join(qtlog.read_text(encoding='utf-8',errors='replace').splitlines()[-80:])
-  except Exception:tail='Qt startup log unavailable'
-  raise RuntimeError('QML root object failed to load\n'+tail)
+ QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();video=VideoWorkspaceRuntime(d);v=video.primary;secondary=video.secondary;streams=StreamWorkspace(d);fw=FirmwareCenter(d);fwexec=FirmwareExecutor(fw);presets=CameraPresets(d);links=LinkDiagnostics();backup=StationBackup(d);pairing=PairingRegistry();telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate)
+ d.streamsChanged.connect(streams.autoSelect);streams.autoSelect();ctx=e.rootContext()
+ for name,obj in [('station',s),('devicesModel',d),('videoRuntime',v),('secondaryVideoRuntime',secondary),('videoWorkspaceRuntime',video),('streamWorkspace',streams),('firmwareCenter',fw),('firmwareExecutor',fwexec),('cameraPresets',presets),('linkDiagnostics',links),('stationBackup',backup),('pairingRegistry',pairing),('mavlinkRuntime',m),('mspSerial',msp_serial),('crsfSerial',crsf_serial),('telemetryRuntime',telemetry),('vehicleRuntime',vehicle),('updater',u)]:ctx.setContextProperty(name,obj)
+ ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);e.load(QUrl.fromLocalFile(str(here/'Main.qml')))
+ def shutdown():video.stopAll();links.clear();pairing.clearPending();m.shutdown();msp_serial.stop();crsf_serial.stop()
+ if not e.rootObjects():shutdown();raise RuntimeError('QML root object failed to load')
  app.aboutToQuit.connect(shutdown);root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized)
- if x.smoke_test:
-  marker=x.smoke_marker or str(DATA/'smoke-test-ok.json');signal_smoke(marker);QTimer.singleShot(1500,app.quit)
+ if x.smoke_test:marker=x.smoke_marker or str(DATA/'smoke-test-ok.json');signal_smoke(marker);QTimer.singleShot(1500,app.quit)
  else:QTimer.singleShot(1200,lambda:signal_ok(x.startup_token))
  return app.exec()
 if __name__=='__main__':

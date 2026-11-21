@@ -9,22 +9,21 @@ Windows FPV ground station using Python + PySide6 + Qt Quick/QML. Target stacks:
 Normalized telemetry preserves unknown/stale state. Verified OpenIPC identity stays distinct from generic ONVIF. Firmware remains guarded with no generic destructive adapter. Independent primary/secondary video, real-stream-only PiP, camera presets, read-only link diagnostics, AES-GCM backup and transactional restore are implemented software-side.
 
 ## OTA/update integrity
-The signed manifest still authenticates release metadata and package SHA-256. Download now persists the verified digest into an exact-field ready state. Installation re-hashes the package before handing it to the detached update helper, passes the expected digest explicitly, and the helper verifies it again before extraction and again after staging. This closes the previous gap where helper extraction trusted only a path/version argument.
+OTA remains a signed-manifest trust chain bound through package SHA-256, strict ready state, guarded ZIP staging and startup acknowledgement/rollback. Release builds remain pinned to the immutable workflow SHA and artifact hashes are checked across jobs.
 
-ZIP staging now rejects traversal paths, backslash member names, case-insensitive duplicate destinations, symbolic links, excessive member counts and excessive declared uncompressed size. Extraction is performed member-by-member only after the package digest and member set pass validation.
+## Station pairing foundation
+A software-side pairing trust lifecycle now exists with pending, explicit confirmation, trusted and revoked/cancelled paths. Pairing secrets are generated locally and never exposed through the public QML-facing records. Trust is not granted unless an injected secret store reports that it is available and successfully persists the secret.
 
-Launcher pending-startup state is bound to the package digest. Pending state without a valid version/digest is not accepted as a successful update candidate. Startup acknowledgement remains token + version bound; on success the digest is recorded as `lastGoodPackageSha256`, while failed pending startup uses rollback.
+The default secret-store implementation is deliberately unavailable. Therefore production pairing is currently disabled until a real OS-protected Windows secret-store adapter is implemented and validated. Pairing secrets are not part of station backup snapshots. Pending secrets live only in process memory and are cleared on application shutdown.
 
-## Distribution hardening
-The authoritative release pipeline builds from an immutable workflow SHA, carries/verifies artifact SHA-256 across jobs, constrains release channel policy, and keeps signing private material in the runner secret/temp boundary. Authenticode remains future work requiring a real code-signing certificate/secret.
-
-## Hardware boundaries
-Real StabX, Starlink/WireGuard observers, target-camera firmware/preset execution and physical dual-decoder validation remain `hardware-validation-pending`.
+## Hardware/platform boundaries
+A Windows OS-protected secret-store adapter is `platform-validation-pending`. Real StabX, Starlink/WireGuard observers, target-camera firmware/preset execution and physical dual-decoder validation remain `hardware-validation-pending`. Authenticode still requires a real signing certificate/secret.
 
 ## Next implementation order
-1. Hardware validation when target devices become available.
-2. Station pairing with OS-protected secrets and explicit trust/revocation lifecycle.
-3. Authenticode/executable signing when the required certificate/secret becomes available.
+1. Implement and validate Windows-protected pairing secret storage without repository-stored secrets.
+2. Add pairing identity/proof transport only after its real protocol is defined; do not invent a peer protocol.
+3. Continue hardware validation as target equipment becomes available.
+4. Add Authenticode when real signing credentials are available.
 
 ## Acceptance rule
-No invented telemetry, hardware state, stream metadata or latency. Hardware-dependent validation stays explicit.
+No invented telemetry, hardware identity, stream metadata, latency, pairing peer state or trust. Hardware/platform-dependent validation stays explicit.
