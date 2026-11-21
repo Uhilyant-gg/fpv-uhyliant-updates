@@ -11,18 +11,17 @@ Normalized telemetry preserves unknown/stale state. Verified OpenIPC identity st
 ## Station pairing
 Pairing has durable non-secret trust metadata persistence through an atomic, versioned JSON metadata store. Secret bytes never enter that store, portable backup, QML-visible state or repository content.
 
-A Windows Credential Manager adapter implements the protected secret-store boundary with Win32 `CredWriteW`, `CredReadW`, `CredDeleteW` and `CredFree`. Credentials use an application-scoped target for the current Windows user. Non-Windows systems remain safely unavailable.
+The Windows Credential Manager adapter implements the protected secret-store boundary with Win32 `CredWriteW`, `CredReadW`, `CredDeleteW` and `CredFree`. Its dedicated Windows CI integration path has now passed, covering real Credential Manager write/read/overwrite/delete and registry confirm, restart/reconcile and revoke with durable metadata. Non-Windows systems remain safely unavailable.
 
 Pairing confirmation remains commit-after-persist and retryable. Reconciliation never converts a secret-store read failure into a fabricated missing-secret state. Revocation reads the protected secret, deletes it, persists candidate metadata, and restores the secret if metadata persistence fails. Duplicate metadata record IDs are rejected.
 
-On Windows, `PairingRegistry` selects the protected adapter and combines it with the LocalAppData metadata store already supplied by the application. A Windows CI job now exercises the real Credential Manager API, including write/read/overwrite/delete plus `PairingRegistry` confirm, restart/reconcile and revoke with durable metadata. This validation remains pending until that CI job completes successfully. Pairing UI and peer/network proof exchange remain pending; no peer protocol has been invented.
+A protocol-safe `PairingPanel.qml` trust-management foundation now reports secret/metadata store readiness, lists only non-secret trusted metadata and permits explicit revoke behind confirmation. It deliberately cannot begin or confirm a new pairing session, and explicitly states that peer proof/exchange is not implemented. It is not yet exposed as a production pairing entry point because no real peer protocol contract exists.
 
 ## Remaining platform/hardware boundaries
-1. Obtain successful Windows Credential Manager CI validation before enabling production pairing UI.
-2. Pairing peer proof/exchange after a real protocol contract exists.
-3. Real StabX / Starlink-WireGuard observations and target-hardware validation.
-4. Camera firmware/preset execution and dual-decoder validation on physical targets.
-5. Authenticode when signing credentials become available.
+1. Define/obtain a real pairing peer proof/exchange protocol contract before enabling new-pairing UI.
+2. Real StabX / Starlink-WireGuard observations and target-hardware validation.
+3. Camera firmware/preset execution and dual-decoder validation on physical targets.
+4. Authenticode when signing credentials become available.
 
 ## Acceptance rule
 No invented telemetry, hardware identity, pairing peer state, trust, stream metadata or latency. Platform/hardware-dependent validation stays explicit.
