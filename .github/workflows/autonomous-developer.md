@@ -9,7 +9,7 @@ permissions:
   issues: read
   pull-requests: read
   actions: read
-model: router
+model: auto
 network: defaults
 tools:
   github:
