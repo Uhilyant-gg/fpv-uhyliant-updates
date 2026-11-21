@@ -1,9 +1,8 @@
 """Read-only MSP v1/v2 parsing and telemetry runtime."""
 from __future__ import annotations
-import struct
-import time
+import struct,time
 from dataclasses import dataclass
-from PySide6.QtCore import QObject, Property, Signal, Slot
+from PySide6.QtCore import QObject,Property,Signal,Slot
 MSP_API_VERSION=1;MSP_FC_VARIANT=2;MSP_FC_VERSION=3;MSP_STATUS=101;MSP_RAW_GPS=106;MSP_ATTITUDE=108;MSP_ALTITUDE=109;MSP_ANALOG=110
 READ_ONLY_COMMANDS=(MSP_API_VERSION,MSP_FC_VARIANT,MSP_FC_VERSION,MSP_STATUS,MSP_RAW_GPS,MSP_ATTITUDE,MSP_ALTITUDE,MSP_ANALOG)
 def crc8_dvb_s2(data):
@@ -72,7 +71,7 @@ class MspRuntime(QObject):
   changed=False
   for frame in self._parser.feed(data):
    self._last_frame=self._clock();changed=True
-   if frame.direction=='!':self._error=f'MSP error response for command {frame.command}'
+   if frame.direction=='!':self._error=f'MSP: відповідь із помилкою для команди {frame.command}'
    else:self._decode(frame.command,frame.payload);self._error=''
   if changed:self.changed.emit()
  def _set(self,values):stamp=self._clock();self._values.update(values);self._updated.update({k:stamp for k in values})

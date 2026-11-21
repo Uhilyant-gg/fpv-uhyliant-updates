@@ -40,8 +40,7 @@ class VideoRuntime(QObject):
   stream,device,profile=self._current_source(self._stream_id)
   return stream is not None and device is not None and profile is not None and self._canonical_stream(stream)==self._stream and dict(device)==self._device and dict(profile)==self._profile
  def invalidateIfSourceChanged(self):
-  if self._stream_id and not self._source_unchanged():
-   self._clear_selection();self._set('error','Підготовлений відеопотік змінено, вимкнено, видалено або він більше не належить активному пристрою');return True
+  if self._stream_id and not self._source_unchanged():self._clear_selection();self._set('error','Підготовлений відеопотік змінено, вимкнено, видалено або він більше не належить активному пристрою');return True
   return False
  def _check_endpoint(self):
   start=time.monotonic()
@@ -54,19 +53,19 @@ class VideoRuntime(QObject):
   stream,device,profile=self._current_source(stream_id)
   if not stream:self._clear_selection();self._set('error','Відеопотік не знайдено, вимкнений або не належить активному пристрою');return False
   if not device:self._clear_selection();self._set('error','Камеру для відеопотоку не знайдено');return False
-  if profile is None:self._clear_selection();self._set('error','Video profile для потоку більше не існує');return False
-  if str(stream.get('protocol','')).lower()!='rtsp':self._clear_selection();self._set('error','Поточний runtime підтримує лише RTSP');return False
+  if profile is None:self._clear_selection();self._set('error','Відеопрофіль для потоку більше не існує');return False
+  if str(stream.get('protocol','')).lower()!='rtsp':self._clear_selection();self._set('error','Поточний модуль відтворення підтримує лише RTSP');return False
   try:port=int(stream.get('port'))
   except (TypeError,ValueError):port=0
   host=str(device.get('host','')).strip();canonical=self._canonical_stream(stream);path=canonical.get('path','')
-  if not host or port<1 or port>65535 or not path:self._clear_selection();self._set('error','RTSP endpoint metadata incomplete or invalid');return False
+  if not host or port<1 or port>65535 or not path:self._clear_selection();self._set('error','Метадані кінцевої точки RTSP неповні або некоректні');return False
   self._stream=canonical;self._device=dict(device);self._profile=dict(profile);self._host=host;self._port=port;self._stream_id=stream_id;self._url=f'rtsp://{self._host}:{self._port}{path}';self._attempts=1;self._set('checking')
   if not self._check_endpoint():return False
   self._set('ready');return True
  @Slot(result=bool)
  def reconnect(self):
   if not self._url or not self._host or not self._port:self._set('error','Немає підготовленого RTSP-потоку для перепідключення');return False
-  if not self._source_unchanged():self._clear_selection();self._set('error','Підготовлений RTSP-потік або його metadata змінилися; потрібна нова підготовка');return False
+  if not self._source_unchanged():self._clear_selection();self._set('error','Підготовлений RTSP-потік або його метадані змінилися; потрібна нова підготовка');return False
   self._attempts+=1;self._set('reconnecting')
   if not self._check_endpoint():return False
   self._set('ready');return True

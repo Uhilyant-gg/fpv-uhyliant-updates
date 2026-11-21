@@ -5,8 +5,7 @@ from cryptography.hazmat.primitives import serialization
 from PySide6.QtCore import QCoreApplication,QObject,Property,QThread,QTimer,Signal,Slot
 from version import VERSION
 KEY_ID='fpv-uhyliant-production-v1';HERE=Path(__file__).resolve().parent;PUB=HERE/'security/production-v1-public.pem';DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';UP=DATA/'updates';VERSION_RE=re.compile(r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$')
-def _manifest_url():
- scheme=''.join(map(chr,[104,116,116,112,115,58,47,47]));host=''.join(map(chr,[117,104,105,108,121,97,110,116,45,103,103,46,103,105,116,104,117,98,46,105,111]));return scheme+host+'/fpv-uhyliant-updates/test/release.json'
+def _manifest_url():scheme=''.join(map(chr,[104,116,116,112,115,58,47,47]));host=''.join(map(chr,[117,104,105,108,121,97,110,116,45,103,103,46,103,105,116,104,117,98,46,105,111]));return scheme+host+'/fpv-uhyliant-updates/test/release.json'
 DEFAULT=_manifest_url()
 def canon(o):d=dict(o);d.pop('signature',None);return json.dumps(d,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()
 def vt(v):
@@ -16,15 +15,15 @@ def https_url(v,label):
  u=urllib.parse.urlparse(v)
  if u.scheme!='https' or not u.hostname or u.username or u.password:raise RuntimeError(f'Некоректний HTTPS URL для {label}')
 def verify(o):
- if not isinstance(o,dict):raise RuntimeError('Manifest має некоректний формат')
+ if not isinstance(o,dict):raise RuntimeError('Маніфест має некоректний формат')
  s=o.get('signature') or {};pkg=o.get('package')
- if s.get('algorithm')!='Ed25519' or s.get('keyId')!=KEY_ID:raise RuntimeError('Недовірений підпис manifest')
- if not isinstance(pkg,dict):raise RuntimeError('Manifest не містить опис пакета')
+ if s.get('algorithm')!='Ed25519' or s.get('keyId')!=KEY_ID:raise RuntimeError('Недовірений підпис маніфесту')
+ if not isinstance(pkg,dict):raise RuntimeError('Маніфест не містить опис пакета')
  vt(o.get('version'));https_url(pkg.get('url',''),'пакета')
  if not isinstance(pkg.get('file'),str) or not pkg['file'] or Path(pkg['file']).name!=pkg['file']:raise RuntimeError('Некоректне ім’я файла пакета')
  if not isinstance(pkg.get('sha256'),str) or not re.fullmatch(r'[0-9a-fA-F]{64}',pkg['sha256']):raise RuntimeError('Некоректний SHA-256 пакета')
  try:serialization.load_pem_public_key(PUB.read_bytes()).verify(base64.b64decode(s['value'],validate=True),canon(o))
- except (InvalidSignature,ValueError,KeyError,OSError) as e:raise RuntimeError('Підпис manifest не пройшов перевірку') from e
+ except (InvalidSignature,ValueError,KeyError,OSError) as e:raise RuntimeError('Підпис маніфесту не пройшов перевірку') from e
 def sha(p):
  h=hashlib.sha256()
  with p.open('rb') as f:
@@ -35,11 +34,11 @@ def load_ready(expected_manifest=None):
  except (OSError,ValueError,TypeError) as e:raise RuntimeError('Некоректний стан завантаженого оновлення') from e
  if not isinstance(r,dict) or set(r)!={'version','package','sha256'} or not all(isinstance(r.get(k),str) for k in ('version','package','sha256')):raise RuntimeError('Некоректний стан завантаженого оновлення')
  vt(r['version']);package=Path(r['package']).resolve()
- if not re.fullmatch(r'[0-9a-f]{64}',r['sha256'].lower()):raise RuntimeError('Некоректний SHA-256 у ready state')
+ if not re.fullmatch(r'[0-9a-f]{64}',r['sha256'].lower()):raise RuntimeError('Некоректний SHA-256 у стані готовності')
  if not package.is_file() or sha(package).lower()!=r['sha256'].lower():raise RuntimeError('Завантажений пакет змінився після перевірки')
  if expected_manifest:
   pkg=expected_manifest.get('package') or {};expected=str(pkg.get('sha256','')).lower()
-  if r['version']!=expected_manifest.get('version') or package.name!=pkg.get('file') or r['sha256'].lower()!=expected:raise RuntimeError('Завантажений пакет не відповідає перевіреному manifest')
+  if r['version']!=expected_manifest.get('version') or package.name!=pkg.get('file') or r['sha256'].lower()!=expected:raise RuntimeError('Завантажений пакет не відповідає перевіреному маніфесту')
  return {'version':r['version'],'package':str(package),'sha256':r['sha256'].lower()}
 class W(QThread):
  done=Signal(bool,object);progress=Signal(int,str)
@@ -47,7 +46,7 @@ class W(QThread):
  def run(self):
   try:
    if self.a=='check':
-    https_url(self.p['url'],'manifest')
+    https_url(self.p['url'],'маніфесту')
     with urllib.request.urlopen(self.p['url'],timeout=15) as r:o=json.loads(r.read(2097152).decode('utf-8'))
     verify(o);self.done.emit(True,o);return
    o=self.p['m'];verify(o);pkg=o['package'];UP.mkdir(parents=True,exist_ok=True);t=UP/pkg['file'];part=t.with_suffix(t.suffix+'.part');part.unlink(missing_ok=True)
@@ -57,7 +56,7 @@ class W(QThread):
      while True:
       b=r.read(524288)
       if not b:break
-      f.write(b);n+=len(b);self.progress.emit(int(n*100/total) if total else 0,f'{n//1048576} MB')
+      f.write(b);n+=len(b);self.progress.emit(int(n*100/total) if total else 0,f'{n//1048576} МБ')
     digest=sha(part).lower()
     if digest!=pkg['sha256'].lower():raise RuntimeError('SHA-256 пакета не збігається')
     os.replace(part,t)
@@ -86,7 +85,7 @@ class Updater(QObject):
  @Property(bool,notify=changed)
  def installReady(self):return self.state=='ready' and self.root is not None and (self.root/'FPV-Uhyliant-Update.exe').exists()
  @Slot()
- def check(self):self._start('check',{'url':self.url},'Перевірка підписаного manifest')
+ def check(self):self._start('check',{'url':self.url},'Перевірка підписаного маніфесту')
  @Slot()
  def download(self):
   if self.m:self._start('download',{'m':self.m},'Завантаження пакета')
@@ -107,7 +106,7 @@ class Updater(QObject):
   if w is not self.w:return
   if not ok:self.state='error';self.status=str(d)
   elif a=='check':self.m=d;self.available=d['version'];self.notes=d.get('releaseNotes',[]);self.state='available' if vt(d['version'])>vt(VERSION) else 'current';self.status='Оновлення доступне' if self.state=='available' else 'Версія актуальна'
-  else:self.state='ready';self.status='Пакет перевірено і готово до установки'
+  else:self.state='ready';self.status='Пакет перевірено і готовий до встановлення'
   self.changed.emit()
  def _finished(self,w):
   if w is self.w:self.w=None
