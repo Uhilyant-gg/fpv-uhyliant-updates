@@ -1,6 +1,6 @@
 #define MyAppName "FPV Uhyliant"
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.12"
+  #define MyAppVersion "2.0.13"
 #endif
 #define MyAppPublisher "Uhilyant-gg"
 #define MyLauncher "FPV-Uhyliant-Launcher.exe"
