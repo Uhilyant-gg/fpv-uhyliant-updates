@@ -7,7 +7,9 @@ class Tests(unittest.TestCase):
   self.assertIn('hardwareE2ERuntime.readiness',self.qml);self.assertIn('exportPreflight()',self.qml);self.assertNotIn('firmwareUpdateSession.execute',self.qml);self.assertNotIn('sysupgrade',self.qml)
  def test_host_key_is_explicit_user_confirmation(self):self.assertIn('SSH host key перевірено та прийнято',self.qml);self.assertIn('setHostKeyAccepted(checked)',self.qml)
  def test_main_wires_preflight_panel_without_destructive_execution(self):
-  self.assertIn('Hardware E2E',self.main);self.assertIn('HardwareE2EPanel',self.main);self.assertIn('hardwareE2EPopup.open()',self.main);self.assertIn('onOpened:hardwareE2ERuntime.reset()',self.main);self.assertIn('onClosed:hardwareE2ERuntime.reset()',self.main)
+  self.assertIn('Hardware E2E',self.main);self.assertIn('HardwareE2EPanel',self.main);self.assertIn('hardwareE2EPopup.open()',self.main);self.assertIn('onOpened:hardwareE2ERuntime.reset()',self.main);self.assertNotIn('onClosed:hardwareE2ERuntime.reset()',self.main)
+ def test_closing_preflight_preserves_explicit_approval_for_firmware_handoff(self):
+  self.assertIn('onCloseRequested:hardwareE2EPopup.close()',self.main);self.assertNotIn('onCloseRequested:{hardwareE2ERuntime.reset()',self.main)
  def test_runtime_is_registered_in_application_context(self):
   self.assertIn('HardwareE2ERuntime(d,diag,credentials)',self.bootstrap);self.assertIn("('hardwareE2ERuntime',hardware_e2e)",self.bootstrap);self.assertIn('hardware_e2e.reset()',self.bootstrap)
  def test_panel_has_local_close_path(self):self.assertIn('signal closeRequested()',self.qml);self.assertIn('onClicked:closeRequested()',self.qml)
