@@ -26,6 +26,13 @@ class Tests(unittest.TestCase):
         outside.write_bytes(b'package')
         self.assertFalse(valid_handoff(self.root, outside, '2.0.12', self.digest, 123))
 
+    def test_rejects_nested_package_path(self):
+        nested = self.updates / 'nested'
+        nested.mkdir()
+        package = nested / 'package.zip'
+        package.write_bytes(b'package')
+        self.assertFalse(valid_handoff(self.root, package, '2.0.12', self.digest, 123))
+
     def test_rejects_missing_package(self):
         self.assertFalse(valid_handoff(self.root, self.updates / 'missing.zip', '2.0.12', self.digest, 123))
 
@@ -35,6 +42,9 @@ class Tests(unittest.TestCase):
 
     def test_rejects_bad_digest(self):
         self.assertFalse(valid_handoff(self.root, self.package, '2.0.12', 'bad', 123))
+
+    def test_accepts_uppercase_digest_for_handoff_verification(self):
+        self.assertTrue(valid_handoff(self.root, self.package, '2.0.12', 'A' * 64, 123))
 
     def test_rejects_nonpositive_or_boolean_pid(self):
         self.assertFalse(valid_handoff(self.root, self.package, '2.0.12', self.digest, 0))
