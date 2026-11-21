@@ -1,4 +1,5 @@
 import hashlib,tempfile,unittest
+from copy import deepcopy
 from pathlib import Path
 from firmware_center import FirmwareCenter
 from firmware_executor import FirmwareExecutor
@@ -8,6 +9,17 @@ class Devices:
  def __init__(self):self.items=[{'id':'cam','host':'192.168.1.50','openipcIdentity':{'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'old','evidence':['Majestic /api/v1/config.json']}}]
 class Adapter:
  def execute(self,*args):return True
+class ContextExecutor:
+ def __init__(self,context):self.context=deepcopy(context);self._nonce=None;self.state='reboot-pending'
+ def beginRediscovery(self):
+  if self.state!='reboot-pending':return None
+  self._nonce=object();self.state='rediscovering';return deepcopy(self.context),self._nonce
+ def failRediscovery(self,nonce=None):
+  if self.state=='rediscovering' and nonce is not self._nonce:return False
+  self.state='error';return False
+ def acceptRediscoveredVerification(self,result,verification,nonce=None):
+  if self.state!='rediscovering' or nonce is not self._nonce:return False
+  self.state='verified' if verification.get('ok') is True else 'error';return verification.get('ok') is True
 class Tests(unittest.TestCase):
  def make(self,probe,candidates=None):
   td=tempfile.TemporaryDirectory();image=Path(td.name)/'fw.bin';image.write_bytes(b'x');devices=Devices();center=FirmwareCenter(devices);center.verifyImage(str(image),hashlib.sha256(b'x').hexdigest());center.precheck('cam','ssc30kq-imx335','upgrade',True,True);center.prepareExecution('cam','ssc30kq-imx335','upgrade');executor=FirmwareExecutor(center);executor.register_adapter(Adapter());self.assertTrue(executor.execute('cam','ssc30kq-imx335','upgrade'));return td,executor,FirmwareUpdateLifecycle(executor,FirmwareRediscovery(probe,sleep=lambda _:None,candidates=candidates))
@@ -32,11 +44,9 @@ class Tests(unittest.TestCase):
   try:self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(x.status['state'],'error')
   finally:td.cleanup()
  def test_non_private_original_host_fails_before_probe(self):
-  calls=[];td,x,l=self.make(lambda host:(calls.append(host) or {}));x._transaction['host']='8.8.8.8'
-  try:self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(x.status['state'],'error');self.assertEqual(calls,[])
-  finally:td.cleanup()
+  calls=[];x=ContextExecutor({'host':'8.8.8.8','profile':'ssc30kq-imx335','before':{'platform':'ssc30kq','sensor':'imx335','firmware':'old'}});l=FirmwareUpdateLifecycle(x,FirmwareRediscovery(lambda host:(calls.append(host) or {}),sleep=lambda _:None))
+  self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(x.state,'error');self.assertEqual(calls,[])
  def test_missing_pre_update_hardware_identity_fails_before_rediscovery(self):
-  calls=[];td,x,l=self.make(lambda host:(calls.append(host) or {}));x._transaction['before']['sensor']=''
-  try:self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(x.status['state'],'error');self.assertEqual(calls,[])
-  finally:td.cleanup()
+  calls=[];x=ContextExecutor({'host':'192.168.1.50','profile':'ssc30kq-imx335','before':{'platform':'ssc30kq','sensor':'','firmware':'old'}});l=FirmwareUpdateLifecycle(x,FirmwareRediscovery(lambda host:(calls.append(host) or {}),sleep=lambda _:None))
+  self.assertFalse(l.verify_after_reboot(1,0));self.assertEqual(x.state,'error');self.assertEqual(calls,[])
 if __name__=='__main__':unittest.main()
