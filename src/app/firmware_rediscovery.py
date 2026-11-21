@@ -47,6 +47,7 @@ class FirmwareRediscovery:
  def _probe_candidates(self,candidates,original,platform,sensor):
   pool=concurrent.futures.ThreadPoolExecutor(max_workers=min(_MAX_REDISCOVERY_WORKERS,len(candidates)))
   futures={pool.submit(self._probe_one,candidate):candidate for candidate in candidates}
+  detached=False
   try:
    for future in concurrent.futures.as_completed(futures):
     candidate=futures[future]
@@ -56,10 +57,10 @@ class FirmwareRediscovery:
     if identity is not None:
      for pending in futures:
       if pending is not future:pending.cancel()
-     pool.shutdown(wait=False,cancel_futures=True)
+     pool.shutdown(wait=False,cancel_futures=True);detached=True
      return candidate,identity
   finally:
-   if all(future.done() for future in futures):pool.shutdown(wait=True)
+   if not detached:pool.shutdown(wait=True,cancel_futures=True)
   return None,None
  def wait(self,host,attempts=30,interval=2.0,expected_identity=None):
   attempts=max(1,min(int(attempts),120));interval=max(0.0,min(float(interval),10.0));expected=expected_identity if isinstance(expected_identity,dict) else {};platform=str(expected.get('platform','')).strip().lower();sensor=str(expected.get('sensor','')).strip().lower();hosts=self._hosts(host);original=str(host).strip()

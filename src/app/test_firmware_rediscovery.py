@@ -1,4 +1,5 @@
 import threading,time,unittest
+from unittest import mock
 from firmware_rediscovery import FirmwareRediscovery,_MAX_REDISCOVERY_CANDIDATES
 IDENTITY={'platform':'ssc30kq','sensor':'imx335'}
 class Tests(unittest.TestCase):
@@ -37,6 +38,17 @@ class Tests(unittest.TestCase):
    before=time.monotonic();r=FirmwareRediscovery(probe,lambda _:None,lambda old:hosts).wait('192.168.1.50',1,0,IDENTITY);elapsed=time.monotonic()-before
    self.assertTrue(started.is_set());self.assertTrue(r['rediscovered']);self.assertEqual(r['host'],'192.168.1.70');self.assertLess(elapsed,1.0)
   finally:gate.set()
+ def test_failed_parallel_scan_always_shuts_executor_down(self):
+  class Pool:
+   def __init__(self,*args,**kwargs):self.shutdown_calls=[]
+   def submit(self,fn,candidate):
+    future=concurrent.futures.Future();future.set_result({});return future
+   def shutdown(self,wait=True,cancel_futures=False):self.shutdown_calls.append((wait,cancel_futures))
+  import concurrent.futures
+  pool=Pool()
+  with mock.patch('firmware_rediscovery.concurrent.futures.ThreadPoolExecutor',return_value=pool):
+   r=FirmwareRediscovery(lambda host:{},lambda _:None)._probe_candidates(['192.168.1.60'],'192.168.1.50','ssc30kq','imx335')
+  self.assertEqual(r,(None,None));self.assertEqual(pool.shutdown_calls,[(True,True)])
  def test_dhcp_candidate_requires_complete_expected_identity(self):
   result={'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':['OpenIPC status.cgi']}
   r=FirmwareRediscovery(lambda host:result,lambda _:None,lambda old:['192.168.1.70']).wait('192.168.1.50',1,0,{'platform':'ssc30kq'});self.assertTrue(r['rediscovered']);self.assertEqual(r['host'],'192.168.1.50')
