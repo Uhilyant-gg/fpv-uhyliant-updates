@@ -15,6 +15,7 @@ def load_main_qml(engine,here,smoke,QUrl):
  if not smoke:engine.load(QUrl.fromLocalFile(str(path)));return
  source=path.read_text(encoding='utf-8')
  replacements={
+  'import QtMultimedia\n':'',
   'AudioOutput{id:audioOut;muted:true}':'QtObject{id:audioOut;property bool muted:true}',
   'MediaPlayer{id:player;videoOutput:videoOut;audioOutput:audioOut;onPlayingChanged:{if(playing){videoRecovery.stop();videoRecoveryCount=0;videoRuntime.markPlaying()}else if(videoRuntime.state==="playing"){videoRuntime.markStalled("Основний RTSP несподівано зупинився");videoRecovery.restart()}}onErrorOccurred:function(error,errorString){videoRuntime.playbackError(errorString);if(videoRuntime.streamId!=="")videoRecovery.restart()}}':'QtObject{id:player;property url source:"";readonly property int playbackState:0;function stop(){} function play(){}}',
   'MediaPlayer{id:secondaryPlayer;videoOutput:secondaryVideoOut;onPlayingChanged:{if(playing){secondaryRecovery.stop();secondaryRecoveryCount=0;secondaryVideoRuntime.markPlaying()}else if(pipEnabled&&secondaryVideoRuntime.state==="playing"){secondaryVideoRuntime.markStalled("Додатковий RTSP несподівано зупинився");secondaryRecovery.restart()}}onErrorOccurred:function(error,errorString){secondaryVideoRuntime.playbackError(errorString);if(pipEnabled&&secondaryVideoRuntime.streamId!=="")secondaryRecovery.restart()}}':'QtObject{id:secondaryPlayer;property url source:"";readonly property int playbackState:0;function stop(){} function play(){}}',
@@ -24,6 +25,8 @@ def load_main_qml(engine,here,smoke,QUrl):
  for production,headless in replacements.items():
   if source.count(production)!=1:raise RuntimeError('QML smoke multimedia boundary is out of sync with Main.qml')
   source=source.replace(production,headless)
+ if 'MediaPlayer.PlayingState' not in source:raise RuntimeError('QML smoke playback-state boundary is out of sync with Main.qml')
+ source=source.replace('MediaPlayer.PlayingState','1')
  engine.loadData(source.encode('utf-8'),QUrl.fromLocalFile(str(here)+os.sep))
 def main():
  a=argparse.ArgumentParser(add_help=False);a.add_argument('--self-test',action='store_true');a.add_argument('--mavlink-self-test',action='store_true');a.add_argument('--smoke-test',action='store_true');a.add_argument('--smoke-marker');a.add_argument('--install-root');a.add_argument('--startup-token');x,_=a.parse_known_args();here=Path(__file__).resolve().parent
