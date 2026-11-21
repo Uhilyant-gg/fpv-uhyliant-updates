@@ -40,14 +40,14 @@ class FirmwareExecutor(QObject):
   expected=SUPPORTED_PROFILES.get(profile,{})
   if identity.get('platform','').lower()!=str(expected.get('platform','')).lower() or identity.get('sensor','').lower()!=str(expected.get('sensor','')).lower():self._set('blocked',error='Апаратна ідентичність змінилася після схвалення');return False
   if self._adapter is None:self._set('hardware-validation-pending',deviceId=device_id,profile=profile,mode=mode,step='executor',error='Апаратний адаптер виконавця не підключений');return False
-  self._handoff=handoff;self._locked_device=device_id;self._set('executing',deviceId=device_id,profile=profile,mode=mode,step='flash',error='',verification={})
+  handoff['host']=str(device.get('host','')).strip();self._handoff=handoff;self._locked_device=device_id;self._set('executing',deviceId=device_id,profile=profile,mode=mode,step='flash',error='',verification={})
   try:
    ok=bool(self._adapter.execute(device_id,profile,mode,deepcopy(handoff['artifact']),deepcopy(handoff['plan'])));self._set('reboot-pending' if ok else 'error',step='rediscover' if ok else 'flash',error='' if ok else 'Виконавець повідомив про помилку');return ok
   except Exception:self._set('error',step='flash',error='Виконавець повідомив про помилку');return False
   finally:self._locked_device='';self.changed.emit()
  def verificationContext(self):
   if self._state.get('state')!='reboot-pending' or not self._handoff:return {'ready':False}
-  device=self._device(self._handoff.get('deviceId'));host=str((device or {}).get('host','')).strip()
+  host=str(self._handoff.get('host','')).strip()
   return {'ready':bool(host),'host':host,'profile':self._handoff.get('profile',''),'before':deepcopy(self._before)}
  def failRediscovery(self):self._set('error',step='rediscover',error='Підтверджену OpenIPC не виявлено після перезапуску',verification={});return False
  def acceptRediscoveredVerification(self,rediscovery,verification):
