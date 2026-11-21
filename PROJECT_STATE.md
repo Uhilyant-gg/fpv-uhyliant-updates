@@ -9,19 +9,18 @@ Windows FPV ground station using Python + PySide6 + Qt Quick/QML. Target stacks:
 Normalized telemetry preserves unknown/stale state. Verified OpenIPC identity stays distinct from generic ONVIF. Firmware remains guarded with no generic destructive adapter. Independent primary/secondary video, real-stream-only PiP, camera presets, read-only link diagnostics, AES-GCM backup and transactional restore are implemented software-side.
 
 ## Station pairing
-Pairing now has durable non-secret trust metadata persistence through an atomic, versioned JSON metadata store. The format is strictly envelope-checked and contains trust metadata only. Pairing secret bytes are never written there and remain excluded from portable station backup.
+Pairing has durable non-secret trust metadata persistence through an atomic, versioned JSON metadata store. Secret bytes never enter that store, portable backup, QML-visible state or repository content.
 
-The trust lifecycle is recovery-aware. Failed metadata persistence after confirmation removes the newly persisted protected secret but keeps the pending in-memory pairing so the user may retry. Reconciliation computes a candidate trust set and only replaces live trust after metadata persistence succeeds, preventing in-memory/disk divergence on metadata write failure.
+A Windows Credential Manager adapter now implements the protected secret-store boundary with Win32 `CredWriteW`, `CredReadW`, `CredDeleteW` and `CredFree`. Credentials use an application-scoped target and are persisted for the current Windows user. Non-Windows systems remain safely unavailable. The adapter has deterministic mocked unit coverage, but real Windows execution is explicitly platform-validation-pending.
 
-The application wires the real metadata store under LocalAppData and reconciles it at startup. The secret-store side deliberately remains unavailable, so production pairing cannot begin yet. Enabling pairing still requires a Windows OS-protected secret-store adapter and platform validation. No peer/network proof protocol has been invented.
+Pairing confirmation remains commit-after-persist and retryable. Reconciliation never converts a secret-store read failure into a fabricated missing-secret state. Revocation reads the protected secret, deletes it, persists candidate metadata, and restores the secret if metadata persistence fails. Duplicate metadata record IDs are rejected.
 
-## OTA/update integrity
-OTA remains bound from signed manifest through package SHA-256, strict ready state, guarded ZIP staging and startup acknowledgement/rollback. Release builds remain pinned to immutable source provenance.
+On Windows, `PairingRegistry` selects the protected adapter and combines it with the LocalAppData metadata store already supplied by the application. Pairing UI and peer/network proof exchange remain pending: no peer protocol has been invented, and production enablement still requires real Windows validation.
 
 ## Remaining platform/hardware boundaries
-1. Windows OS-protected pairing secret storage plus Windows validation.
+1. Validate Credential Manager persistence/recovery/revoke behavior on real Windows before production pairing UI.
 2. Pairing peer proof/exchange after a real protocol contract exists.
-3. Real StabX / Starlink-WireGuard observers and target-hardware validation.
+3. Real StabX / Starlink-WireGuard observations and target-hardware validation.
 4. Camera firmware/preset execution and dual-decoder validation on physical targets.
 5. Authenticode when signing credentials become available.
 

@@ -6,18 +6,20 @@ Read this file and `PROJECT_STATE.md` from current `main` before development. `m
 Windows ground station: Python + PySide6 + Qt Quick/QML. FPV remains video-first. Unknown telemetry stays unavailable. Camera presets, video profiles and firmware remain separate. Generic ONVIF is not verified OpenIPC. Recovery/fullflash is not a generic install path. Secrets/private signing keys are not repository data.
 
 ## Pairing persistence
-Non-secret pairing trust metadata is persisted at `LocalAppData/FPV-Uhyliant/pairing-trust.json` through `JsonMetadataStore`. The envelope is versioned and exact-field validated before records are accepted. Secret bytes must never enter this file, SQLite, portable backup, QML-visible state or repository content.
+Non-secret trust metadata is persisted at `LocalAppData/FPV-Uhyliant/pairing-trust.json` through `JsonMetadataStore`. The envelope is versioned and exact-field validated; duplicate IDs are rejected. Secret bytes must never enter this file, SQLite, portable backup, QML-visible state or repository content.
 
-Pairing confirmation is recovery-safe: persist protected secret, persist candidate metadata, then publish live trust. If metadata persistence fails, delete the new secret and leave the in-memory pending item available for retry. Reconciliation is also commit-after-persist so a metadata write failure cannot silently desynchronize live trust from disk.
+`WindowsCredentialSecretStore` stores opaque bytes as Windows generic credentials under the `FPV-Uhyliant/pairing/` target namespace. It uses the current user's Windows Credential Manager through `ctypes`; no credential is required from the user or repository. On non-Windows platforms it is unavailable by design. Keep real Windows validation marked pending until exercised on a Windows host.
 
-The default secret store remains unavailable. Therefore the presence of the metadata store alone must never enable pairing. A Windows OS-protected secret adapter must be implemented and validated before pairing UI is enabled. Peer proof/exchange still requires a real protocol contract.
+Confirmation persists the protected secret, persists candidate metadata, then publishes live trust. Failed metadata persistence deletes the new secret and leaves pending state retryable. Reconciliation removes metadata only after a successful protected-store absence check and successful metadata write. A protected-store error must remain an error, never fabricated absence.
 
-## Other trust boundaries
-OTA stays bound from signed manifest through package SHA-256, guarded extraction and startup rollback. Portable backups use AES-256-GCM/scrypt and explicit transactional restore. Release builds remain pinned to immutable source provenance.
+Revocation reads the protected secret for rollback, deletes it, then persists candidate metadata. If metadata persistence fails, it restores the secret and leaves live trust unchanged. Do not expose the read operation through QML or public pairing state.
+
+## Pairing enablement boundary
+Do not add pairing UI until the Credential Manager adapter is validated on real Windows together with persistence, restart recovery and revoke paths. Do not implement peer proof/exchange without a verified protocol contract.
 
 ## Next work
-1. Implement Windows-protected pairing secret storage and validate it on Windows.
-2. Add pairing UI only after both stores are operational.
+1. Run Credential Manager integration tests on real Windows and validate restart/reconcile/revoke behavior.
+2. Add pairing UI only after that validation and both stores are operational.
 3. Add peer proof/exchange only from a verified protocol contract.
 4. Continue hardware validation and executable signing as equipment/credentials become available.
 
