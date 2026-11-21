@@ -1,21 +1,21 @@
 {
   "product": "FPV-Uhyliant",
   "channel": "test",
-  "version": "2.0.9",
-  "build": 209,
+  "version": "2.0.10",
+  "build": 2010,
   "mandatory": false,
   "minimumUpdaterVersion": "2.0.4",
   "package": {
-    "file": "FPV-Uhyliant-v2.0.9-Test-UA-Windows.zip",
-    "url": "https://github.com/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.9/FPV-Uhyliant-v2.0.9-Test-UA-Windows.zip",
-    "sha256": "863703ad6101162ab4fde671f23ca71837e25fc4908f352fad9efc24a587103d"
+    "file": "FPV-Uhyliant-v2.0.10-Test-UA-Windows.zip",
+    "url": "https://github.com/Uhilyant-gg/fpv-uhyliant-updates/releases/download/v2.0.10/FPV-Uhyliant-v2.0.10-Test-UA-Windows.zip",
+    "sha256": "d5d345713f1288d716531fd22f922180692b4c2907539634a5df975a5b797313"
   },
   "releaseNotes": [
-    "2.0.9 integration checkpoint: SQLite Devices, streams, per-stream video profiles and RTSP playback"
+    "Hotfix packaged Qt Multimedia startup"
   ],
   "signature": {
     "algorithm": "Ed25519",
     "keyId": "fpv-uhyliant-production-v1",
-    "value": "uxEr8qeqYRzapLdC6hHhHncarRKnyDaoaLBlo8tH4Dq0lVkU8iDhOvAdjoPOah5Jm7ak9dNvPzFHD5W2kciiCg=="
+    "value": "fT6/LVMEfJHH+iU2CySOniF063KKPV5Mc3cqOoOZgbBwY/vc/OQ1va9lbZvrUvtOrKjsCz+uLhMH5fAM7zMCBQ=="
   }
 }
