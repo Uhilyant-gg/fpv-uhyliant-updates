@@ -21,11 +21,14 @@ class FirmwareUpdateSession(QObject):
   self._enabled=transport is not None
   self.executor.register_adapter(OpenIPCUpgradeAdapter(self.devices,transport) if transport is not None else None)
   self._result={'enabled':True,'state':'ready','reason':'Транспорт підключено для явної апаратної перевірки','observedFirmware':'','verification':{}} if self._enabled else self._empty();self.changed.emit();return True
- @Slot(QObject,result=bool)
- def enableAuthenticatedTransport(self,credentials):
-  if self.executor.busy or credentials is None:return False
-  try:snapshot=credentials.snapshot()
+ @Slot(QObject,QObject,result=bool)
+ def enableAuthenticatedTransport(self,credentials,preflight=None):
+  if self.executor.busy or credentials is None or preflight is None:return False
+  try:
+   readiness=preflight.readiness
+   snapshot=credentials.snapshot()
   except Exception:return False
+  if not isinstance(readiness,dict) or readiness.get('ready') is not True:return False
   if not isinstance(snapshot,dict) or not str(snapshot.get('username','')).strip() or snapshot.get('hasPassword') is not True:return False
   return self.configure_transport(AuthenticatedCameraTransport(credentials))
  @Slot(result=bool)
