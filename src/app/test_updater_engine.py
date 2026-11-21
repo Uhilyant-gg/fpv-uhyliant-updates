@@ -11,6 +11,13 @@ class Tests(unittest.TestCase):
   bad=dict(self.manifest);bad['version']='2.0.12';self.assertRaises(RuntimeError,updater_engine.load_ready,bad);bad={'version':'2.0.11','package':{'file':'package.zip','sha256':'0'*64}};self.assertRaises(RuntimeError,updater_engine.load_ready,bad)
  def test_rejects_extra_ready_fields(self):
   (self.root/'ready.json').write_text(json.dumps({'version':'2.0.11','package':str(self.payload),'sha256':self.digest,'trusted':True}));self.assertRaises(RuntimeError,updater_engine.load_ready,self.manifest)
+ def test_rejects_ready_package_outside_updates_directory(self):
+  outside=self.root.parent/(self.root.name+'-outside.zip');outside.write_bytes(b'payload')
+  try:
+   (self.root/'ready.json').write_text(json.dumps({'version':'2.0.11','package':str(outside),'sha256':self.digest}),encoding='utf-8');self.assertRaises(RuntimeError,updater_engine.load_ready,self.manifest)
+  finally:outside.unlink(missing_ok=True)
+ def test_rejects_ready_package_in_nested_updates_directory(self):
+  nested=self.root/'nested';nested.mkdir();package=nested/'package.zip';package.write_bytes(b'payload');(self.root/'ready.json').write_text(json.dumps({'version':'2.0.11','package':str(package),'sha256':self.digest}),encoding='utf-8');self.assertRaises(RuntimeError,updater_engine.load_ready,self.manifest)
  def test_install_root_requires_full_installed_layout(self):
   install=self.root/'install';install.mkdir();self.assertIsNone(updater_engine.validate_install_root(install));(install/'FPV-Uhyliant-Update.exe').write_bytes(b'');(install/'FPV-Uhyliant-Launcher.exe').write_bytes(b'');(install/'app'/'current').mkdir(parents=True);(install/'app'/'current'/'FPV-Uhyliant.exe').write_bytes(b'');self.assertEqual(updater_engine.validate_install_root(install),install.resolve())
 if __name__=='__main__':unittest.main()
