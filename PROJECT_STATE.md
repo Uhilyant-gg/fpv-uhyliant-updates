@@ -2,39 +2,77 @@
 
 `main` is the single source of truth. Historical chat code must not replace newer repository code.
 
-## Product priority
-Current priority is the complete OpenIPC camera lifecycle plus a reliable packaged Windows update path. Before physical hardware E2E, add a small diagnostics/observability foundation so real-device failures can be captured precisely. UI polish is secondary.
+## Current priority
+The software foundation for the guarded OpenIPC update path is now mature enough that the next milestone is integrated validation rather than more isolated defensive hardening. The immediate goal is to make the complete camera journey observable, deterministic and ready for real-hardware E2E:
 
-## Discovery
-Discovery is route-aware and bounded. Saved, last-seen and manual IPv4 addresses are direct candidates. Public/default, loopback, multicast, link-local, oversized and known virtual-adapter routes are not swept. ICMP is not required. Generic reachability is not OpenIPC evidence. Platform, SoC, sensor, variant and firmware remain absent unless observed. Runtime OpenIPC probes use only a validated observed IPv4 plus fixed `/api/v1/config.json` and `/cgi-bin/status.cgi` paths; placeholder URLs are forbidden by regression tests. Protected endpoints may surface an authentication-required camera candidate, but authentication alone never upgrades that candidate to verified OpenIPC. Credentials used to confirm a protected camera are session input and are not persisted with the discovered device.
+`discover -> verify OpenIPC -> observe hardware identity -> select compatible official firmware -> verify artifact -> authenticate -> explicit guarded update -> reboot -> bounded rediscovery -> observe post-update identity/firmware`.
 
-## OpenIPC normal upgrade
-Normal update is fixed `sysupgrade -k -r` for currently verified compatible OpenIPC only. Credentials are session-only. Authentication precedes destructive execution and current host/OpenIPC/platform/sensor are revalidated immediately before the command. Recovery/fullflash remains separate.
+UI work should support this journey and expose only decisions the user actually needs to make. Internal mechanisms remain available only where they are required for diagnostics or an explicit advanced/manual path.
 
-`FirmwareUpdateSession` is the application orchestration boundary around executor, upgrade adapter and reboot verification. It starts without a transport and exposes no credential fields in result/state. `main.py` cannot perform a destructive update without explicit physical transport activation. Authenticated transport activation requires a ready preflight bound to a private IPv4 host plus non-empty observed platform and sensor matching the current verified active device.
+## Discovery and device identity
+Discovery is route-aware and bounded. Saved, last-seen and manual IPv4 addresses are direct candidates. Public/default, loopback, multicast, link-local, oversized and known virtual-adapter routes are not swept. ICMP is not required. Generic reachability or ONVIF is not OpenIPC evidence.
 
-## Firmware acquisition
-The official upstream catalog is consumed through a fail-closed acquisition boundary. Only complete entries with observed platform + sensor, explicit variant/channel/build, an allowed HTTPS OpenIPC download URL, SHA-256 and bounded positive size become candidates. Variant and build are never guessed. An official selection is bound to catalog generation plus device id, host, verified OpenIPC platform and sensor; any change makes the selection stale before download. Download accepts only that bound catalog selection, not an arbitrary UI artifact map. Cached artifacts are reusable only after exact size and SHA-256 verification; corrupt cache files are discarded. Verified bytes are handed to the existing `FirmwareCenter.verifyImage()` boundary. The manual local-image path remains separate and does not claim official-catalog provenance.
+Protected endpoints may surface an authentication-required candidate, but authentication alone never upgrades it to verified OpenIPC. Platform, SoC, sensor, variant and firmware remain unknown unless observed. The evidence ladder remains:
 
-## Reboot and verification
-Command dispatch means only `reboot-pending`. Post-reboot rediscovery first retries the destructive dispatch host and may then examine only route-aware bounded private candidates produced by the existing discovery policy. Rediscovery is refused before probing when the bound dispatch host is not a safe private IPv4 address or the pre-update platform/sensor identity is incomplete. A changed DHCP address is accepted only from fresh OpenIPC endpoint evidence with matching pre-update platform and sensor; an unrelated OpenIPC camera is skipped rather than selected. Success still requires a non-empty actually observed firmware version. Rediscovery remains ICMP-independent and never expands public, default, oversized or known virtual-adapter routes.
+`reachable service -> camera candidate -> verified OpenIPC -> separately evidenced R2D2 compatibility -> observed hardware identity -> observed streams`.
 
-## Application updater
-The signed test manifest and package SHA-256 remain mandatory. Installation is offered only when `--install-root` resolves to the complete installed launcher layout containing the update helper, launcher and `app/current/FPV-Uhyliant.exe`. Update helper staging, payload self-test, atomic current/rollback switching and startup acknowledgement remain fail-closed.
+The camera selected in Firmware Center is also the device bound to hardware preflight. Changing that selected device invalidates host-key acceptance. A missing/unknown explicit device selection fails closed rather than silently falling back to another camera.
+
+## Automatic Firmware Center
+The normal user path uses the selected/active verified OpenIPC camera and derives a supported firmware profile only from observed platform + sensor. A profile is never guessed from a UI choice. If no unique supported profile exists, automatic update remains blocked.
+
+The official OpenIPC catalog is consumed through a fail-closed acquisition boundary. Only complete entries with observed platform + sensor, explicit variant/channel/build, an allowed HTTPS OpenIPC download URL, SHA-256 and bounded positive size become candidates. Variant/build ambiguity requires an explicit advanced choice. The catalog selection is bound to catalog generation plus device id, host, verified OpenIPC platform and sensor. Any change makes it stale.
+
+Downloaded or cached artifacts must pass exact size and SHA-256 verification before entering the existing Firmware Center artifact boundary. Manual local firmware remains a separate expert path and must not be presented as the recommended automatic flow.
+
+For normal `upgrade`, recovery-path and flash-layout confirmations are not prerequisites. Those gates remain applicable to the separate primary/recovery/fullflash paths where required. Recovery/fullflash is never a universal OpenIPC update method.
+
+## Destructive update safety
+Normal OpenIPC update remains fixed `sysupgrade -k -r` for currently verified compatible OpenIPC only. Credentials are session-only. Password fields are masked and cleared on reset/close/shutdown, and passwords must not enter logs, persistence, diagnostics, status, execution plans, shell interpolation or process argv.
+
+Authentication and accepted SSH host-key state precede destructive execution. Immediately before execution, the approved device, current host, verified OpenIPC state, observed platform/sensor, approval, execution plan and firmware artifact integrity must still match. Any stale or changed input fails closed.
+
+The destructive operation remains an explicit user action. A successful command dispatch means only `reboot-pending`, never successful update.
+
+## Reboot and post-update verification
+Post-reboot verification uses the host bound at destructive dispatch and bounded route-aware rediscovery. A changed DHCP address may be accepted only from fresh OpenIPC evidence with matching pre-update platform and sensor. Unrelated OpenIPC devices are skipped.
+
+Update success requires fresh verified OpenIPC evidence, hardware continuity and a non-empty actually observed post-update firmware version. Missing authoritative firmware remains unknown and cannot be interpreted as success.
 
 ## Diagnostics and observability
-Before physical OpenIPC E2E, add a deterministic local diagnostics layer with structured events and tri-state/health results that preserve unknown values. It should produce a sanitized diagnostic snapshot covering application/build identity, discovered devices and evidence, relevant network state, video/runtime state, protocol health, updater state, bounded recent errors/warnings and correlation/timestamp data. Secrets, credentials and private signing material must never be exported.
+Diagnostics is now part of the hardware-validation path, not a separate future feature. The local diagnostics boundary should remain deterministic and sanitized, preserving unknown values rather than inventing health data. Diagnostic export is the evidence capture mechanism for physical E2E failures.
 
-Provide an explicit diagnostic bundle export suitable for offline inspection. AI-assisted diagnosis is a later layer over the same sanitized structured bundle, not a prerequisite for local diagnostics and never an authority for destructive actions. Any future AI integration must remain behind the existing safety boundaries; firmware flashing, sysupgrade, reset/erase, network reconfiguration and flight-controller parameter changes require the normal application approval/validation path.
+Continue improving lifecycle observability where real-hardware debugging needs it: correlate camera/device identity, firmware acquisition state, preflight/auth state, executor phase, rediscovery result and bounded errors/warnings. Secrets, credentials and private signing material must never be exported.
 
-## Execution order
-1. Finish and verify the packaged Windows updater software path.
-2. Run a focused software audit rather than indefinite defensive hardening.
-3. Add the diagnostics/observability foundation and diagnostic bundle export.
-4. Run real OpenIPC hardware E2E with actual credentials and accepted SSH host key.
-5. Fix failures found from real hardware evidence and repeat E2E.
-6. Validate the integrated user journey from discovery through firmware selection/update/reboot/rediscovery/observed version.
-7. Perform the larger video-first UI/UX polish and release-readiness pass.
+AI-assisted diagnosis, if added later, consumes the same sanitized evidence and never becomes an authority for destructive actions.
 
-## Physical boundary
-Destructive OpenIPC transport remains disabled at application startup. Real end-to-end camera update still requires actual credentials, accepted SSH host key and explicit destructive hardware validation.
+## Application updater
+The packaged Windows updater remains a parallel release-readiness track. Signed manifest validation and package SHA-256 remain mandatory. Installation is offered only for a complete installed launcher layout. Helper staging, payload self-test, atomic current/rollback switching and startup acknowledgement remain fail-closed.
+
+Do not let application-updater polish block the next OpenIPC hardware E2E unless a packaging defect prevents producing/running the test build.
+
+## Next execution order
+1. Complete the remaining cross-boundary audit of the automatic Firmware Center journey, especially invalidation between camera selection, catalog selection, preflight/auth, execution plan and executor handoff.
+2. Add only the diagnostics/structured lifecycle evidence needed to make a real-camera failure reproducible and diagnosable.
+3. Produce a testable build and run real OpenIPC hardware E2E with actual session credentials and explicit SSH host-key acceptance.
+4. Fix failures from real hardware evidence immediately and repeat the E2E until the guarded lifecycle completes or a genuine hardware/external blocker is identified.
+5. Validate the complete user journey including discovery, manual-IP fallback, identity/add/active-camera state, automatic firmware selection, authentication, guarded update, reboot, rediscovery and observed firmware.
+6. Perform the larger video-first UI/UX and release-readiness pass after the integrated hardware journey is stable.
+
+## Hardware E2E success contract
+Software-only CI does not prove physical update success. A hardware E2E pass requires observed evidence for the same logical camera across the lifecycle:
+
+- verified OpenIPC before update;
+- observed platform + sensor before update;
+- compatible verified firmware artifact;
+- ready preflight bound to the selected camera;
+- authenticated guarded destructive execution;
+- reboot-pending after dispatch;
+- bounded rediscovery after reboot;
+- fresh verified OpenIPC identity with matching hardware continuity;
+- non-empty observed post-update firmware.
+
+If any item is missing, report the stage and evidence instead of claiming update success.
+
+## Stable product invariants
+FPV remains video-first. Camera presets, video profiles and firmware are separate entities. Firmware update must not apply a video profile. Unknown telemetry/state remains unknown. Recovery/fullflash is separate from normal update. Destructive firmware transport stays disabled at startup and requires the normal explicit safety/approval path.
