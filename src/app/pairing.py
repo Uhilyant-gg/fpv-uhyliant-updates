@@ -6,22 +6,22 @@ from PySide6.QtCore import QObject,Property,Signal,Slot
 class SecretStoreUnavailable(RuntimeError):pass
 class MetadataStoreUnavailable(RuntimeError):pass
 class SecretStore:
- available=False;error='OS-protected secret store unavailable'
+ available=False;error='Захищене системою сховище секретів недоступне'
  def put(self,key,value):raise SecretStoreUnavailable(self.error)
  def get(self,key):raise SecretStoreUnavailable(self.error)
  def delete(self,key):raise SecretStoreUnavailable(self.error)
  def contains(self,key):raise SecretStoreUnavailable(self.error)
 class MetadataStore:
  available=False
- def load(self):raise MetadataStoreUnavailable('pairing metadata store unavailable')
- def save(self,records):raise MetadataStoreUnavailable('pairing metadata store unavailable')
+ def load(self):raise MetadataStoreUnavailable('Сховище метаданих парування недоступне')
+ def save(self,records):raise MetadataStoreUnavailable('Сховище метаданих парування недоступне')
 class JsonMetadataStore(MetadataStore):
  available=True
  def __init__(self,path):self.path=Path(path)
  def load(self):
   if not self.path.exists():return []
   raw=json.loads(self.path.read_text(encoding='utf-8'))
-  if not isinstance(raw,dict) or set(raw)!={'schema','version','records'} or raw['schema']!='fpv-uhyliant-pairing-metadata' or raw['version']!=1 or not isinstance(raw['records'],list):raise MetadataStoreUnavailable('invalid pairing metadata')
+  if not isinstance(raw,dict) or set(raw)!={'schema','version','records'} or raw['schema']!='fpv-uhyliant-pairing-metadata' or raw['version']!=1 or not isinstance(raw['records'],list):raise MetadataStoreUnavailable('Некоректні метадані парування')
   return [dict(r) for r in raw['records']]
  def save(self,records):
   self.path.parent.mkdir(parents=True,exist_ok=True);payload={'schema':'fpv-uhyliant-pairing-metadata','version':1,'records':[dict(r) for r in records]};tmp=self.path.with_suffix(self.path.suffix+'.tmp');tmp.write_text(json.dumps(payload,ensure_ascii=False,sort_keys=True,separators=(',',':')),encoding='utf-8');os.replace(tmp,self.path)
@@ -37,8 +37,8 @@ class PairingRegistry(QObject):
   if not getattr(self.metadata,'available',False):return
   try:
    records=self.metadata.load()
-   if not all(self._valid_record(r) for r in records):raise MetadataStoreUnavailable('invalid trust record')
-   if len({r['id'] for r in records})!=len(records):raise MetadataStoreUnavailable('duplicate trust record')
+   if not all(self._valid_record(r) for r in records):raise MetadataStoreUnavailable('Некоректний запис довіри')
+   if len({r['id'] for r in records})!=len(records):raise MetadataStoreUnavailable('Дубльований запис довіри')
    self._records={r['id']:dict(r) for r in records};self._metadata_error=''
   except Exception as e:self._records={};self._metadata_error=str(e)
  def _valid_record(self,r):
@@ -83,7 +83,7 @@ class PairingRegistry(QObject):
   record={**item['public'],'state':'trusted','trustedAt':int(self.clock()),'secretRef':key};candidate={**self._records,pairing_id:record}
   if not self._persist(candidate):
    cleaned,_=self._secret_call('delete',key)
-   if not cleaned:self._recovery_error='confirm rollback failed; protected secret may be orphaned'
+   if not cleaned:self._recovery_error='Не вдалося відкотити підтвердження; захищений секрет міг залишитися без метаданих'
    self.changed.emit();return False
   self._pending.pop(pairing_id,None);self._records=candidate;self._recovery_error='';self.changed.emit();return True
  @Slot(str,result=bool)
@@ -92,13 +92,13 @@ class PairingRegistry(QObject):
   if not record or self._recovery_error:return False
   ok,secret=self._secret_call('get',record['secretRef'])
   if not ok:self.changed.emit();return False
-  if secret is None:self._recovery_error='trusted metadata references a missing protected secret';self.changed.emit();return False
+  if secret is None:self._recovery_error='Метадані довіри посилаються на відсутній захищений секрет';self.changed.emit();return False
   ok,_=self._secret_call('delete',record['secretRef'])
   if not ok:self.changed.emit();return False
   candidate=dict(self._records);candidate.pop(pairing_id,None)
   if not self._persist(candidate):
    restored,_=self._secret_call('put',record['secretRef'],secret)
-   if not restored:self._recovery_error='revoke rollback failed; trust state requires reconciliation'
+   if not restored:self._recovery_error='Не вдалося відкотити відкликання; стан довіри потребує узгодження'
    self.changed.emit();return False
   self._records=candidate;self._recovery_error='';self.changed.emit();return True
  @Slot(str,result=bool)
@@ -111,16 +111,16 @@ class PairingRegistry(QObject):
  @Slot(result=bool)
  def reconcile(self):
   if not self.secretStoreAvailable or not self.metadataStoreAvailable:
-   self._recovery_error='reconciliation requires both protected secret and metadata stores';self.changed.emit();return False
+   self._recovery_error='Для узгодження потрібні і захищене сховище секретів, і сховище метаданих';self.changed.emit();return False
   if self._metadata_error:
    self._load()
-   if self._metadata_error:self._recovery_error='metadata reload failed; reconciliation incomplete';self.changed.emit();return False
+   if self._metadata_error:self._recovery_error='Не вдалося повторно завантажити метадані; узгодження не завершено';self.changed.emit();return False
   candidate=dict(self._records);changed=False
   for pid,record in list(candidate.items()):
    ok,present=self._secret_call('contains',record['secretRef'])
-   if not ok:self._recovery_error='protected secret verification failed; reconciliation incomplete';self.changed.emit();return False
+   if not ok:self._recovery_error='Не вдалося перевірити захищений секрет; узгодження не завершено';self.changed.emit();return False
    if not present:candidate.pop(pid,None);changed=True
   if changed and not self._persist(candidate):
-   self._recovery_error='metadata persistence failed; reconciliation incomplete';self.changed.emit();return False
+   self._recovery_error='Не вдалося зберегти метадані; узгодження не завершено';self.changed.emit();return False
   if changed:self._records=candidate
   self._recovery_error='';self.changed.emit();return True
