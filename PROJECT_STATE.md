@@ -12,18 +12,20 @@ Normalized telemetry preserves unknown/stale state. Verified OpenIPC identity st
 OTA remains a signed-manifest trust chain bound through package SHA-256, strict ready state, guarded ZIP staging and startup acknowledgement/rollback. Release builds remain pinned to the immutable workflow SHA and artifact hashes are checked across jobs.
 
 ## Station pairing foundation
-A software-side pairing trust lifecycle now exists with pending, explicit confirmation, trusted and revoked/cancelled paths. Pairing secrets are generated locally and never exposed through the public QML-facing records. Trust is not granted unless an injected secret store reports that it is available and successfully persists the secret.
+`PairingRegistry` now separates three states/resources: in-memory pending secrets, OS-protected secret storage, and non-secret persistent trust metadata. Pairing can begin only when both a secret store and metadata store explicitly report availability. Explicit confirmation stores the secret first, then persists trust metadata; if metadata persistence fails, the newly written secret is removed and trust is not granted.
 
-The default secret-store implementation is deliberately unavailable. Therefore production pairing is currently disabled until a real OS-protected Windows secret-store adapter is implemented and validated. Pairing secrets are not part of station backup snapshots. Pending secrets live only in process memory and are cleared on application shutdown.
+Trusted metadata can be reloaded across process restarts without exposing secret bytes. A reconciliation pass removes trust metadata whose protected secret is no longer present. Revocation deletes the protected secret and then persists removal of trust metadata. Pending secrets remain process-memory-only and are cleared on shutdown.
+
+The default secret and metadata stores remain unavailable, so production pairing is still disabled until real Windows-protected secret storage plus trusted metadata persistence are implemented and validated. Pairing secrets remain excluded from station backup snapshots. No peer/network pairing protocol is invented.
 
 ## Hardware/platform boundaries
-A Windows OS-protected secret-store adapter is `platform-validation-pending`. Real StabX, Starlink/WireGuard observers, target-camera firmware/preset execution and physical dual-decoder validation remain `hardware-validation-pending`. Authenticode still requires a real signing certificate/secret.
+Windows-protected pairing storage remains `platform-validation-pending`. Real StabX, Starlink/WireGuard observers, target-camera firmware/preset execution and physical dual-decoder validation remain `hardware-validation-pending`. Authenticode requires real signing credentials.
 
 ## Next implementation order
-1. Implement and validate Windows-protected pairing secret storage without repository-stored secrets.
-2. Add pairing identity/proof transport only after its real protocol is defined; do not invent a peer protocol.
-3. Continue hardware validation as target equipment becomes available.
-4. Add Authenticode when real signing credentials are available.
+1. Implement Windows-protected secret storage and non-secret trust metadata persistence.
+2. Add pairing peer proof/exchange only after a real protocol contract exists.
+3. Continue hardware validation as equipment becomes available.
+4. Add Authenticode when signing credentials are available.
 
 ## Acceptance rule
-No invented telemetry, hardware identity, stream metadata, latency, pairing peer state or trust. Hardware/platform-dependent validation stays explicit.
+No invented telemetry, hardware identity, stream metadata, latency, pairing peer state or trust. Platform/hardware-dependent validation stays explicit.
