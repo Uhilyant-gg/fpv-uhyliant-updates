@@ -155,8 +155,8 @@ class Devices(QObject):
  def _load(self):
   try:
    with self._connect() as db:
-    cols="id,name,type,host,port,connection,notes";self._items=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM devices ORDER BY name COLLATE NOCASE")];row=db.execute("SELECT value FROM settings WHERE key='activeDeviceId'").fetchone();self._active_id=row[0] if row else ""
-   if not any(i["id"]==self._active_id for i in self._items):self._active_id=self._items[0]["id"] if self._items else "";self._save_active()
+    cols="id,name,type,host,port,connection,notes";self._items=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM devices ORDER BY name COLLATE NOCASE")]
+   self._active_id=""
    self._load_streams();self._load_profiles()
   except sqlite3.Error as e:self._items=[];self._streams=[];self._profiles=[];self._active_id="";self.notice.emit("Помилка бази пристроїв: "+str(e))
  def _load_streams(self):
@@ -269,7 +269,7 @@ class Devices(QObject):
   try:
    with self._connect() as db:db.execute("INSERT INTO devices VALUES(?,?,?,?,?,?,?)",(did,name,device_type,host,port,connection,note.strip()))
   except sqlite3.IntegrityError:self.notice.emit("Пристрій з таким host і портом уже існує");return ""
-  self._active_id=self._active_id or did;self._save_active();self._load();self.changed.emit();return did
+  self._load();self.changed.emit();return did
  @Slot(str,str,str,int,str,result=bool)
  def updateDevice(self,did,name,host,port,note):
   name,host=name.strip(),host.strip()
