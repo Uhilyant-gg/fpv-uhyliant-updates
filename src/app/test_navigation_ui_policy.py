@@ -14,7 +14,11 @@ class NavigationUiPolicyTests(unittest.TestCase):
  def test_update_ui_uses_existing_guarded_updater_only(self):
   for call in ('updater.check()','updater.download()','updater.install()'):self.assertIn(call,self.update)
  def test_main_exposes_service_mode_without_fake_observers(self):
-  self.assertIn('SERVICE MODE',self.main);self.assertNotIn('observeStabX',self.main);self.assertNotIn('observeStarlink',self.main)
+  self.assertIn('СЕРВІСНИЙ РЕЖИМ',self.main);self.assertNotIn('observeStabX',self.main);self.assertNotIn('observeStarlink',self.main)
+ def test_main_localizes_core_visible_surfaces(self):
+  for text in ('ВІДЕО','Основний','Додатковий','Поміняти місцями','Телеметрія:','Мережа:','недоступно'):self.assertIn(text,self.main)
+  for obsolete in ('SERVICE MODE','VIDEO WORKSPACE','text:"Primary"','text:"Secondary"','text:"Swap"','text:"Firmware"'):self.assertNotIn(obsolete,self.main)
+ def test_main_uses_delayed_hover_help(self):self.assertGreaterEqual(len(re.findall(r'\bHoverHint\s*\{',self.main)),16)
  def test_navigation_stop_clears_media_sources(self):self.assertIn('player.source=""',self.main);self.assertIn('secondaryPlayer.source=""',self.main)
  def test_hover_help_delay_is_five_seconds(self):self.assertIn('property int delay:5000',self.hint);self.assertIn('showTimer.restart()',self.hint)
  def test_home_uses_delayed_hover_help(self):self.assertGreaterEqual(self.home.count('HoverHint{'),6)

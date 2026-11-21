@@ -27,49 +27,26 @@ class UiLanguagePolicyTests(unittest.TestCase):
 
     def test_firmware_surface_is_ukrainian(self):
         visible = self.visible(self.sources["FirmwareCenter.qml"])
-        for text in (
-            "ЦЕНТР ПРОШИВКИ",
-            "Попередня перевірка",
-            "Підготувати план виконання",
-            "ПРЕСЕТ КАМЕРИ",
-        ):
+        for text in ("ЦЕНТР ПРОШИВКИ", "Попередня перевірка", "Підготувати план виконання", "ПРЕСЕТ КАМЕРИ"):
             self.assertIn(text, visible)
-        for obsolete in (
-            "FIRMWARE CENTER",
-            "IMAGE VERIFIED",
-            "PRE-CHECK APPROVED",
-            "EXECUTION PLAN READY",
-            "Expected SHA-256",
-            "Flash layout verified",
-            "Recovery path verified",
-        ):
+        for obsolete in ("FIRMWARE CENTER", "IMAGE VERIFIED", "PRE-CHECK APPROVED", "EXECUTION PLAN READY", "Expected SHA-256", "Flash layout verified", "Recovery path verified"):
             self.assertNotIn(obsolete, visible)
 
     def test_devices_surface_core_copy_is_ukrainian(self):
         visible = self.visible(self.sources["DevicesPanel.qml"])
-        for obsolete in (
-            "OPENIPC IDENTITY",
-            "Platform / SoC",
-            "Sensor:",
-            "Firmware:",
-            "Evidence:",
-            "Hostname:",
-            "Camera preset",
-            "video profile",
-            "hardware apply",
-        ):
+        for obsolete in ("OPENIPC IDENTITY", "Platform / SoC", "Sensor:", "Firmware:", "Evidence:", "Hostname:", "Camera preset", "video profile", "hardware apply"):
             self.assertNotIn(obsolete, visible)
 
     def test_pairing_surface_core_copy_is_ukrainian(self):
         visible = self.visible(self.sources["PairingPanel.qml"])
-        for obsolete in (
-            "PAIRING TRUST",
-            "Protected secret store",
-            "Trust metadata store",
-            "Recovery required",
-            "Fingerprint:",
-            "trusted",
-        ):
+        for obsolete in ("PAIRING TRUST", "Protected secret store", "Trust metadata store", "Recovery required", "Fingerprint:", "trusted"):
+            self.assertNotIn(obsolete, visible)
+
+    def test_main_surface_core_copy_is_ukrainian(self):
+        visible = self.visible(self.sources["Main.qml"])
+        for expected in ("СЕРВІСНИЙ РЕЖИМ", "ВІДЕО", "Основний", "Додатковий", "Поміняти місцями", "Прошивка", "Телеметрія: ", "Мережа: "):
+            self.assertIn(expected, visible)
+        for obsolete in ("SERVICE MODE", "VIDEO WORKSPACE", "Primary", "Secondary", "Swap", "Firmware", "Telemetry: ", "Network: "):
             self.assertNotIn(obsolete, visible)
 
     def test_update_surface_has_delayed_help(self):
@@ -81,6 +58,9 @@ class UiLanguagePolicyTests(unittest.TestCase):
     def test_devices_and_pairing_have_delayed_help(self):
         self.assertGreaterEqual(self.hover_hint_count(self.sources["DevicesPanel.qml"]), 8)
         self.assertGreaterEqual(self.hover_hint_count(self.sources["PairingPanel.qml"]), 2)
+
+    def test_main_surface_has_delayed_help(self):
+        self.assertGreaterEqual(self.hover_hint_count(self.sources["Main.qml"]), 16)
 
 
 if __name__ == "__main__":
