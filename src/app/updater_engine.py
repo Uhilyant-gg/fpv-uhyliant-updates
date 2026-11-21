@@ -33,7 +33,10 @@ def load_ready(expected_manifest=None):
  try:r=json.loads((UP/'ready.json').read_text(encoding='utf-8'))
  except (OSError,ValueError,TypeError) as e:raise RuntimeError('Некоректний стан завантаженого оновлення') from e
  if not isinstance(r,dict) or set(r)!={'version','package','sha256'} or not all(isinstance(r.get(k),str) for k in ('version','package','sha256')):raise RuntimeError('Некоректний стан завантаженого оновлення')
- vt(r['version']);package=Path(r['package']).resolve()
+ vt(r['version']);package=Path(r['package']).resolve();updates=UP.resolve()
+ try:package.relative_to(updates)
+ except ValueError as e:raise RuntimeError('Пакет оновлення знаходиться поза каталогом оновлень') from e
+ if package.parent!=updates:raise RuntimeError('Пакет оновлення має бути безпосередньо в каталозі оновлень')
  if not re.fullmatch(r'[0-9a-f]{64}',r['sha256'].lower()):raise RuntimeError('Некоректний SHA-256 у стані готовності')
  if not package.is_file() or sha(package).lower()!=r['sha256'].lower():raise RuntimeError('Завантажений пакет змінився після перевірки')
  if expected_manifest:
