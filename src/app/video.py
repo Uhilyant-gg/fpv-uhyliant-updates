@@ -26,6 +26,8 @@ class VideoRuntime(QObject):
   return {'state':self._state,'error':self._error or None,'streamId':self._stream_id or None,'streamName':s.get('name'),'kind':s.get('kind'),'protocol':s.get('protocol'),'host':self._host or None,'port':self._port or None,'path':s.get('path'),'codec':p.get('codec'),'width':p.get('width'),'height':p.get('height'),'fps':p.get('fps'),'latencyMode':p.get('latency_mode'),'endpointCheckMs':self._check_ms,'attempts':self._attempts,'lastEvent':self._last_event or None}
  def _set(self,state,error=''):self._state=state;self._error=error;self._last_event=datetime.now(timezone.utc).isoformat();self.changed.emit()
  def _clear_selection(self):self._stream_id='';self._url='';self._host='';self._port=0;self._attempts=0;self._stream={};self._profile={};self._device={};self._check_ms=None
+ def _canonical_stream(self,stream):
+  value=dict(stream);path=str(value.get('path','')).strip();value['path']=path if not path or path.startswith('/') else '/'+path;return value
  def _current_source(self,stream_id):
   stream=next((s for s in self.devices.activeStreams if s.get('id')==stream_id and s.get('enabled')),None)
   if not stream:return None,None,None
@@ -36,7 +38,7 @@ class VideoRuntime(QObject):
  def _source_unchanged(self):
   if not self._stream_id:return False
   stream,device,profile=self._current_source(self._stream_id)
-  return stream is not None and device is not None and profile is not None and dict(stream)==self._stream and dict(device)==self._device and dict(profile)==self._profile
+  return stream is not None and device is not None and profile is not None and self._canonical_stream(stream)==self._stream and dict(device)==self._device and dict(profile)==self._profile
  def invalidateIfSourceChanged(self):
   if self._stream_id and not self._source_unchanged():
    self._clear_selection();self._set('error','Підготовлений відеопотік змінено, вимкнено, видалено або він більше не належить активному пристрою');return True
@@ -56,9 +58,9 @@ class VideoRuntime(QObject):
   if str(stream.get('protocol','')).lower()!='rtsp':self._clear_selection();self._set('error','Поточний runtime підтримує лише RTSP');return False
   try:port=int(stream.get('port'))
   except (TypeError,ValueError):port=0
-  host=str(device.get('host','')).strip();path=str(stream.get('path','')).strip()
+  host=str(device.get('host','')).strip();canonical=self._canonical_stream(stream);path=canonical.get('path','')
   if not host or port<1 or port>65535 or not path:self._clear_selection();self._set('error','RTSP endpoint metadata incomplete or invalid');return False
-  path=path if path.startswith('/') else '/'+path;self._stream=dict(stream);self._stream['path']=path;self._device=dict(device);self._profile=dict(profile);self._host=host;self._port=port;self._stream_id=stream_id;self._url=f'rtsp://{self._host}:{self._port}{path}';self._attempts=1;self._set('checking')
+  self._stream=canonical;self._device=dict(device);self._profile=dict(profile);self._host=host;self._port=port;self._stream_id=stream_id;self._url=f'rtsp://{self._host}:{self._port}{path}';self._attempts=1;self._set('checking')
   if not self._check_endpoint():return False
   self._set('ready');return True
  @Slot(result=bool)

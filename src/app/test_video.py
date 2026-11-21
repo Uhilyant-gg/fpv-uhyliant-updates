@@ -12,6 +12,9 @@ class VideoRuntimeTests(unittest.TestCase):
  @patch('video.socket.create_connection')
  def test_diagnostics_follow_selected_stream_and_profile_metadata(self,c):
   c.return_value.__enter__.return_value=object();r=VideoRuntime(FakeDevices());self.assertTrue(r.prepare('main'));self.assertEqual(r.diagnostics['codec'],'h265');self.assertTrue(r.prepare('sub'));self.assertEqual(r.diagnostics['codec'],'h264')
+ @patch('video.socket.create_connection')
+ def test_path_is_canonicalized_without_invalidating_same_source(self,c):
+  c.return_value.__enter__.return_value=object();d=FakeDevices();d.streams[0]['path']='stream=0';r=VideoRuntime(d);self.assertTrue(r.prepare('main'));self.assertEqual(r.url,'rtsp://192.168.1.10:554/stream=0');r.markPlaying();self.assertEqual(r.state,'playing');self.assertTrue(r.reconnect());self.assertEqual(r.state,'ready')
  def test_missing_stream_is_unavailable_not_invented(self):
   r=VideoRuntime(FakeDevices());self.assertFalse(r.prepare('missing'));self.assertIsNone(r.diagnostics['streamId']);self.assertIsNone(r.diagnostics['codec']);self.assertIsNone(r.diagnostics['endpointCheckMs'])
  def test_invalid_endpoint_metadata_does_not_attempt_connection(self):
