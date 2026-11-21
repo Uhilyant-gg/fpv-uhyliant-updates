@@ -37,8 +37,10 @@ class ExecutorTests(unittest.TestCase):
   x=FirmwareExecutor(self.center);x.register_adapter(Adapter());self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertFalse(hasattr(x,'verifyObserved'));self.assertFalse(hasattr(x,'completeVerification'));self.assertEqual(x.status['state'],'reboot-pending')
  def test_lock_remains_held_through_reboot_pending_and_blocks_repeat_execute(self):
   x=FirmwareExecutor(self.center);a=Adapter();x.register_adapter(a);self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertTrue(x.busy);self.assertFalse(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(len(a.calls),1);self.assertTrue(x.busy)
- def test_reset_cannot_clear_reboot_pending_transaction(self):
-  x=FirmwareExecutor(self.center);x.register_adapter(Adapter());self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));x.reset();self.assertEqual(x.status['state'],'reboot-pending');self.assertTrue(x.busy);self.assertTrue(x.verificationContext()['ready'])
+ def test_active_transaction_blocks_adapter_swap_and_reset(self):
+  x=FirmwareExecutor(self.center);a=Adapter();replacement=Adapter();self.assertTrue(x.register_adapter(a));self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertFalse(x.register_adapter(replacement));self.assertFalse(x.reset());self.assertTrue(x.busy);self.assertEqual(x.status['state'],'reboot-pending')
+ def test_terminal_methods_cannot_mutate_idle_executor(self):
+  x=FirmwareExecutor(self.center);self.assertFalse(x.failRediscovery());self.assertFalse(x.acceptRediscoveredVerification({'rediscovered':True},{'ok':True}));self.assertEqual(x.status['state'],'idle')
  def test_terminal_rediscovery_outcomes_release_lock(self):
   x=FirmwareExecutor(self.center);x.register_adapter(Adapter());self.assertTrue(x.execute('cam','ssc30kq-imx335','upgrade'));self.assertFalse(x.failRediscovery());self.assertFalse(x.busy)
   x.reset();self.assertEqual(x.status['state'],'idle')

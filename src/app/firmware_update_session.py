@@ -15,9 +15,10 @@ class FirmwareUpdateSession(QObject):
  @Property('QVariantMap',notify=changed)
  def result(self):return deepcopy(self._result)
  def configure_transport(self,transport):
+  if self.executor.busy:return False
   self._enabled=transport is not None
   self.executor.register_adapter(OpenIPCUpgradeAdapter(self.devices,transport) if transport is not None else None)
-  self._result={'enabled':True,'state':'ready','reason':'Транспорт підключено для явної апаратної перевірки','observedFirmware':'','verification':{}} if self._enabled else self._empty();self.changed.emit()
+  self._result={'enabled':True,'state':'ready','reason':'Транспорт підключено для явної апаратної перевірки','observedFirmware':'','verification':{}} if self._enabled else self._empty();self.changed.emit();return True
  def _probe(self,host):return fingerprint(host,threading.Event())
  def _sync(self,ok=None):
   status=self.executor.status;verification=status.get('verification') or {};identity=verification.get('identity') or {}
@@ -36,4 +37,6 @@ class FirmwareUpdateSession(QObject):
   if address.version!=4 or address.is_unspecified or address.is_loopback or address.is_multicast:return self._sync(self.executor.failRediscovery())
   lifecycle=FirmwareUpdateLifecycle(self.executor,FirmwareRediscovery(self._probe));return self._sync(lifecycle.verify_after_reboot())
  @Slot()
- def reset(self):self.executor.reset();self._result={'enabled':self._enabled,'state':'ready' if self._enabled else 'hardware-validation-pending','reason':'' if self._enabled else 'Апаратний транспорт оновлення не підключено','observedFirmware':'','verification':{}};self.changed.emit()
+ def reset(self):
+  if self.executor.busy:return False
+  self.executor.reset();self._result={'enabled':self._enabled,'state':'ready' if self._enabled else 'hardware-validation-pending','reason':'' if self._enabled else 'Апаратний транспорт оновлення не підключено','observedFirmware':'','verification':{}};self.changed.emit();return True

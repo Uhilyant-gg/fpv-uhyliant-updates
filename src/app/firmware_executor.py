@@ -11,7 +11,9 @@ class FirmwareExecutor(QObject):
  def status(self):return deepcopy(self._state)
  @Property(bool,notify=changed)
  def busy(self):return bool(self._locked_device)
- def register_adapter(self,adapter):self._adapter=adapter
+ def register_adapter(self,adapter):
+  if self._locked_device:return False
+  self._adapter=adapter;return True
  def _device(self,did):return next((d for d in self.center.devices.items if d.get('id')==did),None)
  def _set(self,state,**extra):self._state={**self._state,'state':state,**extra};self.changed.emit()
  def _release_lock(self):self._locked_device='';self.changed.emit()
@@ -54,11 +56,14 @@ class FirmwareExecutor(QObject):
   if self._state.get('state')!='reboot-pending' or not self._handoff:return {'ready':False}
   host=str(self._handoff.get('host','')).strip()
   return {'ready':bool(host),'host':host,'profile':self._handoff.get('profile',''),'before':deepcopy(self._before)}
- def failRediscovery(self):self._set('error',step='rediscover',error='Підтверджену OpenIPC не виявлено після перезапуску',verification={});self._release_lock();return False
+ def failRediscovery(self):
+  if not self._locked_device or self._state.get('state')!='reboot-pending':return False
+  self._set('error',step='rediscover',error='Підтверджену OpenIPC не виявлено після перезапуску',verification={});self._release_lock();return False
  def acceptRediscoveredVerification(self,rediscovery,verification):
-  if self._state.get('state')!='reboot-pending' or not rediscovery.get('rediscovered'):return False
-  result=deepcopy(verification or {});result['rediscoveryAttempts']=rediscovery.get('attempts',0)
-  ok=bool(result.get('ok'));self._set('verified' if ok else 'error',step='verify',verification=result,error='' if ok else 'Перевірка після операції не пройдена');self._release_lock();return ok
+  if not self._locked_device or self._state.get('state')!='reboot-pending' or not isinstance(rediscovery,dict) or rediscovery.get('rediscovered') is not True or not isinstance(verification,dict):return False
+  result=deepcopy(verification);result['rediscoveryAttempts']=rediscovery.get('attempts',0)
+  ok=result.get('ok') is True;self._set('verified' if ok else 'error',step='verify',verification=result,error='' if ok else 'Перевірка після операції не пройдена');self._release_lock();return ok
  @Slot()
  def reset(self):
-  if not self._locked_device:self._before={};self._handoff={};self._state=self._idle();self.changed.emit()
+  if self._locked_device:return False
+  self._before={};self._handoff={};self._state=self._idle();self.changed.emit();return True
