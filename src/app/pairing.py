@@ -32,7 +32,7 @@ class PairingRegistry(QObject):
   if secret_store is None and sys.platform=='win32':
    from windows_secret_store import WindowsCredentialSecretStore
    secret_store=WindowsCredentialSecretStore()
-  self.store=secret_store or SecretStore();self.metadata=metadata_store or MetadataStore();self.clock=clock or time.time;self._records={};self._pending={};self._metadata_error='';self._secret_error='';self._load()
+  self.store=secret_store or SecretStore();self.metadata=metadata_store or MetadataStore();self.clock=clock or time.time;self._records={};self._pending={};self._metadata_error='';self._secret_error='';self._recovery_error='';self._load()
  def _load(self):
   if not getattr(self.metadata,'available',False):return
   try:
@@ -59,6 +59,8 @@ class PairingRegistry(QObject):
  def secretStoreError(self):return self._secret_error or str(getattr(self.store,'error',''))
  @Property(str,notify=changed)
  def metadataError(self):return self._metadata_error
+ @Property(str,notify=changed)
+ def recoveryError(self):return self._recovery_error
  @Property('QVariantList',notify=changed)
  def trusted(self):return [deepcopy(v) for v in self._records.values()]
  @Property('QVariantList',notify=changed)
@@ -67,7 +69,7 @@ class PairingRegistry(QObject):
  @Slot(str,str,result='QVariantMap')
  def begin(self,label,endpoint):
   label=label.strip();endpoint=endpoint.strip()
-  if not self.secretStoreAvailable or not self.metadataStoreAvailable or self._metadata_error or not label or not endpoint:return {}
+  if not self.secretStoreAvailable or not self.metadataStoreAvailable or self._metadata_error or self._recovery_error or not label or not endpoint:return {}
   pid=uuid.uuid4().hex;secret=secrets.token_bytes(32);public={'id':pid,'label':label,'endpoint':endpoint,'fingerprint':self._fingerprint(secret),'createdAt':int(self.clock()),'state':'pending'};self._pending[pid]={'public':public,'secret':secret};self.changed.emit();return deepcopy(public)
  @Slot(str,bool,result=bool)
  def confirm(self,pairing_id,approved):
@@ -75,24 +77,31 @@ class PairingRegistry(QObject):
   if not item or not approved:
    if item:self._pending.pop(pairing_id,None);self.changed.emit()
    return False
+  if self._recovery_error:return False
   key='pairing/'+pairing_id;ok,_=self._secret_call('put',key,item['secret'])
   if not ok:self.changed.emit();return False
   record={**item['public'],'state':'trusted','trustedAt':int(self.clock()),'secretRef':key};candidate={**self._records,pairing_id:record}
-  if not self._persist(candidate):self._secret_call('delete',key);self.changed.emit();return False
-  self._pending.pop(pairing_id,None);self._records=candidate;self.changed.emit();return True
+  if not self._persist(candidate):
+   cleaned,_=self._secret_call('delete',key)
+   if not cleaned:self._recovery_error='confirm rollback failed; protected secret may be orphaned'
+   self.changed.emit();return False
+  self._pending.pop(pairing_id,None);self._records=candidate;self._recovery_error='';self.changed.emit();return True
  @Slot(str,result=bool)
  def revoke(self,pairing_id):
   record=self._records.get(pairing_id)
-  if not record:return False
+  if not record or self._recovery_error:return False
   ok,secret=self._secret_call('get',record['secretRef'])
   if not ok:self.changed.emit();return False
+  if secret is None:
+   self._recovery_error='trusted metadata references a missing protected secret';self.changed.emit();return False
   ok,_=self._secret_call('delete',record['secretRef'])
   if not ok:self.changed.emit();return False
   candidate=dict(self._records);candidate.pop(pairing_id,None)
   if not self._persist(candidate):
-   if secret is not None:self._secret_call('put',record['secretRef'],secret)
+   restored,_=self._secret_call('put',record['secretRef'],secret)
+   if not restored:self._recovery_error='revoke rollback failed; trust state requires reconciliation'
    self.changed.emit();return False
-  self._records=candidate;self.changed.emit();return True
+  self._records=candidate;self._recovery_error='';self.changed.emit();return True
  @Slot(str,result=bool)
  def cancel(self,pairing_id):
   existed=self._pending.pop(pairing_id,None) is not None
@@ -109,5 +118,7 @@ class PairingRegistry(QObject):
    if not ok:self.changed.emit();return
    if not present:candidate.pop(pid,None);changed=True
   if changed:
-   if self._persist(candidate):self._records=candidate
+   if self._persist(candidate):self._records=candidate;self._recovery_error=''
    self.changed.emit()
+  elif self._recovery_error:
+   self._recovery_error='';self.changed.emit()

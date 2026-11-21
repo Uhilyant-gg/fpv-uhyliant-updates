@@ -10,12 +10,14 @@ Item {
    Text{text:"Trust metadata store: "+(pairingRegistry.metadataStoreAvailable?"available":"unavailable");color:pairingRegistry.metadataStoreAvailable?green:red;font.bold:true}
    Text{visible:pairingRegistry.secretStoreError!=="";text:pairingRegistry.secretStoreError;color:red;wrapMode:Text.Wrap;Layout.fillWidth:true}
    Text{visible:pairingRegistry.metadataError!=="";text:pairingRegistry.metadataError;color:red;wrapMode:Text.Wrap;Layout.fillWidth:true}
+   Text{visible:pairingRegistry.recoveryError!=="";text:"Recovery required: "+pairingRegistry.recoveryError;color:red;wrapMode:Text.Wrap;Layout.fillWidth:true}
+   Button{visible:pairingRegistry.recoveryError!=="";text:"Повторити reconciliation";onClicked:pairingRegistry.reconcile()}
    Text{text:"Peer proof/exchange protocol ще не реалізований. Цей екран не створює нові pairing-сесії.";color:amber;wrapMode:Text.Wrap;Layout.fillWidth:true}
   }}
   Text{text:"Довірені записи";color:fg;font.pixelSize:18;font.bold:true}
   Label{visible:pairingRegistry.trusted.length===0;text:"Немає збережених trusted записів.";color:sub}
   ListView{id:trustedList;Layout.fillWidth:true;Layout.fillHeight:true;clip:true;spacing:8;model:pairingRegistry.trusted;delegate:Rectangle{required property var modelData;width:trustedList.width;height:itemColumn.implicitHeight+20;radius:8;color:"#101d2d";border.color:line
-   ColumnLayout{id:itemColumn;anchors.fill:parent;anchors.margins:10;RowLayout{Layout.fillWidth:true;ColumnLayout{Layout.fillWidth:true;Text{text:modelData.label;color:fg;font.bold:true}Text{text:modelData.endpoint;color:sub}Text{text:"Fingerprint: "+modelData.fingerprint;color:sub;font.family:"Consolas";elide:Text.ElideMiddle;Layout.fillWidth:true}}Button{text:"Відкликати довіру";onClicked:revokeDialog.open()}}
+   ColumnLayout{id:itemColumn;anchors.fill:parent;anchors.margins:10;RowLayout{Layout.fillWidth:true;ColumnLayout{Layout.fillWidth:true;Text{text:modelData.label;color:fg;font.bold:true}Text{text:modelData.endpoint;color:sub}Text{text:"Fingerprint: "+modelData.fingerprint;color:sub;font.family:"Consolas";elide:Text.ElideMiddle;Layout.fillWidth:true}}Button{text:"Відкликати довіру";enabled:pairingRegistry.recoveryError==="";onClicked:revokeDialog.open()}}
     Dialog{id:revokeDialog;title:"Відкликати довіру?";modal:true;standardButtons:Dialog.Yes|Dialog.No;onAccepted:pairingRegistry.revoke(modelData.id);contentItem:Text{text:"Protected secret і trust metadata для «"+modelData.label+"» буде видалено.";color:fg;wrapMode:Text.Wrap;width:360}}
    }
   }}

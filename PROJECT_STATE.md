@@ -11,11 +11,11 @@ Normalized telemetry preserves unknown/stale state. Verified OpenIPC identity st
 ## Station pairing
 Pairing has durable non-secret trust metadata persistence through an atomic, versioned JSON metadata store. Secret bytes never enter that store, portable backup, QML-visible state or repository content.
 
-The Windows Credential Manager adapter implements the protected secret-store boundary with Win32 `CredWriteW`, `CredReadW`, `CredDeleteW` and `CredFree`. Its dedicated Windows CI integration path has now passed, covering real Credential Manager write/read/overwrite/delete and registry confirm, restart/reconcile and revoke with durable metadata. Non-Windows systems remain safely unavailable.
+The Windows Credential Manager adapter implements the protected secret-store boundary with Win32 `CredWriteW`, `CredReadW`, `CredDeleteW` and `CredFree`. Its dedicated Windows CI integration path has passed, covering real Credential Manager write/read/overwrite/delete and registry confirm, restart/reconcile and revoke with durable metadata. Non-Windows systems remain safely unavailable.
 
-Pairing confirmation remains commit-after-persist and retryable. Reconciliation never converts a secret-store read failure into a fabricated missing-secret state. Revocation reads the protected secret, deletes it, persists candidate metadata, and restores the secret if metadata persistence fails. Duplicate metadata record IDs are rejected.
+Pairing lifecycle recovery is fail-closed. A failed confirmation metadata write attempts secret deletion; if that cleanup also fails, the registry records an explicit recovery error and blocks new pairing mutations until reconciliation succeeds. Revoke now rejects trusted metadata that unexpectedly references a missing protected secret instead of silently treating deletion as success. If revoke metadata persistence fails and secret restoration also fails, that rollback failure is explicit and mutations remain blocked until reconciliation produces a consistent state.
 
-A protocol-safe `PairingPanel.qml` trust-management foundation now reports secret/metadata store readiness, lists only non-secret trusted metadata and permits explicit revoke behind confirmation. It deliberately cannot begin or confirm a new pairing session, and explicitly states that peer proof/exchange is not implemented. It is not yet exposed as a production pairing entry point because no real peer protocol contract exists.
+`PairingPanel.qml` remains protocol-safe: it reports store and recovery state, lists only non-secret trusted metadata, permits explicit revoke when recovery is clean, and exposes a reconciliation retry when recovery is required. It cannot begin or confirm a new pairing session. Peer proof/exchange remains unimplemented because no real protocol contract exists.
 
 ## Remaining platform/hardware boundaries
 1. Define/obtain a real pairing peer proof/exchange protocol contract before enabling new-pairing UI.
