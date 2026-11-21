@@ -58,14 +58,14 @@ jobs:
           & pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant --icon assets/fpv-uhyliant.ico --paths src/app @qmlArgs --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --hidden-import PySide6.QtMultimedia --hidden-import PySide6.QtSerialPort --hidden-import pymavlink --hidden-import pymavlink.mavutil --collect-all PySide6.QtMultimedia --collect-all pymavlink src/app/main.py
           pyinstaller --noconfirm --clean --onefile --windowed --name FPV-Uhyliant-Launcher --icon assets/fpv-uhyliant.ico src/launcher.py
           pyinstaller --noconfirm --clean --onefile --windowed --name FPV-Uhyliant-Update --icon assets/fpv-uhyliant.ico src/update_helper.py
-      - name: Verify packaged QML inventory
+      - name: Verify packaged application QML inventory
         shell: pwsh
         run: |
           $expected = @(Get-ChildItem src\app\*.qml | ForEach-Object Name | Sort-Object)
           $packaged = @(Get-ChildItem dist\FPV-Uhyliant -Recurse -File -Filter *.qml | ForEach-Object Name | Sort-Object -Unique)
           $missing = @($expected | Where-Object { $_ -notin $packaged })
-          $unexpected = @($packaged | Where-Object { $_ -notin $expected })
-          if ($missing.Count -or $unexpected.Count) { throw "Packaged QML inventory mismatch. Missing: $($missing -join ', '); unexpected: $($unexpected -join ', ')" }
+          if ($missing.Count) { throw "Required application QML missing from package: $($missing -join ', ')" }
+          Write-Host "Verified $($expected.Count) application QML files; Qt runtime QML dependencies are allowed."
       - name: Packaged application tests
         shell: pwsh
         run: |
