@@ -23,7 +23,7 @@ jobs:
       - name: Install Linux Qt runtime libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libdbus-1-3 libfontconfig1 libglib2.0-0 libpulse0
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libdbus-1-3 libfontconfig1 libglib2.0-0 libpulse0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0 xauth xvfb
       - name: Install application dependencies
         run: pip install -r src/requirements.txt
       - name: Compile all Python sources
@@ -43,16 +43,15 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
         run: python main.py --mavlink-self-test
-      - name: Load full QML application offscreen
+      - name: Load full QML application on virtual display
         working-directory: src/app
         env:
-          QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
           QT_MEDIA_BACKEND: null
           PULSE_SERVER: /dev/null
         run: |
           marker="$RUNNER_TEMP/fpv-uhyliant-smoke.json"
-          python main.py --smoke-test --smoke-marker "$marker"
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24 -ac +extension GLX +render -noreset" python main.py --smoke-test --smoke-marker "$marker"
           python - "$marker" <<'PY'
           import json, pathlib, sys
           payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
