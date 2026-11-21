@@ -1,97 +1,68 @@
 # FPV Uhyliant project state
 
-Read this file together with `DEVELOPMENT_GUIDE.md` before making changes. These two files are the canonical handoff for new development chats and must be updated whenever project state, blockers, architecture decisions, release behavior, priorities, or the development plan materially change.
+`main` is the single source of truth for implementation. Historical chat snippets must not replace newer repository code.
 
-## Current baseline
+## Product direction
 
-- Source version: `2.0.10`
-- Product name: `ФПВ Ухилянт`
-- Release channel: `test`
-- UI: PySide6 + Qt Quick/QML + Qt Multimedia
-- Manifest path: `test/release.json`
-- Signing key ID: `fpv-uhyliant-production-v1`
-- Package integrity: SHA-256
-- Manifest authentication: Ed25519
-- Per-user Windows install path: `%LOCALAPPDATA%\Programs\FPV Uhyliant`
-- Windows layout: launcher + updater helper + `app/current`
-- Runtime/user data: `%LOCALAPPDATA%/FPV-Uhyliant`
+FPV Uhyliant is a Windows ground-station application focused on a maximum-video-workspace flight view. The normal flow is Home / device selection -> Connect -> FPV view. Secondary controls belong in popup or slide-out panels rather than a permanent navigation rail.
 
-## Current 2.0.10 release blocker
+Target flight-controller/protocol coverage remains ArduPilot, Betaflight and INAV with MAVLink, MSP and CRSF. Protocol integrations should be isolated backends/providers rather than mixed into the video runtime.
 
-The Windows binaries build successfully, but packaged GUI/QML startup validation remains the active gate before publishing/validating 2.0.10 on the target Windows PC.
+## Implemented foundation
 
-Smoke-test diagnostics identified the concrete startup failure: `QQmlApplicationEngine` could not load `Main.qml` because the QML parser reported `Unexpected token ';'` at lines 13 and 22. This proves the Windows Qt platform plugin was found and loaded, while QML parsing prevented creation of the root object.
+- Windows PyInstaller build, launcher/update helper and GitHub release/OTA pipeline.
+- Packaged GUI/QML smoke test.
+- SQLite-backed devices, streams and video profiles.
+- Network-interface selection and OpenIPC discovery via mDNS, ONVIF hints, Majestic/OpenIPC fingerprinting and bounded /24 probing.
+- RTSP `VideoRuntime` kept separate from telemetry.
+- Device-selection screen and Connect transition into flight workspace.
+- Flight view prioritizes `VideoOutput`; stream/profile, diagnostics and configuration live in popups.
 
-Current `main` includes a direct fix to `src/app/Main.qml` that changes affected signal handlers to explicit block bodies and removes parser-ambiguous semicolon boundaries around those handlers. The next required action is to re-run the 2.0.10 Windows release pipeline from current `main` and inspect the packaged smoke-test result.
+## MAVLink phase 1
 
-Current smoke-test contract:
+`src/app/mavlink_runtime.py` is a read-only MAVLink backend. It does not expose ARM/DISARM, flight-mode changes, parameter writes or other vehicle-control commands.
 
-1. Start the frozen `FPV-Uhyliant.exe` with `--smoke-test --smoke-marker <path>`.
-2. Successful QML root creation writes `smoke-test-ok.json`.
-3. The test requests window close and `app.exit(0)`.
-4. CI treats absence of the marker as GUI/QML initialization failure.
-5. A shutdown hang after successful marker creation is reported separately and the process may be terminated by CI.
-6. Diagnostics are preserved/uploaded when available.
+Current telemetry surface:
 
-Expected diagnostics under `%LOCALAPPDATA%/FPV-Uhyliant` during a normal installed run include:
+- heartbeat / connection state
+- armed state
+- flight mode
+- battery voltage, current and remaining percentage
+- GPS fix, satellites and HDOP
+- altitude, ground speed and heading
+- roll, pitch and yaw
+- RSSI with source where available
+- home distance when both home and current coordinates are known
 
-- `startup.log` for unhandled Python startup exceptions
-- `qt-startup.log` for Qt/QML/Multimedia messages
-- `startup-ok.json` for launcher startup verification
-- `updater.log` for launcher/update events
+Connection settings are configurable and persisted. Default is `udpin:0.0.0.0:14550`; serial endpoints use the configured baud rate.
 
-CI smoke testing also uses `smoke-test-ok.json` as its explicit initialization marker.
+Telemetry now tracks freshness by group. Stale heartbeat, battery, GPS, position, attitude and radio fields are invalidated instead of leaving old values looking live. Heartbeat controls connection state independently from reception of other MAVLink messages.
 
-## Version 2.0.10 changes
+CI includes a MAVLink backend startup test without simulated FC telemetry and a packaged-backend startup test in addition to the packaged GUI/QML smoke test.
 
-- Windows frozen build explicitly imports `PySide6.QtMultimedia` and collects its PyInstaller package data/plugins.
-- CI validates the packaged GUI/QML application rather than relying only on the Python-only `--self-test`.
-- Packaged smoke testing is marker-based.
-- Qt/QML/Multimedia startup diagnostics are captured.
-- QML parser errors found by packaged smoke testing have been corrected in `Main.qml` and require CI re-validation.
-- Full release pipeline retains Windows build, signing/publishing, and Pages deployment stages.
-- Inno Setup fallback version is `2.0.10`.
-- Firmware behavior remains unchanged by the 2.0.10 startup hotfix work.
+## Camera preset vs video profile
 
-## Next validation
+These are separate concepts.
 
-1. Re-run the `2.0.10` Windows release pipeline from current `main` after the `Main.qml` parser fix.
-2. If smoke test fails, inspect the exact QML/Qt diagnostics before making further changes.
-3. Publish/build the test installer only after packaged GUI/QML initialization succeeds.
-4. Install the test EXE on the target Windows PC.
-5. Validate normal launcher startup, OTA/startup verification, and rollback behavior.
-6. Firmware Center work may be developed in parallel, but 2.0.10 remains gated on packaged startup validation.
+Camera preset is device/firmware configuration. Video profile is stream presentation/encoding configuration. A video profile is not applied as part of camera flashing. Each camera/video stream may select its own video profile.
 
-## Development priority after 2.0.10
+## OpenIPC flashing rule
 
-P0 is `Devices -> Camera -> Firmware` because a working OpenIPC camera is required for meaningful downstream validation.
+The BAT/fullflash workflow is only appropriate for cameras already running a compatible custom OpenIPC setup. It is not the universal primary flashing method. Future provisioning must identify hardware/flash layout, validate compatibility, back up state where possible, verify the image and provide a recovery path before destructive writes.
 
-Target firmware workflow:
+## Next implementation order
 
-`Detect -> Identify -> Select firmware -> Pre-check -> Flash -> Reboot -> Rediscover -> Verify`
+1. Validate the current MAVLink backend and OSD against a real FC and packaged Windows build.
+2. Add source-system/component identity and more explicit message-rate/link diagnostics.
+3. Harden video reconnect, stall detection and diagnostics without coupling video to telemetry.
+4. Introduce a vehicle-level data model above devices/streams.
+5. Build a structured diagnostics engine for station/network/camera/video/FC health.
+6. Add safe OpenIPC provisioning and versioned camera presets, keeping video profiles separate.
+7. Introduce a normalized telemetry-provider API, then add read-only MSP and CRSF providers.
+8. Add StabX/external-navigation health as its own telemetry capability rather than treating it as GPS.
+9. Add Starlink/VPN connectivity diagnostics and degraded-link handling.
+10. Add encrypted export/import and later station pairing for sharing device databases with minimal server dependency.
 
-Initial real hardware focus includes SSC30KQ / IMX335.
+## Acceptance rule for telemetry work
 
-After Firmware Center:
-
-1. OpenIPC camera identity/state integration.
-2. Real RTSP stream detection and playback hardening.
-3. Camera presets and per-stream video profiles while keeping those models separate.
-4. Read-only flight-controller integration for ArduPilot, Betaflight, and INAV using MAVLink/MSP/CRSF as appropriate.
-5. FPV Mode, telemetry, and OSD.
-
-## Project rules
-
-1. `src/` is authoritative source.
-2. `DEVELOPMENT_GUIDE.md` and `PROJECT_STATE.md` are the canonical project handoff/context and must stay current.
-3. Release metadata under `releases/<version>/` is immutable after publication.
-4. Private signing keys must never be committed.
-5. Every published release must have signed manifest, SHA-256 metadata and Git tag.
-6. Camera presets and video profiles are separate models.
-7. Video profiles are assigned per camera/video stream and are never applied as part of camera flashing.
-8. BAT/fullflash is only for cameras already running the relevant OpenIPC firmware, not the universal primary flashing path.
-9. Generic ONVIF devices must not be classified as OpenIPC without OpenIPC/Majestic evidence.
-10. Target flight stacks/protocols include ArduPilot, Betaflight, INAV and MAVLink/MSP/CRSF.
-11. Primary UI flow: Home -> Devices / Quick connect / Firmware / Update / Diagnostics -> FPV or Service Mode.
-12. Small corrective changes may be committed directly to `main` when appropriate; risky or substantial changes should use focused review/CI before merge.
-13. Do not move a release forward while its packaged Windows validation is failing.
+No decorative telemetry in production UI. Unknown or stale values display as unavailable. New protocol backends begin read-only and must not silently gain vehicle-control operations.
