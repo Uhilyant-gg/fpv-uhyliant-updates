@@ -40,6 +40,12 @@ class Tests(unittest.TestCase):
  def test_post_reboot_missing_firmware_fails_closed(self):
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
    self.prepare(td);self.session._probe_provider=lambda host:{'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335'},'evidence':['OpenIPC status.cgi']};self.session._candidate_provider=lambda host:[];self.assertTrue(self.session.configure_transport(Transport()));self.assertTrue(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertFalse(self.session.verifyAfterReboot());self.assertEqual(self.session.result['state'],'error');self.assertEqual(self.session.result['observedFirmware'],'');self.assertFalse(self.executor.busy)
+ def test_rediscovery_result_with_invalid_host_fails_closed(self):
+  with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
+   self.prepare(td);self.assertTrue(self.session.configure_transport(Transport()));self.assertTrue(self.session.execute('cam','ssc30kq-imx335','upgrade'))
+   fake={'rediscovered':True,'attempts':1,'host':'','identity':{'verified':True,'platform':'ssc30kq','sensor':'imx335','firmware':'new'}}
+   with patch('firmware_update_session.FirmwareRediscovery.wait',return_value=fake):self.assertFalse(self.session.verifyAfterReboot())
+   self.assertEqual(self.session.result['state'],'error');self.assertEqual(self.session.result['verification'],{});self.assertFalse(self.executor.busy)
  def test_device_identity_change_invalidates_approved_execution(self):
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
    self.prepare(td);self.devices.items[0]['host']='192.168.1.99';self.assertFalse(self.center.approvalMatches('cam','ssc30kq-imx335','upgrade'));self.assertFalse(self.executor.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(self.executor.status['state'],'blocked');self.assertFalse(self.executor.busy)
