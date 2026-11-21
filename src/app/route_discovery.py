@@ -87,42 +87,45 @@ def system_routes():
 
 
 def _fetch(url, accept, limit, cancel):
-    if cancel.is_set():
-        return None
+    if cancel.is_set(): return None
     request = urllib.request.Request(url, headers={"Accept": accept, "User-Agent": "FPV-Uhyliant/route-discovery"})
     try:
-        with urllib.request.urlopen(request, timeout=PROBE_TIMEOUT) as response:
-            return response.read(limit)
-    except (urllib.error.URLError, TimeoutError, socket.timeout, OSError):
-        return None
+        with urllib.request.urlopen(request, timeout=PROBE_TIMEOUT) as response: return response.read(limit)
+    except (urllib.error.URLError, TimeoutError, socket.timeout, OSError): return None
 
 
 def _walk_identity(value, result):
+    """Extract hardware keys only. Generic nested `version` is deliberately ignored."""
     if isinstance(value, dict):
         for key, child in value.items():
             low = str(key).lower()
-            if low in ("platform", "board") and not result["platform"] and isinstance(child, (str, int)):
-                result["platform"] = str(child).strip()
-            elif low in ("soc", "chip") and not result["soc"] and isinstance(child, (str, int)):
-                result["soc"] = str(child).strip()
-            elif low == "sensor" and not result["sensor"] and isinstance(child, (str, int)):
-                result["sensor"] = str(child).strip()
-            elif low in ("firmware", "release") and not result["firmware"] and isinstance(child, (str, int)):
-                result["firmware"] = str(child).strip()
-            elif low == "version" and not result["majestic"] and isinstance(child, (str, int)):
-                result["majestic"] = str(child).strip()
+            if low in ("platform", "board") and not result["platform"] and isinstance(child, (str, int)): result["platform"] = str(child).strip()
+            elif low in ("soc", "chip") and not result["soc"] and isinstance(child, (str, int)): result["soc"] = str(child).strip()
+            elif low == "sensor" and not result["sensor"] and isinstance(child, (str, int)): result["sensor"] = str(child).strip()
+            elif low in ("firmware", "release") and not result["firmware"] and isinstance(child, (str, int)): result["firmware"] = str(child).strip()
             _walk_identity(child, result)
     elif isinstance(value, list):
-        for child in value:
-            _walk_identity(child, result)
+        for child in value: _walk_identity(child, result)
 
 
 def _status_value(text, labels):
     for label in labels:
         match = re.search(rf"(?is){label}\s*(?:</[^>]+>\s*)*[:=]?\s*(?:<[^>]+>\s*)*([\w.+-]+)", text)
-        if match:
-            return unescape(match.group(1)).strip()
+        if match: return unescape(match.group(1)).strip()
     return ""
+
+
+def _config_identity(data, identity):
+    _walk_identity(data, identity)
+    system = data.get("system") if isinstance(data.get("system"), dict) else {}
+    top_version = data.get("version")
+    majestic_version = data.get("majestic")
+    if isinstance(majestic_version, dict): majestic_version = majestic_version.get("version")
+    if isinstance(majestic_version, (str, int)): identity["majestic"] = str(majestic_version).strip()
+    elif isinstance(top_version, (str, int)): identity["majestic"] = str(top_version).strip()
+    if not identity["firmware"]:
+        version = system.get("version")
+        if isinstance(version, (str, int)): identity["firmware"] = str(version).strip()
 
 
 def fingerprint(host, cancel):
@@ -132,24 +135,20 @@ def fingerprint(host, cancel):
     config = _fetch(f"<scrubbed-url-domain>", "application/json", 524288, cancel)
     if config:
         result["reachable"] = True
-        try:
-            data = json.loads(config.decode("utf-8"))
-        except (UnicodeError, json.JSONDecodeError):
-            data = None
+        try: data = json.loads(config.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError): data = None
         majestic_shape = isinstance(data, dict) and any(key in data for key in ("video0", "video1", "system", "isp", "rtsp", "fpv"))
         if majestic_shape:
             result["camera"] = result["openipc"] = True
             result["services"].append("Majestic API")
             result["evidence"].append("Majestic /api/v1/config.json")
-            _walk_identity(data, identity)
-            for key in ("video0", "video1"):
-                if isinstance(data.get(key), dict):
-                    result["streams"].append({"name": key, "protocol": "rtsp", "port": 554, "path": f"/{key}", "observed": True})
+            _config_identity(data, identity)
+            # Presence of video0/video1 configuration is not proof of an RTSP URL.
+            # Streams stay empty until an endpoint/path is actually observed.
     status = _fetch(f"<scrubbed-url-domain>", "text/html", 262144, cancel)
     if status:
         result["reachable"] = True
-        text = status.decode("utf-8", "ignore")
-        lower = text.lower()
+        text = status.decode("utf-8", "ignore"); lower = text.lower()
         if "openipc" in lower or "majestic" in lower:
             result["camera"] = result["openipc"] = True
             result["services"].append("OpenIPC WebUI")
@@ -160,34 +159,26 @@ def fingerprint(host, cancel):
             identity["firmware"] = identity["firmware"] or _status_value(text, ("firmware", "release"))
             identity["majestic"] = identity["majestic"] or _status_value(text, ("majestic",))
         if "r2d2" in lower and result["openipc"]:
-            result["r2d2"] = True
-            result["evidence"].append("R2D2 marker in status.cgi")
+            result["r2d2"] = True; result["evidence"].append("R2D2 marker in status.cgi")
     if result["openipc"]:
-        identity["verified"] = True
-        identity["evidence"] = list(result["evidence"])
+        identity["verified"] = True; identity["evidence"] = list(result["evidence"])
         result["identityVerified"] = any(identity[key] for key in ("platform", "soc", "sensor", "firmware", "majestic"))
     return result
 
 
 def discover_targets(targets, cancel, progress=None):
-    found = []
-    total = len(targets)
+    found = []; total = len(targets)
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        futures = {pool.submit(fingerprint, host, cancel): host for host in targets}
-        done = 0
+        futures = {pool.submit(fingerprint, host, cancel): host for host in targets}; done = 0
         for future in concurrent.futures.as_completed(futures):
             done += 1
-            if cancel.is_set():
-                break
-            try:
-                item = future.result()
-            except Exception:
-                item = None
+            if cancel.is_set(): break
+            try: item = future.result()
+            except Exception: item = None
             if item and item["camera"]:
                 item["name"] = ("OpenIPC " if item["openipc"] else "Камера ") + item["host"]
                 item["hostname"] = item["host"]
                 item["confidence"] = "OpenIPC підтверджено" if item["openipc"] else "Кандидат камери"
                 found.append(item)
-            if progress:
-                progress(done, total, len(found))
+            if progress: progress(done, total, len(found))
     return sorted(found, key=lambda item: int(ipaddress.ip_address(item["host"])))
