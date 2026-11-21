@@ -9,25 +9,24 @@ Windows FPV ground station using Python + PySide6 + Qt Quick/QML. ArduPilot, Bet
 Normalized read-only providers sit behind `TelemetryRouter`; unknown/stale/missing telemetry is unavailable. Real FC/radio validation is `hardware-validation-pending`.
 
 ## OpenIPC / firmware
-Verified OpenIPC identity stays distinct from generic ONVIF. Firmware Center has SSC30KQ / IMX335 compatibility, primary/upgrade/recovery separation, SHA-256 verification, immutable approvals, pre-handoff re-hash, operation locking and verified post-reboot identity lifecycle. No hardware adapter is registered by default; destructive work is `hardware-validation-pending`.
+Verified OpenIPC identity stays distinct from generic ONVIF. Firmware Center remains guarded; no destructive hardware adapter is registered by default.
 
-## Video workspace
-`VideoWorkspaceRuntime` owns independent primary and secondary `VideoRuntime` instances. QML has separate Qt playback/render paths and real-stream-only PiP. Playback health uses observable Qt/runtime events; endpoint timing is reachability only.
+## Video / diagnostics
+Independent primary/secondary video runtimes and real-stream-only PiP are implemented. Playback health is observational. `LinkDiagnostics` keeps external-navigation and network observations separate; real StabX/Starlink/WireGuard adapters remain `hardware-validation-pending`.
 
-## External navigation / link diagnostics
-`LinkDiagnostics` models observed external-navigation and network-link state separately. Missing data remains unavailable and observations age to stale. Real StabX and Starlink/WireGuard adapters remain `hardware-validation-pending`.
+## Station backup and restore
+Station backup v2 is password-encrypted and authenticated before parsing the station snapshot. The envelope records its schema/version and fixed scrypt parameters; payload confidentiality/integrity use the stdlib authenticated stream construction implemented in `station_backup.py`. Import first authenticates and validates schema plus entity references, then creates an in-memory restore plan. No live data changes until explicit confirmation.
 
-## Station backup foundation
-A versioned station snapshot now covers devices, streams, video profiles, verified OpenIPC identities and active-device selection. Export writes a portable manifest with SHA-256 integrity. Import is inspection/planning only: schema, digest and entity references are validated, but live SQLite state is not changed without a future explicit restore decision. Backup encryption and actual restore execution are not yet implemented.
+Confirmed restore runs through a single SQLite transaction. Devices, streams, per-stream video profiles, verified OpenIPC identities and active-device selection are replaced atomically; validation failure or SQL/type failure leaves the previous live database state intact. Pairing secrets and signing keys are not part of the snapshot.
 
 ## Presets / profiles
-Camera presets are versioned hardware-compatible device configuration requiring verified OpenIPC platform/sensor identity. Camera presets remain separate from per-stream video profiles and firmware operations.
+Camera presets remain separate from video profiles and firmware operations.
 
 ## Next implementation order
-1. Hardware-only firmware/preset adapters and real SSC30KQ / IMX335 validation remain pending physical hardware.
-2. Validate dual-decoder and real RTSP recovery on target Windows hardware (`hardware-validation-pending`).
-3. Connect verified read-only StabX/external-navigation and Starlink/VPN observers when evidence is available.
-4. Add encrypted backup envelope, explicit transactional restore, station pairing and distribution hardening.
+1. Hardware-only firmware/preset and real target-device validation remain pending physical hardware.
+2. Validate dual-decoder and RTSP recovery on target Windows hardware.
+3. Connect verified read-only StabX/external-navigation and Starlink/VPN observers when hardware/protocol evidence is available.
+4. Add station pairing and distribution hardening; mature backup cryptography toward a platform/library AEAD when dependency policy permits.
 
 ## Acceptance rule
 No invented telemetry, hardware state, stream metadata or latency. Hardware-dependent validation is `hardware-validation-pending`.

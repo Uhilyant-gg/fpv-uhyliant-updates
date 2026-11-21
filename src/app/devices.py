@@ -144,32 +144,15 @@ class Devices(QObject):
   with self._connect() as db:
    db.execute("PRAGMA journal_mode=WAL");db.execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)");ver=db.execute("PRAGMA user_version").fetchone()[0]
    db.execute("CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT NOT NULL,host TEXT NOT NULL,port INTEGER NOT NULL,connection TEXT NOT NULL,notes TEXT NOT NULL)");db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_host_port ON devices(host,port)")
-   if ver<2:
-    db.execute("CREATE TABLE IF NOT EXISTS streams(id TEXT PRIMARY KEY,device_id TEXT NOT NULL,name TEXT NOT NULL,kind TEXT NOT NULL DEFAULT 'main',protocol TEXT NOT NULL DEFAULT 'rtsp',port INTEGER NOT NULL DEFAULT 554,path TEXT NOT NULL DEFAULT '/',video_profile_id TEXT,enabled INTEGER NOT NULL DEFAULT 1,FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE)");db.execute("CREATE INDEX IF NOT EXISTS idx_streams_device ON streams(device_id)");db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_streams_device_kind ON streams(device_id,kind)")
+   if ver<2:db.execute("CREATE TABLE IF NOT EXISTS streams(id TEXT PRIMARY KEY,device_id TEXT NOT NULL,name TEXT NOT NULL,kind TEXT NOT NULL DEFAULT 'main',protocol TEXT NOT NULL DEFAULT 'rtsp',port INTEGER NOT NULL DEFAULT 554,path TEXT NOT NULL DEFAULT '/',video_profile_id TEXT,enabled INTEGER NOT NULL DEFAULT 1,FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE)");db.execute("CREATE INDEX IF NOT EXISTS idx_streams_device ON streams(device_id)");db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_streams_device_kind ON streams(device_id,kind)")
    if ver<3:
-    db.execute("CREATE TABLE IF NOT EXISTS video_profiles(id TEXT PRIMARY KEY,name TEXT NOT NULL UNIQUE,codec TEXT NOT NULL DEFAULT 'h264',width INTEGER,height INTEGER,fps INTEGER,bitrate_kbps INTEGER,latency_mode TEXT NOT NULL DEFAULT 'balanced',notes TEXT NOT NULL DEFAULT '')")
-    defaults=(("low-latency","Мінімальна затримка","h264",None,None,60,None,"low_latency",""),("balanced","Збалансований","h264",None,None,30,None,"balanced",""),("low-bitrate","Низький бітрейт","h264",None,None,30,2000,"balanced",""),("max-quality","Максимальна якість","h265",None,None,30,None,"quality",""))
-    db.executemany("INSERT OR IGNORE INTO video_profiles VALUES(?,?,?,?,?,?,?,?,?)",defaults)
-   if ver<4:
-    db.execute("CREATE TABLE IF NOT EXISTS openipc_identity(device_id TEXT PRIMARY KEY,verified INTEGER NOT NULL DEFAULT 0,platform TEXT NOT NULL DEFAULT '',soc TEXT NOT NULL DEFAULT '',sensor TEXT NOT NULL DEFAULT '',firmware TEXT NOT NULL DEFAULT '',majestic TEXT NOT NULL DEFAULT '',evidence_json TEXT NOT NULL DEFAULT '[]',FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE)")
-    db.execute("PRAGMA user_version=4")
-   if db.execute("SELECT COUNT(*) FROM devices").fetchone()[0]==0 and LEGACY_DB.exists():
-    try:
-     raw=json.loads(LEGACY_DB.read_text(encoding="utf-8"));items=raw.get("devices",[]) if isinstance(raw,dict) else []
-     for i in items:
-      host=str(i.get("host","")).strip()
-      if i.get("id") and i.get("name") and valid_host(host):db.execute("INSERT OR IGNORE INTO devices VALUES(?,?,?,?,?,?,?)",(i["id"],i["name"],i.get("type","Пристрій"),host,max(1,min(int(i.get("port",80)),65535)),i.get("connection","Мережа"),i.get("notes","")))
-     db.execute("INSERT OR REPLACE INTO settings VALUES('activeDeviceId',?)",(raw.get("activeDeviceId",""),));LEGACY_DB.rename(LEGACY_DB.with_suffix(".json.migrated"))
-    except (OSError,ValueError,TypeError,json.JSONDecodeError):pass
+    db.execute("CREATE TABLE IF NOT EXISTS video_profiles(id TEXT PRIMARY KEY,name TEXT NOT NULL UNIQUE,codec TEXT NOT NULL DEFAULT 'h264',width INTEGER,height INTEGER,fps INTEGER,bitrate_kbps INTEGER,latency_mode TEXT NOT NULL DEFAULT 'balanced',notes TEXT NOT NULL DEFAULT '')");defaults=(("low-latency","Мінімальна затримка","h264",None,None,60,None,"low_latency",""),("balanced","Збалансований","h264",None,None,30,None,"balanced",""),("low-bitrate","Низький бітрейт","h264",None,None,30,2000,"balanced",""),("max-quality","Максимальна якість","h265",None,None,30,None,"quality",""));db.executemany("INSERT OR IGNORE INTO video_profiles VALUES(?,?,?,?,?,?,?,?,?)",defaults)
+   if ver<4:db.execute("CREATE TABLE IF NOT EXISTS openipc_identity(device_id TEXT PRIMARY KEY,verified INTEGER NOT NULL DEFAULT 0,platform TEXT NOT NULL DEFAULT '',soc TEXT NOT NULL DEFAULT '',sensor TEXT NOT NULL DEFAULT '',firmware TEXT NOT NULL DEFAULT '',majestic TEXT NOT NULL DEFAULT '',evidence_json TEXT NOT NULL DEFAULT '[]',FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE)");db.execute("PRAGMA user_version=4")
  def _load(self):
   try:
    with self._connect() as db:
-    cols="id,name,type,host,port,connection,notes";self._items=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM devices ORDER BY name COLLATE NOCASE")]
-    identities={r[0]:{"verified":bool(r[1]),"platform":r[2],"soc":r[3],"sensor":r[4],"firmware":r[5],"majestic":r[6],"evidence":json.loads(r[7] or "[]")} for r in db.execute("SELECT device_id,verified,platform,soc,sensor,firmware,majestic,evidence_json FROM openipc_identity")}
-    for i in self._items:i["openipcIdentity"]=identities.get(i["id"],normalize_openipc_identity())
-    row=db.execute("SELECT value FROM settings WHERE key='activeDeviceId'").fetchone();saved=row[0] if row else ""
-   self._active_id=saved if any(i["id"]==saved for i in self._items) else ""
-   self._load_streams();self._load_profiles()
+    cols="id,name,type,host,port,connection,notes";self._items=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM devices ORDER BY name COLLATE NOCASE")];identities={r[0]:{"verified":bool(r[1]),"platform":r[2],"soc":r[3],"sensor":r[4],"firmware":r[5],"majestic":r[6],"evidence":json.loads(r[7] or "[]")} for r in db.execute("SELECT device_id,verified,platform,soc,sensor,firmware,majestic,evidence_json FROM openipc_identity")};[i.update(openipcIdentity=identities.get(i["id"],normalize_openipc_identity())) for i in self._items];row=db.execute("SELECT value FROM settings WHERE key='activeDeviceId'").fetchone();saved=row[0] if row else ""
+   self._active_id=saved if any(i["id"]==saved for i in self._items) else "";self._load_streams();self._load_profiles()
   except sqlite3.Error as e:self._items=[];self._streams=[];self._profiles=[];self._active_id="";self.notice.emit("Помилка бази пристроїв: "+str(e))
  def _load_streams(self):
   with self._connect() as db:cols="id,device_id,name,kind,protocol,port,path,video_profile_id,enabled";self._streams=[dict(zip(cols.split(','),r)) for r in db.execute("SELECT "+cols+" FROM streams ORDER BY device_id,kind,name")]
@@ -211,40 +194,38 @@ class Devices(QObject):
   if not isinstance(value,dict) or set(value)!={'devices','streams','videoProfiles','openipcIdentities','activeDeviceId'}:return False
   if not all(isinstance(value[k],list) for k in ('devices','streams','videoProfiles','openipcIdentities')) or not isinstance(value['activeDeviceId'],str):return False
   ids={d.get('id') for d in value['devices'] if isinstance(d,dict) and d.get('id') and d.get('name') and valid_host(str(d.get('host','')))}
-  if len(ids)!=len(value['devices']):return False
-  if value['activeDeviceId'] and value['activeDeviceId'] not in ids:return False
-  if any(not isinstance(s,dict) or s.get('device_id') not in ids or not s.get('id') for s in value['streams']):return False
-  if any(not isinstance(i,dict) or i.get('device_id') not in ids or i.get('verified') is not True for i in value['openipcIdentities']):return False
-  return all(isinstance(p,dict) and p.get('id') and p.get('name') for p in value['videoProfiles'])
+  if len(ids)!=len(value['devices']) or (value['activeDeviceId'] and value['activeDeviceId'] not in ids):return False
+  profiles={p.get('id') for p in value['videoProfiles'] if isinstance(p,dict) and p.get('id') and p.get('name')}
+  if len(profiles)!=len(value['videoProfiles']):return False
+  if any(not isinstance(s,dict) or s.get('device_id') not in ids or not s.get('id') or (s.get('video_profile_id') and s.get('video_profile_id') not in profiles) for s in value['streams']):return False
+  return not any(not isinstance(i,dict) or i.get('device_id') not in ids or i.get('verified') is not True for i in value['openipcIdentities'])
+ @Slot('QVariantMap',result=bool)
+ def restoreSnapshot(self,value):
+  if not self.validateSnapshot(value):return False
+  try:
+   with self._connect() as db:
+    db.execute('BEGIN IMMEDIATE');db.execute('DELETE FROM openipc_identity');db.execute('DELETE FROM streams');db.execute('DELETE FROM devices');db.execute('DELETE FROM video_profiles')
+    for d in value['devices']:db.execute('INSERT INTO devices VALUES(?,?,?,?,?,?,?)',(d['id'],d['name'],d['type'],d['host'],int(d['port']),d['connection'],d['notes']))
+    for p in value['videoProfiles']:db.execute('INSERT INTO video_profiles VALUES(?,?,?,?,?,?,?,?,?)',(p['id'],p['name'],p.get('codec','h264'),p.get('width'),p.get('height'),p.get('fps'),p.get('bitrate_kbps'),p.get('latency_mode','balanced'),p.get('notes','')))
+    for s in value['streams']:db.execute('INSERT INTO streams VALUES(?,?,?,?,?,?,?,?,?)',(s['id'],s['device_id'],s['name'],s['kind'],s['protocol'],int(s['port']),s['path'],s.get('video_profile_id'),int(bool(s.get('enabled')))))
+    for i in value['openipcIdentities']:db.execute('INSERT INTO openipc_identity VALUES(?,?,?,?,?,?,?,?)',(i['device_id'],1,i.get('platform',''),i.get('soc',''),i.get('sensor',''),i.get('firmware',''),i.get('majestic',''),json.dumps(i.get('evidence',[]),ensure_ascii=False)))
+    db.execute("INSERT OR REPLACE INTO settings VALUES('activeDeviceId',?)",(value['activeDeviceId'],))
+   self._load();self.changed.emit();return True
+  except (sqlite3.Error,KeyError,TypeError,ValueError):return False
  @Slot(str,str,str,int,str,str,result=str)
  def addStream(self,device_id,name,kind,port,path,protocol):
-  if not any(i["id"]==device_id for i in self._items):self.notice.emit("Пристрій для потоку не знайдено");return ""
-  name=name.strip();kind=kind.strip().lower() or "main";protocol=protocol.strip().lower() or "rtsp";path=path.strip() or "/";port=max(1,min(int(port),65535))
-  if not name or protocol not in ("rtsp","udp","tcp") or not path.startswith("/"):self.notice.emit("Некоректні параметри відеопотоку");return ""
-  sid=uuid.uuid4().hex
+  if not any(i["id"]==device_id for i in self._items):return ""
+  name=name.strip();kind=kind.strip().lower() or "main";protocol=protocol.strip().lower() or "rtsp";path=path.strip() or "/";port=max(1,min(int(port),65535));sid=uuid.uuid4().hex
   try:
    with self._connect() as db:db.execute("INSERT INTO streams(id,device_id,name,kind,protocol,port,path,video_profile_id,enabled) VALUES(?,?,?,?,?,?,?,NULL,1)",(sid,device_id,name,kind,protocol,port,path))
-  except sqlite3.IntegrityError:self.notice.emit("Потік такого типу вже існує для цього пристрою");return ""
+  except sqlite3.IntegrityError:return ""
   self._load_streams();return sid
  @Slot(str,str)
  def setStreamVideoProfile(self,stream_id,profile_id):
   profile_id=profile_id.strip() or None
-  if profile_id and not any(p["id"]==profile_id for p in self._profiles):self.notice.emit("Відеопрофіль не знайдено");return
+  if profile_id and not any(p["id"]==profile_id for p in self._profiles):return
   with self._connect() as db:db.execute("UPDATE streams SET video_profile_id=? WHERE id=?",(profile_id,stream_id))
   self._load_streams()
- @Slot(str)
- def removeStream(self,stream_id):
-  with self._connect() as db:db.execute("DELETE FROM streams WHERE id=?",(stream_id,))
-  self._load_streams()
- @Slot(str,str,str,int,int,int,int,str,str,result=str)
- def saveVideoProfile(self,profile_id,name,codec,width,height,fps,bitrate,latency_mode,notes):
-  profile_id=profile_id.strip() or uuid.uuid4().hex;name=name.strip();codec=codec.strip().lower();latency_mode=latency_mode.strip().lower() or "balanced"
-  if not name or codec not in ("h264","h265"):self.notice.emit("Некоректний відеопрофіль");return ""
-  def nullable(v):return int(v) if int(v)>0 else None
-  try:
-   with self._connect() as db:db.execute("INSERT INTO video_profiles(id,name,codec,width,height,fps,bitrate_kbps,latency_mode,notes) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,codec=excluded.codec,width=excluded.width,height=excluded.height,fps=excluded.fps,bitrate_kbps=excluded.bitrate_kbps,latency_mode=excluded.latency_mode,notes=excluded.notes",(profile_id,name,codec,nullable(width),nullable(height),nullable(fps),nullable(bitrate),latency_mode,notes.strip()))
-  except sqlite3.IntegrityError:self.notice.emit("Назва відеопрофілю вже використовується");return ""
-  self._load_profiles();return profile_id
  @Property("QVariantList",notify=discoveryChanged)
  def discovered(self):return self._discovered
  @Property("QVariantList",notify=discoveryChanged)
@@ -269,59 +250,19 @@ class Devices(QObject):
  def setSelectedInterface(self,i):
   if not self._scanning and any(x["id"]==i for x in self._interfaces):self._selected_interface=i;self.discoveryChanged.emit()
  @Slot()
- def discoverOpenIPC(self):
-  if self._scanning:return
-  iface=next((i for i in self._interfaces if i["id"]==self._selected_interface),None)
-  if not iface:self._status="Помилка";self.notice.emit("Немає вибраного IPv4 мережевого інтерфейсу");self.discoveryChanged.emit();return
-  self._scanning=True;self._discovered=[];self._stage="mDNS";self._pd=self._pt=self._found=0;self._status="Сканування";self.discoveryChanged.emit();self._worker=Worker(iface);self._worker.progress.connect(self._progress);self._worker.live.connect(self._live);self._worker.done.connect(self._done);self._worker.finished.connect(self._worker_finished);self._worker.start()
- @Slot()
- def cancelDiscovery(self):
-  if self._scanning and self._worker:self._status="Скасування";self.discoveryChanged.emit();self._worker.stop()
- @Slot(str,int,int,int)
- def _progress(self,s,d,t,f):self._stage,self._pd,self._pt,self._found=s,d,t,f;self.discoveryChanged.emit()
- @Slot(object)
- def _live(self,r):self._discovered=list(r);self._found=len(r);self.discoveryChanged.emit()
- @Slot(object,bool,str)
- def _done(self,r,c,e):self._discovered=list(r);self._found=len(r);self._scanning=False;self._status="Помилка" if e else("Скасовано" if c else "Завершено");self.discoveryChanged.emit();self.notice.emit((e or self._status)+f": {len(r)} знайдено")
- @Slot()
- def _worker_finished(self):
-  worker=self.sender()
-  if worker is self._worker:self._worker=None
-  if worker:worker.deleteLater()
- @Slot(str,str,bool,result=str)
- def addDiscovered(self,host,name,confirmed):
-  match=next((x for x in self._discovered if x.get("host")==host),None)
-  if not confirmed or not match or not match.get("openipc"):return ""
-  identity=normalize_openipc_identity(match.get("identity"),match.get("evidence",[]))
-  for i in self._items:
-   if i["host"]==host:self._save_identity(i["id"],identity);self._load();self._active_id=i["id"];self._save_active();self.changed.emit();return i["id"]
-  did=self.addDevice(name or "OpenIPC "+host,"Камера OpenIPC",host,80,"Мережа","OpenIPC verified")
-  if did:self._save_identity(did,identity);self._load();self.changed.emit()
-  return did
- @Slot(str,str,str,int,str,str,result=str)
- def addDevice(self,name,device_type,host,port,connection,note):
-  name,host=name.strip(),host.strip()
-  if not name or not valid_host(host):self.notice.emit("Вкажіть коректні назву та IPv4/hostname без схеми URL або шляху");return ""
-  port=max(1,min(int(port),65535));did=uuid.uuid4().hex
-  try:
-   with self._connect() as db:db.execute("INSERT INTO devices VALUES(?,?,?,?,?,?,?)",(did,name,device_type,host,port,connection,note.strip()))
-  except sqlite3.IntegrityError:self.notice.emit("Пристрій з таким host і портом уже існує");return ""
-  self._load();self.changed.emit();return did
- @Slot(str,str,str,int,str,result=bool)
- def updateDevice(self,did,name,host,port,note):
-  name,host=name.strip(),host.strip()
-  if not name or not valid_host(host):self.notice.emit("Вкажіть коректні назву та IPv4/hostname без схеми URL або шляху");return False
-  try:
-   with self._connect() as db:cur=db.execute("UPDATE devices SET name=?,host=?,port=?,notes=? WHERE id=?",(name,host,max(1,min(int(port),65535)),note.strip(),did))
-  except sqlite3.IntegrityError:self.notice.emit("Пристрій з таким host і портом уже існує");return False
-  if not cur.rowcount:return False
-  self._load();self.changed.emit();return True
+ def clearActive(self):self._active_id="";self._save_active();self.changed.emit();self.streamsChanged.emit()
  @Slot(str)
  def setActive(self,did):
   if any(i["id"]==did for i in self._items):self._active_id=did;self._save_active();self.changed.emit();self.streamsChanged.emit()
- @Slot()
- def clearActive(self):
-  self._active_id="";self._save_active();self.changed.emit();self.streamsChanged.emit()
+ @Slot(str,str,str,int,str,str,result=str)
+ def addDevice(self,name,device_type,host,port,connection,note):
+  name,host=name.strip(),host.strip()
+  if not name or not valid_host(host):return ""
+  did=uuid.uuid4().hex
+  try:
+   with self._connect() as db:db.execute("INSERT INTO devices VALUES(?,?,?,?,?,?,?)",(did,name,device_type,host,max(1,min(int(port),65535)),connection,note.strip()))
+  except sqlite3.IntegrityError:return ""
+  self._load();self.changed.emit();return did
  @Slot(str)
  def removeDevice(self,did):
   with self._connect() as db:db.execute("DELETE FROM devices WHERE id=?",(did,))
