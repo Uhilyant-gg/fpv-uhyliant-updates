@@ -1,195 +1,82 @@
 # FPV Uhyliant development guide
 
-This file and `PROJECT_STATE.md` are the canonical persistent handoff/context for future development chats. Read both from current `main` before making changes. Update both whenever project state, blockers, architecture decisions, release behavior, priorities, or the development plan materially change. Do not let either file become a historical snapshot that contradicts current `main`.
+This file and `PROJECT_STATE.md` are the canonical persistent handoff/context for future development chats. Read both from current `main` before making changes. Update both whenever project state, blockers, architecture decisions, release behavior, priorities, or the development plan materially change.
 
 ## Product goal
-
-`ФПВ Ухилянт` is a Windows ground-station application for FPV systems. The application should provide one coherent workflow for discovering devices, configuring cameras/video, installing OpenIPC firmware, diagnostics, FPV operation, updates, and later flight-controller telemetry/control integration.
+`ФПВ Ухилянт` is a Windows ground-station application for FPV systems, combining device discovery, camera/video management, OpenIPC firmware operations, diagnostics, FPV operation, updates and flight-controller telemetry in one workflow.
 
 ## Core UI flow
-
 Home -> Devices / Quick connect / Firmware / Update / Diagnostics -> FPV or Service Mode
 
-Firmware should also be directly reachable in the context of a camera:
-
+Firmware is also reachable in camera context:
 Devices -> Camera -> Firmware
 
-## Current technology baseline
-
+## Technology baseline
 - Python + PySide6.
 - Qt Quick/QML UI.
 - Qt Multimedia video playback.
-- SQLite persistence for devices, streams, settings, and video profiles.
+- SQLite devices, streams, settings and video profiles.
 - Windows per-user installation.
-- OTA update flow with signed manifests, SHA-256 package integrity, Ed25519 signatures, launcher startup verification, and rollback.
-- GitHub Actions builds Windows packages/releases.
+- OTA with signed manifests, SHA-256 integrity, Ed25519 signatures, launcher verification and rollback.
+- GitHub Actions Windows builds/releases.
 
 ## Non-negotiable architecture rules
-
 1. `src/` is authoritative source.
 2. Camera preset and video profile are separate entities.
 3. Video profile belongs to a camera/video stream and is not applied during camera flashing.
-4. A camera or each of its streams may have its own video profile.
-5. BAT/fullflash is not the universal primary OpenIPC installation method. It is intended only for cameras already running the relevant custom OpenIPC firmware.
+4. A camera or each stream may have its own video profile.
+5. BAT/fullflash is only for cameras already running the relevant compatible custom OpenIPC firmware, not a universal install method.
 6. OpenIPC installation should be automated as far as safely possible.
-7. Generic ONVIF devices must not be classified as OpenIPC without actual OpenIPC/Majestic evidence.
-8. Target flight stacks are ArduPilot, Betaflight, and INAV.
-9. Target protocols include MAVLink, MSP, and CRSF.
+7. Generic ONVIF devices must not be classified as OpenIPC without OpenIPC/Majestic evidence.
+8. Target flight stacks are ArduPilot, Betaflight and INAV.
+9. Target protocols include MAVLink, MSP and CRSF.
 10. Published release metadata under `releases/<version>/` is immutable.
 11. Never commit private signing keys.
-12. Every published release requires a signed manifest, SHA-256 metadata, and Git tag.
+12. Every published release requires a signed manifest, SHA-256 metadata and Git tag.
+13. New flight protocol backends start read-only.
+14. Do not display invented or stale telemetry as live.
 
-## Immediate release priority: 2.0.10
+## Current development state
+MAVLink phase 1 is implemented in read-only form and awaits real FC/long-running-link validation. The RTSP runtime now has explicit reconnect/stalled/error state handling and the UI has bounded automatic recovery plus manual reconnect/diagnostic visibility. Both areas still require real-hardware validation.
 
-The current blocker is reliable startup validation of the packaged Windows application.
+## Current implementation order
+### P0. Hardware validation
+Validate MAVLink phase 1 against a real flight controller and exercise RTSP playback/recovery against real OpenIPC hardware. Preserve diagnostics from failures.
 
-Current 2.0.10 work includes:
+### P1. Vehicle model and diagnostics
+Introduce a vehicle-level model above individual telemetry transports and a structured diagnostics engine so MAVLink, later MSP/CRSF, video, network and external-navigation health can be represented consistently.
 
-- explicit PySide6.QtMultimedia inclusion in the PyInstaller build;
-- packaged GUI/QML smoke testing;
-- `startup.log` for unhandled startup exceptions;
-- `qt-startup.log` for Qt/QML/Multimedia messages;
-- marker-based smoke testing so GUI initialization failure can be distinguished from shutdown hangs;
-- full signing/publishing/Pages release pipeline preserved;
-- Inno Setup fallback version aligned to 2.0.10.
-
-Observed CI history relevant to the current blocker:
-
-1. The original packaged smoke test timed out while waiting for the GUI process to exit.
-2. Marker-based validation was introduced.
-3. A later run exited with `-1` before creating the smoke marker.
-4. Current `main` uses a single quoted PowerShell argument line for `--smoke-test --smoke-marker <path>` and prints available startup/Qt diagnostics into the failed CI job.
-
-Do not move the release forward while packaged GUI/QML validation is failing. Diagnose the actual failure first and keep the diagnostic evidence.
-
-Expected installed runtime diagnostics directory:
-
-`%LOCALAPPDATA%/FPV-Uhyliant`
-
-Important diagnostic files may include:
-
-- `startup.log`
-- `qt-startup.log`
-- `startup-ok.json`
-- `updater.log`
-
-CI also uses `smoke-test-ok.json` as the explicit successful-GUI-initialization marker.
-
-## Development priority after 2.0.10 is validated
-
-### P0. Firmware Center first
-
-Firmware has priority over further video/telemetry development because real OpenIPC hardware is needed to validate the downstream camera functionality.
-
-Target entry point:
-
-Devices -> Camera -> Firmware
-
+### P2. Safe OpenIPC provisioning
 Target workflow:
-
 Detect -> Identify -> Select firmware -> Pre-check -> Flash -> Reboot -> Rediscover -> Verify
 
-Initial real hardware target should include the SSC30KQ / IMX335 OpenIPC setup already used during manual flashing/recovery work.
+Initial supported hardware should include the SSC30KQ / IMX335 OpenIPC setup used during manual flashing/recovery work. Keep primary installation, upgrade and recovery/fullflash paths separate. Before destructive writes, identify hardware/flash layout, validate compatibility, preserve recoverable state and verify images.
 
-The Firmware Center should eventually identify as much of the following as the hardware exposes:
+### P3. OpenIPC device integration and video
+Make OpenIPC cameras first-class devices with identity/platform/sensor, firmware, network, Majestic state, streams and diagnostics. Continue real-video work including stream discovery, main/sub streams, codec/resolution/FPS visibility where available, latency diagnostics, stream switching, fullscreen and later secondary/thermal/PiP. TCP port reachability is not proof of healthy RTSP playback.
 
-- IP / hostname
-- platform / SoC
-- sensor
-- current firmware/OpenIPC state
-- Majestic availability
-- supported installation/recovery path
+### P4. Presets and profiles
+Keep camera preset separate from per-stream video profiles. Video profiles cover playback/stream-oriented settings and must not silently participate in firmware flashing.
 
-Keep primary installation, upgrade, and recovery/fullflash paths clearly separated.
+### P5. Protocol normalization
+After the vehicle/diagnostics abstraction exists, add normalized providers and then read-only MSP and CRSF support for Betaflight/INAV while retaining MAVLink support for ArduPilot.
 
-### P1. OpenIPC device integration
-
-After flashing works, make an OpenIPC camera a first-class manageable device rather than only a discovered IP address.
-
-Expected camera page areas:
-
-- identity/platform/sensor
-- firmware state
-- network state
-- Majestic/OpenIPC state
-- streams
-- diagnostics
-- Firmware action
-
-### P2. Real video validation
-
-Then harden the path required for actual FPV video:
-
-- automatic RTSP stream detection
-- main/sub stream support
-- reconnect behavior
-- playback error diagnostics
-- codec/resolution/FPS visibility where available
-- latency diagnostics
-- stream switching
-- fullscreen
-- later secondary/thermal stream and PiP
-
-Do not treat a successful TCP connection to port 554 as proof that RTSP playback is healthy.
-
-### P3. Camera presets and video profiles
-
-Keep these models independent.
-
-Conceptual model:
-
-Camera -> Camera preset
-
-Camera -> Stream 1 -> Video profile A
-
-Camera -> Stream 2 -> Video profile B
-
-Video profiles should cover stream/playback-oriented settings such as codec, FPS, bitrate, resolution, and latency mode where applicable.
-
-### P4. Flight-controller integration
-
-Add read-only integration first, then configuration/write operations later.
-
-Support targets:
-
-- ArduPilot via MAVLink
-- Betaflight via MSP/CRSF as appropriate
-- INAV via MSP/CRSF as appropriate
-
-The first objective is reliable discovery/connection and telemetry ingestion, not parameter editing.
-
-### P5. FPV Mode and OSD
-
-Combine verified video and flight telemetry into FPV Mode.
-
-Potential OSD/status areas include:
-
-- flight mode
-- battery/power
-- GPS/navigation quality including HDOP where available
-- link/network state
-- Starlink/network connectivity state where measurable
-- external navigation/stabilization state when exposed by an integration
-- warnings and failsafe state
-
-Do not invent telemetry. Display only values actually received from the connected system.
+### P6. StabX and network integration
+Add external-navigation/StabX status integration when exposed by a supported interface, plus Starlink/VPN/link diagnostics. Feed only verified received status into FPV OSD and diagnostics.
 
 ## Development workflow
+1. Read current `DEVELOPMENT_GUIDE.md` and `PROJECT_STATE.md` from `main` at the start of development work.
+2. Inspect actual current source before editing.
+3. Update both canonical context files after material changes to state, blockers, roadmap, architecture, release behavior or workflow.
+4. `PROJECT_STATE.md` records what is true now and what happens next.
+5. `DEVELOPMENT_GUIDE.md` records product rules and development order.
+6. Small corrective changes may go directly to `main` when appropriate.
+7. Risky/substantial changes should receive focused review and CI before merge.
+8. Preserve existing release/update/security behavior unless explicitly changing it.
+9. Do not publish failing validation.
+10. For Windows GUI changes, validate the frozen executable, not only source execution.
+11. Preserve useful failure logs/artifacts.
+12. Firmware changes must not silently apply video profiles.
 
-1. At the start of a new development chat, read current `DEVELOPMENT_GUIDE.md` and `PROJECT_STATE.md` from `main` before proposing or applying changes.
-2. Inspect the actual current source files related to the requested change before writing.
-3. After every material change to state, blockers, roadmap, architecture, release behavior, or workflow, update both canonical context files in the same development cycle.
-4. `PROJECT_STATE.md` should answer: what is true right now, what is blocked, what was most recently changed, and what should happen next.
-5. `DEVELOPMENT_GUIDE.md` should answer: what are we building, what rules must remain true, and in what priority/order should functionality be implemented.
-6. Small corrective changes may be committed directly to `main` when appropriate, per the current user preference.
-7. Risky/substantial changes should use focused review and CI before merge.
-8. Preserve existing release/update/security behavior unless the change explicitly targets it.
-9. Do not merge or publish failing validation.
-10. For release-pipeline changes, ensure signing/publishing/Pages jobs remain present.
-11. For Windows GUI changes, validate the frozen executable, not only Python source execution.
-12. When diagnostics fail, preserve or upload useful logs/artifacts instead of replacing the error with a generic timeout.
-13. Firmware changes must not silently apply video profiles.
-
-## Definition of done for the next major milestone
-
-The next major milestone is not simply a Firmware button. It is reached when, on a supported test camera, the application can identify the device, choose the appropriate supported OpenIPC firmware path, execute the intended flashing workflow with safeguards, reboot/rediscover the camera, and verify that the resulting OpenIPC/Majestic system is reachable. Real video validation follows immediately after that.
+## Next major milestone
+The next milestone requires real-hardware evidence: stable MAVLink telemetry on a supported FC and reliable RTSP playback/recovery on a supported OpenIPC camera. After that, vehicle-level diagnostics and safe provisioning can be built on validated foundations.

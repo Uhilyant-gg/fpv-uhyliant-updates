@@ -22,6 +22,9 @@ Implemented:
 
 Important: sequence-gap packet loss is diagnostic only and can over-report loss when routers or redundant links alter which packets reach the GCS. Real-FC validation is still required before declaring the phase field-validated.
 
+## VideoRuntime status
+RTSP runtime now tracks checking, ready, playing, reconnecting, stalled and error states, connection-attempt count and last-event timestamp. The FPV UI performs bounded automatic recovery after playback stops/errors and exposes manual reconnect plus RTSP diagnostics. TCP endpoint reachability is still only a pre-check; real stream health and frame-level stall validation require camera testing.
+
 ## Existing foundation
 - Windows PyInstaller/OTA/release pipeline and packaged GUI smoke-test.
 - SQLite devices, streams and video profiles.
@@ -37,7 +40,7 @@ BAT/fullflash is only for cameras already running a compatible custom OpenIPC se
 
 ## Next implementation order
 1. Hardware-validate MAVLink phase 1 against a real FC and long-running link.
-2. Harden VideoRuntime reconnect/stall diagnostics.
+2. Hardware-validate RTSP reconnect/error behavior against a real OpenIPC camera and add frame-level stall detection if Qt exposes sufficient playback evidence.
 3. Introduce vehicle-level model and structured diagnostics engine.
 4. Add safe OpenIPC provisioning and versioned camera presets.
 5. Add normalized telemetry providers, then read-only MSP and CRSF.
