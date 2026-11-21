@@ -20,6 +20,7 @@ def run_current(token=None):
  if not exe.is_file():raise RuntimeError('current FPV-Uhyliant.exe missing')
  args=[str(exe),'--install-root',str(R)]
  if token:args+=['--startup-token',token]
+ elif os.environ.get('GITHUB_ACTIONS')=='true':args+=['--smoke-test','--smoke-marker',str(D/'launcher-smoke-ok.json')]
  return subprocess.Popen(args,cwd=C)
 def rollback(st,reason):
  note(reason+'; rollback');action=rollback_preconditions(C.exists(),B.exists())
