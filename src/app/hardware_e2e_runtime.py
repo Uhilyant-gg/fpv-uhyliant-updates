@@ -19,9 +19,10 @@ class HardwareE2ERuntime(QObject):
   device=self._selected();identity=dict(device.get('openipcIdentity') or {});fw=self._firmware();artifact=fw.get('artifact') or {};plan=fw.get('plan') or {};approval=fw.get('approval') or {}
   return (device.get('id') or '',device.get('host') or '',identity.get('platform') or '',identity.get('sensor') or '',artifact.get('sha256') or '',artifact.get('size') or 0,plan.get('approvalToken') or '',approval.get('approvalToken') or '')
  def _source_changed(self):
-  current=self._identity_key()
-  if self._host_key_accepted and current!=self._accepted_identity:self._host_key_accepted=False;self._accepted_identity=None
-  if self._evidence_binding is not None and current!=self._evidence_binding:self._captures={};self._evidence_binding=None
+  current=self._identity_key();session=self._session_result();transaction=session.get('transaction') or {}
+  active=bool(transaction) and str(session.get('state') or '') in ('executing','reboot-pending','rediscovering','verified','error')
+  if self._host_key_accepted and current!=self._accepted_identity and not active:self._host_key_accepted=False;self._accepted_identity=None
+  if self._evidence_binding is not None and current!=self._evidence_binding and not active:self._captures={};self._evidence_binding=None
   self.changed.emit()
  @Property('QVariantMap',notify=changed)
  def readiness(self):return hardware_e2e_readiness(self._selected(),self._network(),bool(self.credentials.snapshot().get('hasPassword')),self._host_key_accepted and self._identity_key()==self._accepted_identity,self._firmware())
@@ -31,7 +32,7 @@ class HardwareE2ERuntime(QObject):
  def captures(self):return deepcopy(self._captures)
  @Property('QVariantMap',notify=changed)
  def evidenceReadiness(self):
-  result=self._session_result();state=str(result.get('state') or '');verification=result.get('verification') or {};identity=verification.get('identity') or {};observed=str(identity.get('firmware') or result.get('observedFirmware') or '').strip();bound=self._evidence_binding is not None and self._identity_key()==self._evidence_binding
+  result=self._session_result();state=str(result.get('state') or '');verification=result.get('verification') or {};identity=verification.get('identity') or {};observed=str(identity.get('firmware') or result.get('observedFirmware') or '').strip();transaction=result.get('transaction') or {};bound=self._evidence_binding is not None and bool(transaction) and all(transaction.get(k)==v for k,v in zip(('deviceId','host','platform','sensor','artifactSha256','artifactSize','approvalToken'),self._evidence_binding[:7]))
   return {'preflight':self.readiness.get('ready') is True,'postUpdate':bound and 'preflight' in self._captures and state=='verified' and verification.get('ok') is True and bool(observed),'failure':bound and 'preflight' in self._captures and state in ('error','blocked'),'state':state,'observedFirmware':observed}
  @Slot(str)
  def selectDevice(self,device_id):
