@@ -12,4 +12,8 @@ class Tests(unittest.TestCase):
   r=FirmwareRediscovery(lambda host:{'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':['Majestic cached identity']},lambda _:None).wait('192.168.1.50',1,0);self.assertFalse(r['rediscovered']);self.assertFalse(r['identity']['verified'])
  def test_status_endpoint_is_recognized_as_fresh_probe_evidence(self):
   r=FirmwareRediscovery(lambda host:{'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':['OpenIPC status.cgi']},lambda _:None).wait('192.168.1.50',1,0);self.assertTrue(r['rediscovered']);self.assertTrue(r['identity']['verified'])
+ def test_probe_exception_is_bounded_failure(self):
+  calls=[]
+  def probe(host):calls.append(host);raise RuntimeError('probe failed')
+  r=FirmwareRediscovery(probe,lambda _:None).wait('192.168.1.50',2,0);self.assertFalse(r['rediscovered']);self.assertEqual(r['attempts'],2);self.assertEqual(len(calls),2)
 if __name__=='__main__':unittest.main()

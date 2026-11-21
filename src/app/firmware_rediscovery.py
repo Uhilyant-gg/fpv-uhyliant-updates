@@ -9,7 +9,8 @@ class FirmwareRediscovery:
  def wait(self,host,attempts=30,interval=2.0):
   attempts=max(1,min(int(attempts),120));interval=max(0.0,min(float(interval),10.0))
   for index in range(attempts):
-   result=self.probe(host)
+   try:result=self.probe(host)
+   except Exception:result=None
    if result and result.get('openipc'):
     evidence=list(result.get('evidence') or []);fresh_evidence=[item for item in evidence if item in _FRESH_OPENIPC_EVIDENCE]
     payload=dict(result.get('identity') or {});payload['verified']=bool(fresh_evidence)
