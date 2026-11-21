@@ -1,4 +1,4 @@
-import hashlib,json,tempfile,unittest
+import hashlib,tempfile,unittest
 from unittest.mock import patch
 from openipc_firmware_acquisition import OpenIPCFirmwareAcquisition
 FIXTURE_URL=''.join(('https://','fixture.invalid','/artifact'))
@@ -15,7 +15,9 @@ class Center:
  def verifyImage(self,path,sha):self.calls.append((path,sha));return True
 class Tests(unittest.TestCase):
  def setUp(self):self.data=b'firmware';self.entry={'platform':'ssc30kq','sensor':'imx335','variant':'lite','channel':'nightly','build':'b1','url':FIXTURE_URL,'sha256':hashlib.sha256(self.data).hexdigest(),'size':len(self.data)}
- def service(self,td,responses=None):return OpenIPCFirmwareAcquisition(Center(),td,opener=lambda *a,**k:(responses or [Response(self.data)]).pop(0))
+ def service(self,td,responses=None):
+  queue=responses if responses is not None else [Response(self.data)]
+  return OpenIPCFirmwareAcquisition(Center(),td,opener=lambda *a,**k:queue.pop(0))
  def prime(self,s):s._catalog=[dict(self.entry)];s._generation=1;return s.selectForDevice('cam','nightly','b1','lite')
  def test_selection_binds_device_host_and_identity(self):
   with tempfile.TemporaryDirectory() as td:
@@ -34,5 +36,5 @@ class Tests(unittest.TestCase):
    s=self.service(td);self.prime(s);s._status['selection']['artifact']={**self.entry,'build':'evil'};self.assertFalse(s.downloadSelected('cam'));self.assertEqual(s.center.calls,[])
  def test_verified_cache_is_reused_only_after_rehash(self):
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
-   s=self.service(td);self.prime(s);target=s.cache/('openipc-'+self.entry['sha256'][:16]+'.tgz');s.cache.mkdir();target.write_bytes(self.data);self.assertTrue(s.downloadSelected('cam'));self.assertEqual(len(s.center.calls),1)
+   s=self.service(td);self.prime(s);target=s.cache/('openipc-'+self.entry['sha256'][:16]+'.tgz');s.cache.mkdir(parents=True,exist_ok=True);target.write_bytes(self.data);self.assertTrue(s.downloadSelected('cam'));self.assertEqual(len(s.center.calls),1)
 if __name__=='__main__':unittest.main()
