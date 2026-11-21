@@ -3,28 +3,26 @@
 `main` is the single source of truth. Historical chat code must not replace newer repository code.
 
 ## Product direction
-Windows ground station with maximum-video-workspace flight UX. ArduPilot, Betaflight and INAV are target stacks; MAVLink, MSP and CRSF are target telemetry protocols.
+Windows FPV ground station using Python + PySide6 + Qt Quick/QML. ArduPilot, Betaflight and INAV are target stacks; MAVLink, MSP and CRSF are target telemetry protocols. FPV remains video-first.
 
 ## Telemetry
-Normalized read-only providers sit behind `TelemetryRouter`; FPV consumes the selected provider and unknown/stale/missing telemetry remains unavailable. Hardware validation is `hardware-validation-pending`.
+Normalized read-only providers sit behind `TelemetryRouter`; unknown/stale/missing telemetry is unavailable. Real FC/radio validation is `hardware-validation-pending`.
 
-## OpenIPC and video
-Verified OpenIPC identity is distinct from generic ONVIF discovery. Platform/SoC, sensor, firmware and Majestic are populated only from observed verified evidence. Stream diagnostics include main/sub identity plus associated video-profile codec/resolution/FPS/latency-mode metadata and measured endpoint-connect check time. Endpoint timing is reachability data, not glass-to-glass latency. Real camera validation remains `hardware-validation-pending`.
+## OpenIPC / firmware
+Verified OpenIPC identity stays distinct from generic ONVIF. Firmware Center has SSC30KQ / IMX335 compatibility, primary/upgrade/recovery separation, SHA-256 verification, immutable approvals, pre-handoff re-hash, operation locking and verified post-reboot identity lifecycle. No hardware adapter is registered by default; destructive work is `hardware-validation-pending`.
 
-## Firmware Center
-SSC30KQ / IMX335 is the initial explicit profile. Primary, upgrade and recovery/fullflash are distinct; recovery/fullflash is only for verified compatible existing custom OpenIPC. SHA-256 verification, immutable approval, immediate pre-handoff re-hash, operation locking and guarded executor lifecycle exist. No hardware adapter is registered by default, so destructive writing remains disabled and reports `hardware-validation-pending`.
+## Video workspace
+A stream-workspace model now selects only persisted enabled streams. It prefers a real `main` stream and may select a real `sub`, `secondary` or `thermal` stream as secondary. PiP availability is true only when two distinct real streams exist. Main/sub switching state lives above playback runtime. Video diagnostics expose associated profile codec/resolution/FPS/latency-mode only when configured and endpoint-connect timing only as reachability information, never invented glass-to-glass latency.
 
-The executor now records pre-operation identity and accepts a structured observed post-reboot identity. Post-flash verification checks rediscovery/OpenIPC evidence, platform/sensor compatibility, optional expected firmware and hardware identity continuity before lifecycle state becomes `verified`. Obtaining that observation from real hardware remains `hardware-validation-pending`.
-
-## Presets and profiles
-Versioned camera presets remain separate from per-stream video profiles; firmware operations never apply video profiles.
+## Presets / profiles
+Versioned camera presets remain separate from per-stream video profiles. Firmware operations never apply video profiles.
 
 ## Next implementation order
-1. Implement supported real device adapters only when the actual primary/upgrade/recovery mechanisms are available for hardware validation; do not create generic destructive fallbacks.
-2. Continue software-only video work: stream switching state, playback diagnostics, secondary/thermal/PiP preparation.
-3. Expand camera presets independently of video profiles.
+1. Hardware-only firmware adapters and real SSC30KQ / IMX335 validation remain pending physical hardware.
+2. Continue secondary playback/PiP runtime and playback-health instrumentation without synthetic metadata.
+3. Expand camera presets separately from stream video profiles.
 4. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
-5. Add encrypted DB export/import and station pairing; continue distribution hardening.
+5. Add encrypted DB export/import, station pairing and distribution hardening.
 
 ## Acceptance rule
 No invented telemetry, hardware state, stream metadata or latency. Hardware-dependent validation is `hardware-validation-pending`.
