@@ -282,6 +282,9 @@ class Devices(QObject):
  @Slot(str)
  def setActive(self,did):
   if any(i["id"]==did for i in self._items):self._active_id=did;self._save_active();self.changed.emit();self.streamsChanged.emit()
+ @Slot()
+ def clearActive(self):
+  self._active_id="";self._save_active();self.changed.emit();self.streamsChanged.emit()
  @Slot(str)
  def removeDevice(self,did):
   with self._connect() as db:db.execute("DELETE FROM devices WHERE id=?",(did,))
