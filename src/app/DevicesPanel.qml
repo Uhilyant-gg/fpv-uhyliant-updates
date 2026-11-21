@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 Item {
  id:root
- signal closeRequested()
+ signal closeRequested();signal activateDevice(string deviceId)
  property color fg:"#f5f8fc";property color muted:"#8799ad";property color surface:"#0d1723";property color raised:"#132235";property color accent:"#35e0a1";property color blue:"#4195ff";property color line:"#203348";property color danger:"#ff7080"
  property var selectedFound:null;property var selectedSaved:null
  function value(v){return v===undefined||v===null||v===""?"Не визначено":v}
@@ -32,7 +32,7 @@ Item {
        Column{anchors.fill:parent;anchors.margins:10;spacing:4;Text{text:modelData.name;color:fg;font.bold:true}Text{text:modelData.host;color:muted;font.pixelSize:12}Text{text:modelData.openipcIdentity.verified?"● OpenIPC підтверджено":"○ Ідентичність не підтверджена";color:modelData.openipcIdentity.verified?accent:muted;font.pixelSize:11}}
       }
      }
-     RowLayout{Layout.fillWidth:true;Button{text:"Зробити активною";Layout.fillWidth:true;enabled:selectedSaved!==null;onClicked:devicesModel.setActive(selectedSaved.id);HoverHint{text:"Вибрати цю збережену камеру як активну."}}Button{text:"⋯";enabled:selectedSaved!==null;onClicked:savedDetails.open();HoverHint{text:"Показати відомості про збережену камеру."}}}
+     RowLayout{Layout.fillWidth:true;Button{text:"Зробити активною";Layout.fillWidth:true;enabled:selectedSaved!==null;onClicked:root.activateDevice(selectedSaved.id);HoverHint{text:"Вибрати цю збережену камеру як активну та синхронізувати FPV-потоки."}}Button{text:"⋯";enabled:selectedSaved!==null;onClicked:savedDetails.open();HoverHint{text:"Показати відомості про збережену камеру."}}}
     }
    }
    Item{SplitView.preferredWidth:12}
