@@ -3,10 +3,19 @@ from copy import deepcopy
 
 SECRET_KEYS={'password','passwd','secret','token','privatekey','private_key','apikey','api_key','authorization','credential','credentials','sshkey','ssh_key','signingkey','signing_key'}
 _SECRET_KEY_PARTS=('password','passwd','secret','token','privatekey','apikey','authorization','credential','sshkey','signingkey')
+_SECRET_VALUE_PATTERNS=(
+    re.compile(r'(?i)\b(authorization\s*:\s*(?:basic|bearer)\s+)[^\s,;]+'),
+    re.compile(r'(?i)\b((?:password|passwd|secret|token|api[_-]?key|credential)\s*[=:]\s*)[^\s,;]+'),
+)
 
 def _secret_key(key):
     normalized=re.sub(r'[^a-z0-9]','',str(key).lower())
     return normalized in {re.sub(r'[^a-z0-9]','',k) for k in SECRET_KEYS} or any(part in normalized for part in _SECRET_KEY_PARTS)
+
+def _sanitize_string(value):
+    out=value
+    for pattern in _SECRET_VALUE_PATTERNS:out=pattern.sub(lambda m:m.group(1)+'[redacted]',out)
+    return out
 
 def _sanitize(value):
     if isinstance(value,dict):
@@ -17,6 +26,7 @@ def _sanitize(value):
         return out
     if isinstance(value,list):return [_sanitize(v) for v in value]
     if isinstance(value,tuple):return [_sanitize(v) for v in value]
+    if isinstance(value,str):return _sanitize_string(value)
     return value
 
 def diagnostic_bundle(version,build=None,devices=None,network=None,video=None,protocols=None,updater=None,events=None,now=None,correlation_id=None):
