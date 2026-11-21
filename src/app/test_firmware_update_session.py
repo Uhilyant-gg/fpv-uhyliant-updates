@@ -18,4 +18,8 @@ class SessionTests(unittest.TestCase):
   t=Transport();self.session.configure_transport(t);self.assertTrue(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(t.calls,[('auth','192.168.1.50'),('run','192.168.1.50',['sysupgrade','-k','-r'])]);self.assertEqual(self.session.result['state'],'reboot-pending')
  def test_auth_failure_never_runs_sysupgrade(self):
   t=Transport(False);self.session.configure_transport(t);self.assertFalse(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.assertEqual(t.calls,[('auth','192.168.1.50')])
+ def test_transport_object_is_not_retained_by_session(self):
+  t=Transport();self.session.configure_transport(t);self.assertNotIn('_transport',self.session.__dict__);self.assertNotIn('password',repr(self.session.result).lower())
+ def test_invalid_post_reboot_host_fails_closed_without_probe(self):
+  t=Transport();self.session.configure_transport(t);self.assertTrue(self.session.execute('cam','ssc30kq-imx335','upgrade'));self.devices.items[0]['host']='not-an-ip';self.assertFalse(self.session.verifyAfterReboot());self.assertEqual(self.session.result['state'],'error')
 if __name__=='__main__':unittest.main()
