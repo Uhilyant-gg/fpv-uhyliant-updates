@@ -1,16 +1,19 @@
 from pathlib import Path
-import re
 import unittest
 class Tests(unittest.TestCase):
- def setUp(self):self.qml=(Path(__file__).parent/'FirmwareCenter.qml').read_text(encoding='utf-8');self.center=(Path(__file__).parent/'firmware_center.py').read_text(encoding='utf-8')
- def test_ui_wires_bound_official_acquisition_to_center(self):
-  for token in ('firmwareAcquisition.refresh()','firmwareAcquisition.selectForDevice(','firmwareAcquisition.downloadSelected(','firmwareCenter.artifact.verified'):
-   self.assertIn(token,self.qml)
- def test_variant_and_build_are_explicit_catalog_controls(self):self.assertIn('id:variantBox',self.qml);self.assertIn('id:buildBox',self.qml);self.assertIn('Варіант вибирається явно',self.qml);self.assertIn('Збірка вибирається явно',self.qml)
- def test_acquisition_uses_observed_device_identity(self):self.assertIn('firmwareCenter.acquisitionIdentity(deviceBox.currentValue',self.qml);self.assertIn('deviceBox.currentValue,channelBox.currentText',self.qml)
- def test_busy_executor_blocks_catalog_mutations(self):self.assertRegex(self.qml,r'Оновити каталог";enabled:!firmwareExecutor\.busy');self.assertRegex(self.qml,r'Завантажити і перевірити";enabled:[^\n}]*!firmwareExecutor\.busy')
- def test_update_requires_explicit_authenticated_transport(self):
-  self.assertIn('firmwareUpdateSession.enableAuthenticatedTransport(cameraCredentials,hardwareE2ERuntime)',self.qml);self.assertIn('hardwareReady.ready',self.qml);self.assertIn('Ключ хоста має бути перевірений і явно прийнятий',self.qml);self.assertIn('sessionResult.enabled&&firmwareCenter.executionPlan.ready&&!firmwareExecutor.busy&&modeBox.currentText==="upgrade"',self.qml)
- def test_reboot_pending_has_explicit_verification_action(self):self.assertIn('firmwareUpdateSession.verifyAfterReboot()',self.qml);self.assertIn('firmwareExecutor.status.state==="reboot-pending"',self.qml)
- def test_close_and_reset_drop_transport_and_credentials(self):self.assertIn('firmwareUpdateSession.disableTransport()',self.qml);self.assertIn('clearSensitive()',self.qml)
+ def setUp(self):self.qml=(Path(__file__).parent/'FirmwareCenter.qml').read_text(encoding='utf-8');self.acquisition=(Path(__file__).parent/'openipc_firmware_acquisition.py').read_text(encoding='utf-8')
+ def test_primary_flow_is_automatic_and_destructive_action_is_explicit(self):
+  self.assertIn('firmwareAcquisition.prepareRecommended(deviceBox.currentValue)',self.qml);self.assertIn('text:"Оновити камеру"',self.qml);self.assertIn('firmwareUpdateSession.execute(deviceBox.currentValue,"ssc30kq-imx335","upgrade")',self.qml)
+ def test_active_camera_is_preferred(self):self.assertIn('if(items[i].active===true)',self.qml);self.assertIn('Component.onCompleted:activeDevice()',self.qml)
+ def test_human_readable_camera_card_preserves_unknowns(self):
+  for token in ('OpenIPC: ','Платформа / сенсор: ','Встановлена firmware: ','Доступна firmware: ','не спостережено'):self.assertIn(token,self.qml)
+ def test_ambiguous_catalog_requires_explicit_advanced_choice(self):
+  self.assertIn('selectRecommendedForDevice',self.acquisition);self.assertIn("resolve(self._catalog,device['platform'],device['sensor'])",self.acquisition);self.assertIn('id:variantBox',self.qml);self.assertIn('Варіант вибирається явно',self.qml)
+ def test_manual_image_and_technical_controls_are_advanced(self):self.assertIn('visible:advanced',self.qml);self.assertIn('РУЧНИЙ ШЛЯХ ЛОКАЛЬНОГО ОБРАЗУ',self.qml);self.assertIn('Очікуваний SHA-256',self.qml)
+ def test_credentials_are_conditional_masked_and_session_only(self):
+  self.assertIn('visible:firmwareCenter.executionPlan.ready||hardwareReady.checks.credentialsPresent',self.qml);self.assertIn('echoMode:TextInput.Password',self.qml);self.assertIn('Дані потрібні лише для цього сеансу й не зберігаються.',self.qml);self.assertIn('clearSensitive()',self.qml)
+ def test_update_requires_authenticated_transport_and_plan(self):self.assertIn('enabled:sessionResult.enabled&&firmwareCenter.executionPlan.ready&&!firmwareExecutor.busy',self.qml);self.assertIn('firmwareUpdateSession.enableAuthenticatedTransport(cameraCredentials,hardwareE2ERuntime)',self.qml)
+ def test_progress_and_post_reboot_verification_are_visible(self):
+  for stage in ('Підготовка','Завантаження','Оновлення','Перезапуск','Перевірка'):self.assertIn(stage,self.qml)
+  self.assertIn('firmwareUpdateSession.verifyAfterReboot()',self.qml);self.assertIn('Камеру успішно оновлено до ',self.qml)
 if __name__=='__main__':unittest.main()

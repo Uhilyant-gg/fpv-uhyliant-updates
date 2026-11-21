@@ -117,6 +117,20 @@ class OpenIPCFirmwareAcquisition(QObject):
   result=resolve(self._catalog,device['platform'],device['sensor'],channel,build,variant)
   if result.get('ready'):result={**result,'deviceId':device_id,'device':device,'catalogGeneration':self._generation,'source':'official-openipc-catalog'}
   self._status={**self._status,'selection':deepcopy(result)};self.changed.emit();return result
+ @Slot(str,result='QVariantMap')
+ def selectRecommendedForDevice(self,device_id):
+  device=self._device_snapshot(device_id)
+  if not device:
+   result={'ready':False,'reason':'Спочатку виберіть підтверджену OpenIPC-камеру'};self._status={**self._status,'selection':result};self.changed.emit();return result
+  result=resolve(self._catalog,device['platform'],device['sensor'])
+  if result.get('ready'):result={**result,'deviceId':device_id,'device':device,'catalogGeneration':self._generation,'source':'official-openipc-catalog','recommended':True}
+  self._status={**self._status,'selection':deepcopy(result)};self.changed.emit();return result
+ @Slot(str,result=bool)
+ def prepareRecommended(self,device_id):
+  if not self.refresh():return False
+  selection=self.selectRecommendedForDevice(device_id)
+  if not selection.get('ready'):return False
+  return self.downloadSelected(device_id)
  @Slot(str,result=bool)
  def downloadSelected(self,device_id):
   selection=deepcopy(self._status.get('selection') or {})
