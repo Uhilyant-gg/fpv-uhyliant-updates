@@ -3,29 +3,28 @@
 `main` is the single source of truth. Historical chat code must not replace newer repository code.
 
 ## Product direction
-Windows ground station with maximum-video-workspace flight UX. Target controllers: ArduPilot, Betaflight, INAV. Target telemetry protocols: MAVLink, MSP, CRSF. Video and telemetry remain separate runtimes.
+Windows ground station with maximum-video-workspace flight UX. ArduPilot, Betaflight and INAV are target stacks; MAVLink, MSP and CRSF are target telemetry protocols.
 
-## Telemetry architecture
-MAVLink, MSP and CRSF use normalized read-only providers behind `TelemetryRouter`. FPV OSD consumes the selected provider; unknown fields remain unavailable. Real FC/radio validation is `hardware-validation-pending`.
+## Telemetry
+Normalized read-only providers sit behind `TelemetryRouter`; FPV consumes the selected provider and unknown/stale/missing telemetry remains unavailable. Hardware validation is `hardware-validation-pending`.
 
-## OpenIPC / video
-Verified OpenIPC identity persists separately from generic device data. Generic ONVIF/name hints do not establish OpenIPC. Platform/SoC, sensor, firmware and Majestic values are retained only when observed. Stream-aware RTSP diagnostics distinguish main/sub streams. Real camera validation is `hardware-validation-pending`.
+## OpenIPC and video
+Verified OpenIPC identity is distinct from generic ONVIF discovery. Platform/SoC, sensor, firmware and Majestic are populated only from observed verified evidence. Stream diagnostics now include main/sub identity plus associated video-profile codec/resolution/FPS/latency-mode metadata and measured endpoint-connect check time. This timing is a reachability diagnostic, not claimed glass-to-glass video latency. Real camera validation remains `hardware-validation-pending`.
 
 ## Firmware Center
-Workflow: Detect -> Identify -> Select firmware -> Pre-check -> Flash -> Reboot -> Rediscover -> Verify. SSC30KQ / IMX335 is the initial compatibility profile. Primary, upgrade and recovery/fullflash are distinct. Recovery/fullflash requires verified compatible existing custom OpenIPC. Firmware image SHA-256 is verified and immutable approval binds device/profile/mode/image/hardware identity.
+SSC30KQ / IMX335 is the initial explicit profile. Primary, upgrade and recovery/fullflash are distinct; recovery/fullflash is only for verified compatible existing custom OpenIPC. SHA-256 verification, immutable approval, immediate pre-handoff re-hash, single-operation locking and guarded executor lifecycle exist. No hardware adapter is registered by default, so destructive writing is disabled and reports `hardware-validation-pending`.
 
-A guarded `FirmwareExecutor` boundary now exists. It re-hashes the artifact immediately before executor handoff, enforces a single-device operation lock, and requires post-operation rediscovery/identity verification. No hardware adapter is registered by default, so destructive execution remains disabled and reports `hardware-validation-pending`.
+Pure post-flash verification now validates rediscovery evidence, OpenIPC evidence, platform/sensor compatibility, optional expected firmware and hardware identity continuity. The acquisition of post-reboot identity from real hardware is still `hardware-validation-pending`.
 
 ## Presets and profiles
-Versioned camera presets are separate from per-stream video profiles. Firmware operations do not apply video profiles.
+Versioned camera presets remain separate from per-stream video profiles; firmware operations never apply video profiles.
 
 ## Next implementation order
-1. Implement real adapter contracts for supported primary/upgrade/recovery paths only after their hardware-specific mechanisms are known and testable; no generic fullflash.
-2. Add rediscovery/firmware-version verification implementation around the executor state machine.
-3. Improve OpenIPC stream metadata and diagnostics: codec/resolution/FPS/latency, switching, secondary/thermal/PiP preparation.
-4. Expand versioned camera presets independently of video profiles.
-5. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
-6. Add encrypted DB export/import and station pairing; continue distribution hardening.
+1. Wire observed rediscovery identity into `FirmwareExecutor.completeVerification` once a supported real adapter supplies it.
+2. Continue video switching/playback diagnostics and secondary/thermal/PiP preparation without inventing stream metadata.
+3. Expand camera presets independently of video profiles.
+4. Add verified StabX/external-navigation and Starlink/VPN diagnostics.
+5. Add encrypted DB export/import and station pairing; continue distribution hardening.
 
 ## Acceptance rule
-No decorative telemetry or invented hardware state. Unknown/stale/missing is unavailable. New telemetry/control backends start read-only. Hardware-dependent validation is `hardware-validation-pending`.
+No invented telemetry, hardware state, stream metadata or latency. Hardware-dependent validation is `hardware-validation-pending`.
