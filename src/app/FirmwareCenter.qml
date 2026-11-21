@@ -3,9 +3,10 @@ import QtQuick.Controls
 import QtQuick.Layouts
 Item {
  id:root;signal closeRequested();property color fg:"#f4f7fb";property color sub:"#8fa1b7";property color line:"#273d55";property color green:"#27d59a";property color red:"#ff6678";property color amber:"#ffb84d";property var hw:firmwareCenter.acquisitionIdentity(deviceBox.currentValue||"");property var selectedFirmware:firmwareAcquisition.status.selection||({});property var sessionResult:firmwareUpdateSession.result;property var hardwareReady:hardwareE2ERuntime.readiness;property bool advanced:false;property string automaticProfile:firmwareCenter.compatibleProfile(deviceBox.currentValue||"")
- function clearSensitive(){passwordField.text="";cameraCredentials.clear()} function closePanel(){clearSensitive();firmwareUpdateSession.disableTransport();root.closeRequested()}
- function activeDevice(){var items=devicesModel.items||[];for(var i=0;i<items.length;i++){if(items[i].active===true){deviceBox.currentIndex=i;return}}}
- function prepareAutomatic(){if(!deviceBox.currentValue)return;if(firmwareAcquisition.prepareRecommended(deviceBox.currentValue)){firmwareCenter.prepareAutomaticUpgrade(deviceBox.currentValue)}}
+ function clearSensitive(){passwordField.text="";cameraCredentials.clear()} function closePanel(){clearSensitive();firmwareUpdateSession.disableTransport();hardwareE2ERuntime.selectDevice("");root.closeRequested()}
+ function bindDevice(){hardwareE2ERuntime.selectDevice(deviceBox.currentValue||"")}
+ function activeDevice(){var items=devicesModel.items||[];for(var i=0;i<items.length;i++){if(items[i].active===true){deviceBox.currentIndex=i;bindDevice();return}}bindDevice()}
+ function prepareAutomatic(){if(!deviceBox.currentValue)return;bindDevice();if(firmwareAcquisition.prepareRecommended(deviceBox.currentValue)){firmwareCenter.prepareAutomaticUpgrade(deviceBox.currentValue)}}
  function phase(){var s=firmwareExecutor.status.state;if(s==="executing")return "Оновлення";if(s==="reboot-pending")return "Перезапуск";if(s==="rediscovering")return "Перевірка";if(firmwareAcquisition.status.state==="loading")return "Підготовка";if(firmwareAcquisition.status.state==="downloading")return "Завантаження";return ""}
  function stateText(){if(sessionResult.state==="verified")return "Камеру успішно оновлено до "+sessionResult.observedFirmware;if(sessionResult.state==="error"||sessionResult.state==="blocked")return sessionResult.reason||"Оновлення не завершено";if(firmwareCenter.executionPlan.ready)return "Все готово. Оновлення запуститься лише після вашого підтвердження.";if(firmwareAcquisition.status.reason)return firmwareAcquisition.status.reason;if(!hw.ready)return "Потрібна підтверджена OpenIPC-камера зі спостереженими platform і sensor.";if(automaticProfile==="")return "Для цієї спостереженої платформи та сенсора немає однозначного підтримуваного профілю.";return "Перевірте доступне оновлення."}
  Component.onCompleted:activeDevice()
@@ -16,7 +17,7 @@ Item {
    Rectangle{Layout.fillWidth:true;implicitHeight:cameraCard.implicitHeight+24;radius:10;color:"#111d2c";border.color:hw.ready?green:line
     ColumnLayout{id:cameraCard;anchors.fill:parent;anchors.margins:12;spacing:7
      Text{text:"КАМЕРА";color:sub;font.bold:true}
-     ComboBox{id:deviceBox;Layout.fillWidth:true;model:devicesModel.items;textRole:"name";valueRole:"id";enabled:!firmwareExecutor.busy}
+     ComboBox{id:deviceBox;Layout.fillWidth:true;model:devicesModel.items;textRole:"name";valueRole:"id";enabled:!firmwareExecutor.busy;onCurrentValueChanged:root.bindDevice()}
      Text{text:deviceBox.currentText||"Активну камеру не вибрано";color:fg;font.pixelSize:18;font.bold:true}
      Text{text:"OpenIPC: "+(hw.verifiedOpenIPC?"підтверджено":"не підтверджено");color:hw.verifiedOpenIPC?green:amber}
      Text{text:"Платформа / сенсор: "+(hw.ready?(hw.platform+" / "+hw.sensor):"не спостережено");color:hw.ready?fg:sub}
