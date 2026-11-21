@@ -117,7 +117,15 @@ Item {
             Text { visible: devicesModel.manualResult.openipc === true; text: "OpenIPC підтверджено · " + value(devicesModel.manualResult.identity.platform) + " · " + value(devicesModel.manualResult.identity.sensor); color: accent; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             RowLayout { Layout.fillWidth: true
                 Button { text: devicesModel.manualBusy ? "Перевірка…" : "Перевірити"; enabled: !devicesModel.manualBusy; onClicked: devicesModel.inspectManualIp(manualIp.text); HoverHint { text: "Запустити для цієї адреси той самий безпечний fingerprint pipeline." } }
-                Button { text: "Додати"; enabled: devicesModel.manualResult.openipc === true; onClicked: { devicesModel.addDiscovered(devicesModel.manualResult.host, "OpenIPC " + devicesModel.manualResult.host, true); manualPopup.close() }; HoverHint { text: "Зберегти камеру після підтвердження OpenIPC." } }
+                Button {
+                    text: "Додати"
+                    enabled: devicesModel.manualResult.openipc === true
+                    onClicked: {
+                        devicesModel.addDiscovered(devicesModel.manualResult.host, "OpenIPC " + devicesModel.manualResult.host, true)
+                        manualPopup.close()
+                    }
+                    HoverHint { text: "Зберегти камеру після підтвердження OpenIPC." }
+                }
                 Item { Layout.fillWidth: true }
                 Button { text: "Закрити"; flat: true; onClicked: manualPopup.close() }
             }
