@@ -67,6 +67,9 @@ jobs:
         shell: pwsh
         run: |
           python -m compileall -q -f src tools
+          Push-Location src\app
+          python -m unittest -v test_*.py
+          Pop-Location
           python src/app/main.py --mavlink-self-test
       - name: Prepare assets
         shell: pwsh
@@ -79,7 +82,7 @@ jobs:
       - name: Build binaries
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant --icon assets/fpv-uhyliant.ico --paths src/app --add-data "src/app/Main.qml;." --add-data "src/app/DevicesPanel.qml;." --add-data "src/app/MavlinkDiagnostics.qml;." --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --hidden-import PySide6.QtMultimedia --hidden-import pymavlink --hidden-import pymavlink.mavutil --collect-all PySide6.QtMultimedia --collect-all pymavlink src/app/main.py
+          pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant --icon assets/fpv-uhyliant.ico --paths src/app --add-data "src/app/Main.qml;." --add-data "src/app/DevicesPanel.qml;." --add-data "src/app/MavlinkDiagnostics.qml;." --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --hidden-import PySide6.QtMultimedia --hidden-import PySide6.QtSerialPort --hidden-import pymavlink --hidden-import pymavlink.mavutil --collect-all PySide6.QtMultimedia --collect-all pymavlink src/app/main.py
           pyinstaller --noconfirm --clean --onefile --windowed --name FPV-Uhyliant-Launcher --icon assets/fpv-uhyliant.ico src/launcher.py
           pyinstaller --noconfirm --clean --onefile --windowed --name FPV-Uhyliant-Update --icon assets/fpv-uhyliant.ico src/update_helper.py
           Copy-Item dist\FPV-Uhyliant-Launcher.exe bootstrap-output\ -Force

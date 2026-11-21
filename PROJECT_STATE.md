@@ -5,25 +5,22 @@
 ## Product direction
 Windows ground station with maximum-video-workspace flight UX. Target controllers: ArduPilot, Betaflight, INAV. Target telemetry protocols: MAVLink, MSP, CRSF. Video and telemetry remain separate runtimes.
 
-## MAVLink phase 1
-Code complete in strictly read-only form. Configurable UDP/TCP/serial endpoint, passive identity/telemetry, freshness, diagnostics and smoke coverage exist. Real-FC validation remains hardware-validation-pending.
+## Telemetry architecture
+MAVLink, MSP and CRSF use normalized read-only providers behind `TelemetryRouter`. FPV OSD and the main telemetry panel now consume the selected normalized provider rather than hard-coding MAVLink telemetry. Unknown fields remain unavailable.
 
-## Vehicle and telemetry abstraction
-A vehicle-level runtime and structured diagnostics foundation exists. MAVLink, MSP and CRSF now have normalized providers behind a stable read-only `TelemetryRouter`, so provider selection can change without replacing the vehicle/UI contract. Missing fields remain null/None and stale values become unavailable rather than being invented.
+MAVLink remains the default. MSP has a serial transport that polls only the explicit read-only MSP command allowlist. CRSF serial transport is passive and does not transmit. COM/baud/enabled configuration is persistent. Real FC/radio validation remains hardware-validation-pending.
 
-The application instantiates all three provider runtimes and exposes the router to QML. MAVLink remains the default active provider. MSP/CRSF serial transport/device selection is still pending, so the router does not fabricate connectivity for those providers.
-
-## MSP and CRSF
-Read-only MSP v1/v2 and passive CRSF parsing/runtime foundations exist with freshness/checksum/CRC tests. MSP/CRSF serial transport/device selection and hardware validation remain pending.
+## Vehicle and diagnostics
+A vehicle-level runtime and structured diagnostics foundation exists above the selected telemetry provider and video runtime. Protocol switching does not require duplicate vehicle UI.
 
 ## VideoRuntime status
 RTSP runtime tracks checking, ready, playing, reconnecting, stalled and error states, connection attempts and last-event time. Bounded UI recovery and manual reconnect/diagnostics exist. Real-camera validation remains pending.
 
 ## Persistence and startup
-SQLite persists devices, streams, video profiles and the active device. CI includes a regression test that reloads the database and verifies active-device persistence/removal. QML startup failures emit Qt diagnostics to CI and shut down MAVLink cleanly; smoke tests use normal Qt shutdown.
+SQLite persists devices, streams, video profiles and the active device. QML startup failures emit Qt diagnostics to CI and stop telemetry transports cleanly. Smoke tests use normal Qt shutdown.
 
 ## Updater integrity
-Signed manifest and package SHA-256 verification remain required. Immediately before install, the updater binds `ready.json` to the currently verified manifest and re-hashes the downloaded package so a changed/stale package is rejected. CI auto-discovers all `test_*.py` unit tests.
+Signed manifest and package SHA-256 verification are required. Immediately before install, the updater binds `ready.json` to the currently verified manifest and re-hashes the downloaded package. CI auto-discovers all application `test_*.py` tests.
 
 ## Camera preset vs video profile
 Camera preset is device/firmware configuration. Video profile belongs to a stream. Video profile is not applied as part of camera flashing.
@@ -32,15 +29,15 @@ Camera preset is device/firmware configuration. Video profile belongs to a strea
 BAT/fullflash is only for cameras already running a compatible custom OpenIPC setup. Provisioning must identify hardware/flash layout, validate compatibility and images, preserve a recovery path, then verify after flashing.
 
 ## Next implementation order
-1. Add serial transport/device handling for read-only MSP/CRSF and expose safe provider selection in UI.
-2. Continue RTSP diagnostics and safe first-class OpenIPC device/provisioning work.
-3. Add versioned camera presets separately from per-stream video profiles.
-4. Add StabX/external-navigation and Starlink/VPN diagnostics from verified received state.
-5. Add encrypted database export/import and station pairing.
-6. Hardware-validate MAVLink, MSP, CRSF, RTSP/OpenIPC, StabX and network behavior when equipment is available.
+1. Hardware-validation-pending for MAVLink/MSP/CRSF must not block software work.
+2. Continue RTSP diagnostics and make OpenIPC camera a first-class verified device.
+3. Implement Firmware Center: Detect -> Identify -> Select firmware -> Pre-check -> Flash -> Reboot -> Rediscover -> Verify, beginning with SSC30KQ / IMX335 while keeping primary/upgrade/recovery-fullflash paths separate.
+4. Add versioned camera presets separately from per-stream video profiles.
+5. Add StabX/external-navigation and Starlink/VPN diagnostics from verified received state.
+6. Add encrypted database export/import and station pairing.
 
 ## Validation status
-CI compiles Python, automatically runs all application `test_*.py` unit tests, runs application/MAVLink self-tests, loads QML offscreen, checks version consistency and validates signed test metadata when present. Hardware-dependent validation remains explicitly pending. The most recent CI result must still be confirmed independently before it is called successful.
+Normal CI compiles Python, runs all application tests, exercises application/MAVLink self-tests and loads QML offscreen. The Windows release pipeline now also runs all application unit tests before freezing and explicitly includes Qt SerialPort in the PyInstaller build. Hardware-dependent validation remains explicitly pending.
 
 ## Acceptance rule
 No decorative telemetry in production UI. Unknown, absent or stale values are unavailable. New protocol backends begin read-only.
