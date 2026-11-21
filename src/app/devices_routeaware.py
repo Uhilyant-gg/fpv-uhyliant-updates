@@ -55,6 +55,14 @@ class Devices(LegacyDevices):
     def manualResult(self):return self._manual_result
     @Property(str,notify=manualChanged)
     def manualError(self):return self._manual_error
+    @Property(str,notify=LegacyDevices.discoveryChanged)
+    def scanStage(self):return self._stage
+    @Property(str,notify=LegacyDevices.discoveryChanged)
+    def scanStatus(self):return self._status
+    @Property(int,notify=LegacyDevices.discoveryChanged)
+    def scanDone(self):return self._pd
+    @Property(int,notify=LegacyDevices.discoveryChanged)
+    def scanTotal(self):return self._pt
 
     @Slot()
     def discoverOpenIPC(self):
