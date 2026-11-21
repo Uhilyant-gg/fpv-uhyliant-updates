@@ -10,42 +10,35 @@ The phase-1 backend is strictly read-only. It exposes no ARM/DISARM, mode change
 
 Implemented:
 - configurable UDP/TCP/serial endpoint and baud, persisted with QSettings;
-- quick endpoint presets plus optional system/component filtering;
-- passive FC identity from HEARTBEAT and passive AUTOPILOT_VERSION parsing when broadcast;
-- heartbeat/connection, armed, mode, battery voltage/current/remaining, GPS fix/satellites/HDOP, altitude, ground speed, heading, roll/pitch/yaw, RSSI and home distance;
-- freshness windows that invalidate stale telemetry instead of displaying old values as live;
-- link health state, rolling message rate, last-packet age, received/BAD_DATA counters and diagnostic sequence-gap loss estimate;
-- RADIO_STATUS diagnostics when broadcast plus SYS_STATUS communication errors/controller load;
-- reusable `MavlinkDiagnostics.qml` integrated in telemetry and diagnostics popups;
-- JSON diagnostics export to the local FPV-Uhyliant data directory;
-- backend startup self-test without a real FC and packaged backend smoke-test.
+- passive FC identity and telemetry from received MAVLink messages;
+- telemetry freshness and link/MAVLink diagnostics;
+- reusable diagnostics UI and JSON diagnostics export;
+- backend and packaged smoke tests.
 
-Important: sequence-gap packet loss is diagnostic only and can over-report loss when routers or redundant links alter which packets reach the GCS. Real-FC validation is still required before declaring the phase field-validated.
+Real-FC validation is still required before declaring the phase field-validated.
+
+## Vehicle and telemetry abstraction
+A vehicle-level runtime and structured diagnostics foundation exists. MAVLink now reaches it through a normalized read-only telemetry provider rather than a MAVLink-specific vehicle dependency. Missing source fields remain null/None and unrelated runtime fields are rejected. CI includes a focused telemetry-provider test.
+
+This provider boundary is the foundation for upcoming read-only MSP and CRSF integrations. Hardware validation pending does not block software-only work.
 
 ## VideoRuntime status
-RTSP runtime now tracks checking, ready, playing, reconnecting, stalled and error states, connection-attempt count and last-event timestamp. The FPV UI performs bounded automatic recovery after playback stops/errors and exposes manual reconnect plus RTSP diagnostics. TCP endpoint reachability is still only a pre-check; real stream health and frame-level stall validation require camera testing.
-
-## Existing foundation
-- Windows PyInstaller/OTA/release pipeline and packaged GUI smoke-test.
-- SQLite devices, streams and video profiles.
-- OpenIPC discovery through mDNS, ONVIF hints, fingerprinting and bounded /24 probing.
-- separate RTSP VideoRuntime.
-- maximum-video-workspace flight screen.
+RTSP runtime tracks checking, ready, playing, reconnecting, stalled and error states, connection attempts and last-event time. Bounded UI recovery and manual reconnect/diagnostics exist. Real-camera validation remains pending.
 
 ## Camera preset vs video profile
-Camera preset is device/firmware configuration. Video profile belongs to a stream. Video profile is not applied as part of a camera flash.
+Camera preset is device/firmware configuration. Video profile belongs to a stream. Video profile is not applied as part of camera flashing.
 
 ## OpenIPC flashing rule
-BAT/fullflash is only for cameras already running a compatible custom OpenIPC setup. Future provisioning must identify hardware/flash layout, validate compatibility, back up state, verify images and provide recovery before destructive writes.
+BAT/fullflash is only for cameras already running a compatible custom OpenIPC setup. Provisioning must identify hardware/flash layout, validate compatibility and images, preserve a recovery path, then verify after flashing.
 
 ## Next implementation order
-1. Hardware-validate MAVLink phase 1 against a real FC and long-running link.
-2. Hardware-validate RTSP reconnect/error behavior against a real OpenIPC camera and add frame-level stall detection if Qt exposes sufficient playback evidence.
-3. Introduce vehicle-level model and structured diagnostics engine.
-4. Add safe OpenIPC provisioning and versioned camera presets.
-5. Add normalized telemetry providers, then read-only MSP and CRSF.
-6. Add StabX/external-navigation and Starlink/VPN diagnostics.
-7. Add encrypted database export/import and station pairing.
+1. Add read-only MSP provider for Betaflight/INAV on the normalized provider boundary.
+2. Add read-only CRSF telemetry and integrate protocol health without duplicate UI.
+3. Continue RTSP diagnostics and safe first-class OpenIPC device/provisioning work.
+4. Add versioned camera presets separately from per-stream video profiles.
+5. Add StabX/external-navigation and Starlink/VPN diagnostics from verified received state.
+6. Add encrypted database export/import and station pairing.
+7. Hardware-validate MAVLink, RTSP/OpenIPC, StabX and network behavior when equipment is available.
 
 ## Acceptance rule
 No decorative telemetry in production UI. Unknown, absent or stale values are unavailable. New protocol backends begin read-only.
