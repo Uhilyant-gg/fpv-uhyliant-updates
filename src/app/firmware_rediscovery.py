@@ -9,7 +9,8 @@ class FirmwareRediscovery:
   for index in range(attempts):
    result=self.probe(host)
    if result and result.get('openipc'):
-    identity=normalize_openipc_identity(result.get('identity',{}),result.get('evidence',[]))
+    payload=dict(result.get('identity') or {});payload['verified']=False
+    identity=normalize_openipc_identity(payload,result.get('evidence',[]))
     if identity.get('verified'):return {'rediscovered':True,'attempts':index+1,'identity':identity}
    if index+1<attempts:self.sleep(interval)
   return {'rediscovered':False,'attempts':attempts,'identity':normalize_openipc_identity()}
