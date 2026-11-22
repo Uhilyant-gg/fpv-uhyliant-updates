@@ -2,38 +2,38 @@
 Feature: Orchestrator v2 deterministic security boundary
   @stale-execution @concurrency
   Scenario: stale execution cannot mutate a newer PR head
-    Given an active Story is bound to a baseline, PR and expected HEAD SHA
-    When the current PR HEAD no longer equals the expected HEAD SHA
+    Given an active Story is bound to a baseline PR and expected HEAD SHA
+    When current evidence has another HEAD SHA
     Then autonomous privileged mutation is blocked
   @repair-loop @provider-failure
   Scenario: repair budget is exhausted
     Given CI failed for the active Story and PR
     And repair attempts equal max_repair_attempts
-    When another repair is requested
     Then the state is BLOCKED_AUTOMATION
   @merge-gate @ci-integrity @audit
-  Scenario: GitHub evidence authorizes merge only for exact HEAD
-    Given factual PR checks security and review evidence were acquired from GitHub
-    When required CI security review tested SHA and reviewed SHA match current HEAD
-    Then the deterministic gate may report READY_TO_MERGE
+  Scenario: privileged merge revalidates exact GitHub evidence
+    Given persisted Story baseline PR and HEAD binding
+    And fresh required CI security and review evidence for that HEAD
+    When the privileged actor evaluates merge immediately before mutation
+    Then merge may be authorized for exactly that HEAD
   @merge-gate @stale-execution
-  Scenario: old workflow run observes a new PR head
-    Given an expected HEAD SHA was bound to the execution
-    When newly acquired GitHub PR evidence has another HEAD SHA
-    Then merge authority is denied as stale execution
-  @protected-files @workflow-integrity
-  Scenario: control-plane files change
-    Given a PR changes workflow or Orchestrator control-plane files
-    Then SECURITY_REVIEW_REQUIRED is required
+  Scenario: HEAD changes before privileged merge
+    Given merge was previously eligible
+    When fresh PR HEAD differs from expected HEAD
+    Then privileged merge is denied as stale execution
+  @protected-files @security
+  Scenario: protected change lacks exact security review
+    Given a PR changes protected control-plane files
+    When no approved security review is bound to current HEAD
+    Then privileged merge is denied
   @generated @supply-chain
   Scenario: generated agentic workflow drifts
-    Given an agentic workflow markdown source is canonical
-    When recompilation does not reproduce its lock YAML
+    Given agentic markdown source is canonical
+    When its lock YAML is stale
     Then CI fails closed
   @input-validation @adversarial
-  Scenario: GitHub evidence is incomplete or ambiguous
-    Given duplicate missing stale or malformed required GitHub evidence
-    When the collector normalizes evidence
+  Scenario: GitHub evidence is incomplete ambiguous or cancelled
+    Given required GitHub evidence is missing stale duplicated unknown or cancelled
     Then privileged action fails closed
   @hardware @physical-boundary
   Scenario: software evidence cannot establish hardware verification
@@ -41,7 +41,7 @@ Feature: Orchestrator v2 deterministic security boundary
     When no physical evidence exists
     Then HARDWARE_VERIFIED is false
   @recovery @level2
-  Scenario: recovery remains deterministic
+  Scenario: recovery remains deterministic without AI
     Given persisted binding and factual GitHub evidence
-    When the AI engine is unavailable
+    When AI is unavailable
     Then reconciliation remains available
