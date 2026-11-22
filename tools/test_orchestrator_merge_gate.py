@@ -9,8 +9,10 @@ class MergeAuthorityTests(unittest.TestCase):
     def run_gate(self,**kw):
         a=dict(event=self.event,checks=self.checks,reviews=self.reviews,required_checks={"verify"},security_checks={"p0-security"},story_id="ORCH-S5",expected_head_sha="head");a.update(kw);return evaluate_event(**a)
     def test_exact_evidence_allows_authority(self):self.assertTrue(self.run_gate()["mergeEligible"])
+    def test_solo_policy_does_not_require_self_approval(self):self.assertTrue(self.run_gate(reviews=[])["mergeEligible"])
     def test_stale_run_denied_before_policy(self):self.assertEqual(self.run_gate(expected_head_sha="old")["reasonCode"],"stale-execution")
-    def test_missing_review_denied(self):self.assertFalse(self.run_gate(reviews=[])["mergeEligible"])
     def test_failed_security_denied(self):
         checks=[self.checks[0],dict(self.checks[1],conclusion="failure")];self.assertFalse(self.run_gate(checks=checks)["mergeEligible"])
+    def test_stale_tested_sha_denied(self):
+        checks=[dict(self.checks[0],head_sha="old"),self.checks[1]];self.assertFalse(self.run_gate(checks=checks)["mergeEligible"])
 if __name__=="__main__":unittest.main()
