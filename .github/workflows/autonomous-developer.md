@@ -11,7 +11,7 @@ permissions:
   actions: read
 engine:
   id: copilot
-model: router/robust
+model: gpt-5.6-sol
 network: defaults
 tools:
   github:
