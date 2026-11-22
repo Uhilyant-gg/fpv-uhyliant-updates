@@ -1,119 +1,35 @@
 # FPV Uhyliant autonomous development framework
 
-This contract makes repository development independent of chat history and of any particular AI assistant. Current `main` and the canonical repository documents are the only project authority.
+Current `main` and canonical repository documents are the only project authority. Historical chat code must never replace newer repository state.
 
 ## Mandatory context
-Before material work, read from current `main`:
-- `PRODUCT_UX.md`
-- `PROJECT_STATE.md`
-- `DEVELOPMENT_GUIDE.md`
-- `HARDWARE_E2E.md`
-- `DELIVERY_ROADMAP.md`
-- this file
-
-Never restore historical chat code over newer repository state.
+Before material work read `PRODUCT_UX.md`, `PROJECT_STATE.md`, `DEVELOPMENT_GUIDE.md`, `HARDWARE_E2E.md`, `DELIVERY_ROADMAP.md` and this file from current `main`.
 
 ## Autonomous operator contract
-The development agent should continue without intermediate user questions whenever the next action can be determined from repository state, tests, CI, sanitized evidence, and the canonical roadmap.
-
-Stop and request the user only for:
-1. `PHYSICAL_ACTION_REQUIRED` - real hardware must be connected, power-cycled, observed, or otherwise manipulated.
-2. `SECRET_REQUIRED` - a credential, secret or key must be entered outside the agent runtime.
-3. `PRODUCT_DECISION_REQUIRED` - a genuine product/UX choice cannot be determined from the canonical plan.
-
-Do not request confirmation for routine file edits, tests, refactors required by the active story, CI repairs, or documentation synchronization.
+Continue without intermediate questions whenever the next action is derivable from repository state, tests, CI, sanitized evidence and the canonical roadmap. Stop only for `PHYSICAL_ACTION_REQUIRED`, `SECRET_REQUIRED`, or `PRODUCT_DECISION_REQUIRED`.
 
 ## Work selection
-1. Read the current canonical delivery roadmap.
+1. Read the current canonical roadmap.
 2. Find the earliest incomplete Epic/Story whose dependencies are satisfied.
-3. Prefer the largest safe logically complete implementation batch within that ready scope.
-4. Preserve all canonical safety and product invariants.
-5. Do not begin unrelated work while the active batch is failing.
+3. Prefer the largest safe logically complete batch in that scope.
+4. Preserve all safety/product invariants.
+5. Repair the active batch before unrelated work if CI is red.
 
 ## Git contract
-Normal autonomous development uses a work branch and reviewable pull request rather than unrestricted direct writes to `main`.
-
-Branch naming:
-`automation/<epic>-<short-purpose>`
-
-A batch should:
-1. branch from the current green `main`;
-2. contain one logically complete change;
-3. update related tests and canonical docs in the same batch when required;
-4. run the required validation before publication;
-5. publish a pull request with scope, tests, known risks and the roadmap Story IDs it closes;
-6. wait for required CI checks;
-7. repair the same branch/PR on red CI;
-8. never start the next roadmap batch until the current one is green and merged.
-
-Direct `main` mutation by an autonomous workflow is not part of this contract.
-
-## CI repair loop
-When CI is red:
-1. identify the failing job, test and contract;
-2. compare the failure with the active batch diff and canonical invariants;
-3. decide whether production behavior or the test contract is wrong;
-4. repair only the active batch and directly related regression coverage;
-5. rerun validation;
-6. update the same PR;
-7. repeat until green or until a real external/physical/secret/product blocker is proven.
-
-Never weaken a safety invariant merely to make CI green. Never hide, skip, or relabel a failing physical requirement as software success.
+Use `automation/<epic>-<short-purpose>` branches and reviewable PRs. Branch from current green `main`; keep one logically complete change; update tests/docs with the implementation; validate; publish a PR containing Story IDs, scope, tests and risks; repair the same PR on red CI; do not start the next roadmap batch before the current one is green and merged. Autonomous workflows do not directly mutate `main`.
 
 ## Project Doctor interface
-`tools/project_doctor.py` is the planned machine-readable readiness entry point. Until implemented, normal repository tests and canonical checks remain authoritative.
+`tools/project_doctor.py` is implemented. It emits deterministic JSON, verifies canonical-file presence, compiles Python sources, runs application tests and tool tests, and exits zero only for READY. Its output must never be interpreted as physical hardware validation.
 
-The target output contract is JSON:
-```json
-{
-  "schemaVersion": 1,
-  "status": "READY",
-  "area": "repository",
-  "stage": "validation",
-  "reasonCode": "ready",
-  "summary": "Repository validation passed",
-  "checks": [],
-  "nextMilestone": "E1"
-}
-```
+The current implementation is an E5 foundation, not E5 completion. Remaining E5 contract includes a canonical machine-readable project-state/capability matrix, canonical drift/consistency validation, CI integration, and an audited next-milestone value derived from that state rather than a stale hard-coded phase.
 
-Blocked form:
-```json
-{
-  "schemaVersion": 1,
-  "status": "BLOCKED",
-  "area": "firmware",
-  "stage": "artifact-integrity",
-  "reasonCode": "sha-mismatch",
-  "summary": "Firmware artifact integrity failed",
-  "checks": [],
-  "nextMilestone": null
-}
-```
+Target fields remain: `schemaVersion`, `status`, `area`, `stage`, `reasonCode`, `summary`, `checks`, `nextMilestone`. Requirements remain deterministic exit behavior, no secret output, stable reason codes, human-readable summary, no synthetic hardware success and detectable canonical drift.
 
-Requirements:
-- deterministic exit code: 0 for READY, non-zero for BLOCKED/internal failure;
-- no secrets in output;
-- reason codes stable enough for CI/agent consumption;
-- human-readable summary included;
-- no synthetic hardware success;
-- canonical drift detectable when machine-readable project state is introduced.
+## CI repair loop
+On red CI identify the failing job/test/contract, compare it to the active diff and invariants, repair only the active batch and related regression coverage, rerun validation, and update the same PR. Never weaken a safety invariant or relabel missing physical evidence as success.
 
-## Agentic workflow security contract
-Agentic workflows must be read-only by default and receive only the minimum permissions required for declared safe outputs. Prefer reviewable pull requests or issues/comments over direct repository mutation.
-
-Secrets must not be placed in prompts, generated evidence, logs, pull-request bodies, or agent-visible repository files. Hardware credentials remain session-local to the desktop application.
-
-Autonomous workflows must never perform physical destructive firmware execution. Hardware destructive actions remain inside the desktop application's guarded local workflow with explicit operator confirmation.
+## Agentic workflow security
+Agentic workflows are read-only by default and receive minimum permissions. Prefer reviewable PRs/issues/comments over direct mutation. Secrets never enter prompts, evidence, logs, PR bodies or agent-visible repository files. Autonomous workflows never execute physical destructive firmware operations; those remain in the guarded local application with explicit operator confirmation.
 
 ## Review output
-Every autonomous PR should state:
-- active Epic/Story IDs;
-- what changed;
-- why the batch is logically complete;
-- tests/checks executed;
-- CI status when known;
-- remaining physical, secret or product-decision blockers;
-- exact next roadmap step after merge.
-
-The target user interaction is therefore limited to green/red CI evidence, physical actions, secret entry, and product judgement such as `подобається / не подобається`.
+Every autonomous PR states active Epic/Story IDs, changes, why the batch is complete, tests/checks, CI status when known, remaining physical/secret/product blockers, and exact next roadmap step after merge.
