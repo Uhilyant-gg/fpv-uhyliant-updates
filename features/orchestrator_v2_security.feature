@@ -42,15 +42,23 @@ Feature: Orchestrator v2 deterministic security boundary
     When recompilation does not reproduce its lock YAML
     Then CI fails closed
 
+  @recovery @audit
+  Scenario: persisted state is recovered without AI
+    Given a versioned persisted lifecycle state
+    And exact factual GitHub evidence for its Story baseline PR and HEAD
+    When deterministic reconciliation runs without an AI engine
+    Then the lifecycle state is recovered from evidence
+
+  @recovery @adversarial
+  Scenario: persisted state or evidence is malformed
+    Given persisted state or GitHub evidence does not match its exact schema
+    When deterministic reconciliation is attempted
+    Then the state is STATE_INCONSISTENT
+    And privileged mutation is blocked
+
   @hardware @physical-boundary
   Scenario: software evidence cannot establish hardware verification
     Given CI, mocks and simulation passed
     And AI claims hardware success
     When no physical evidence exists
     Then HARDWARE_VERIFIED is false
-
-  @recovery @adversarial
-  Scenario: reconciliation evidence is ambiguous
-    Given persisted state and GitHub evidence do not identify one safe lifecycle state
-    When deterministic reconciliation runs without AI
-    Then the state is STATE_INCONSISTENT
