@@ -38,6 +38,8 @@ jobs:
       - name: Run tooling unit tests
         working-directory: tools
         run: python -m unittest -v test_*.py
+      - name: Run Project Doctor
+        run: python tools/project_doctor.py
       - name: Run application self-test
         working-directory: src/app
         run: python main.py --self-test
