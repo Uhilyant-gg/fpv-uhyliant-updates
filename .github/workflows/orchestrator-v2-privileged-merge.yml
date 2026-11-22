@@ -1,0 +1,80 @@
+name: orchestrator-v2-privileged-merge
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        required: true
+        type: number
+      story_id:
+        required: true
+        type: string
+      baseline_sha:
+        required: true
+        type: string
+      expected_head_sha:
+        required: true
+        type: string
+permissions:
+  contents: write
+  checks: read
+  pull-requests: write
+concurrency:
+  group: orchestrator-v2-privileged-merge-${{ inputs.pr_number }}
+  cancel-in-progress: false
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    environment: orchestrator-merge
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          persist-credentials: false
+      - name: Acquire fresh exact GitHub evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ inputs.pr_number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPO/pulls/$PR" > pr.json
+          head_sha="$(jq -r '.head.sha' pr.json)"
+          test "$head_sha" = '${{ inputs.expected_head_sha }}'
+          gh api --paginate "repos/$REPO/commits/$head_sha/check-runs?per_page=100" --jq '.check_runs[]' | jq -s '[.[] | {name,status,conclusion,head_sha}]' > checks.json
+          gh api --paginate "repos/$REPO/pulls/$PR/reviews?per_page=100" | jq -s 'add | [.[] | {state,commit_id,user:{login:.user.login}}]' > reviews.json
+          gh api --paginate "repos/$REPO/pulls/$PR/files?per_page=100" --jq '.[].filename' | jq -Rs 'split("\n") | map(select(length>0))' > files.json
+      - name: Final deterministic authorization
+        env:
+          STORY_ID: ${{ inputs.story_id }}
+          BASELINE_SHA: ${{ inputs.baseline_sha }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os,sys
+          sys.path.insert(0,'tools')
+          from orchestrator_privileged_merge import authorize
+          from orchestrator_v2 import Binding,is_protected_path
+          pr=json.load(open('pr.json'))
+          checks=json.load(open('checks.json'))
+          reviews=json.load(open('reviews.json'))
+          files=json.load(open('files.json'))
+          binding=Binding(os.environ['STORY_ID'],os.environ['BASELINE_SHA'],int(os.environ['PR_NUMBER']),os.environ['EXPECTED_HEAD_SHA'])
+          protected=any(is_protected_path(p) for p in files)
+          security_review=any(r.get('state')=='APPROVED' and r.get('commit_id')==binding.expected_head_sha for r in reviews)
+          decision=authorize(binding=binding,pr=pr,checks=checks,reviews=reviews,required_checks={'verify'},security_checks={'p0-security'},story_id=os.environ['STORY_ID'],protected_change=protected,security_review_for_head=security_review)
+          print(decision)
+          if not decision.authorized:raise SystemExit(decision.reason_code)
+          PY
+      - name: Re-check HEAD and merge with expected SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ inputs.pr_number }}
+          REPO: ${{ github.repository }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+        run: |
+          set -euo pipefail
+          current="$(gh api "repos/$REPO/pulls/$PR" --jq '.head.sha')"
+          test "$current" = "$EXPECTED_HEAD_SHA"
+          gh api -X PUT "repos/$REPO/pulls/$PR/merge" -f merge_method=squash -f sha="$EXPECTED_HEAD_SHA" --jq 'if .merged == true then .sha else error(.message) end'
