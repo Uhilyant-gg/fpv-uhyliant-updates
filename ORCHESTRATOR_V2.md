@@ -1,42 +1,37 @@
 # Orchestrator v2
 
-## Purpose
-Orchestrator v2 automates repository development while keeping authority in a deterministic control plane. AI is a replaceable untrusted executor: AI proposes; deterministic policy decides; GitHub enforces.
+Orchestrator v2 keeps lifecycle authority in a deterministic control plane. AI proposes; deterministic policy decides; GitHub enforces. AI is replaceable and untrusted.
 
-## Architecture
-The control plane owns persisted lifecycle state, reconciliation with GitHub, transition validation, retry budgets, stale-execution protection, security policy and merge eligibility. GitHub Actions remains the execution infrastructure. AI is invoked only for bounded planning, implementation and repair work and has no independent merge or hardware authority.
+## Lifecycle
+Roadmap -> Story -> implementation -> tests -> PR -> CI -> bounded repair -> security/review gate -> merge -> project-state update -> next Story.
 
-Lifecycle: roadmap -> Story selection -> implementation -> tests -> PR -> CI -> bounded repair -> security/review gate -> merge -> project-state update -> next Story.
+States remain `READY`, `PLANNING`, `IMPLEMENTING`, `PR_OPEN`, `CI_RUNNING`, `CI_FAILED`, `REPAIRING`, `REVIEWING`, `READY_TO_MERGE`, `MERGING`, `UPDATING_STATE`, `BLOCKED_HARDWARE`, `BLOCKED_SECRET`, `BLOCKED_PRODUCT`, `BLOCKED_AUTOMATION`, `STATE_INCONSISTENT`, `COMPLETE`. Transitions are allowlisted and fail closed.
 
-No database, event bus, Kubernetes, custom CI platform, dashboard or provider framework is required for Phase 1. State is a small versioned JSON document.
+## Persisted execution binding
+`tools/orchestrator_state.py` persists schema-versioned state atomically. Authority is bound to `story_id`, `baseline_sha`, PR and `expected_head_sha`. State contains no provider session or secret data. Invalid, additional or incomplete state/evidence fields fail closed.
 
-## States and execution binding
-The minimal states remain `READY`, `PLANNING`, `IMPLEMENTING`, `PR_OPEN`, `CI_RUNNING`, `CI_FAILED`, `REPAIRING`, `REVIEWING`, `READY_TO_MERGE`, `MERGING`, `UPDATING_STATE`, `BLOCKED_HARDWARE`, `BLOCKED_SECRET`, `BLOCKED_PRODUCT`, `BLOCKED_AUTOMATION`, `STATE_INCONSISTENT`, `COMPLETE`.
+## GitHub evidence collector
+`tools/orchestrator_github_evidence.py` is transport-agnostic. Workflows fetch factual GitHub PR/check/review JSON; the collector converts it to the strict `GitHubEvidence` boundary. It never calls AI and never turns absence into success.
 
-Transitions are allowlisted and invalid transitions fail closed. Every privileged repository mutation is bound to `story_id`, `baseline_sha`, PR number and `expected_head_sha`.
+Required check names are policy input. Every required check must exist exactly once, be completed with an accepted successful conclusion, and report one tested SHA. Security checks are evaluated separately. Tested SHA must equal current PR HEAD. Review approval must be bound to current HEAD; a current blocking review prevents approval. Ambiguity, duplicates, missing checks, unknown statuses and stale SHAs fail closed.
 
-## Persisted state and deterministic recovery
-`tools/orchestrator_state.py` defines schema version 1 for the minimal persisted lifecycle state. Reads reject unknown schema fields, invalid bindings and invalid repair budgets. Writes use atomic replacement. The state contains no model/provider session data or secrets.
+The collector does not decide which checks an administrator marks required. That remains repository security policy. It only evaluates explicit policy plus GitHub facts.
 
-The CLI consumes a separate normalized factual GitHub evidence document. Evidence must contain exactly the expected PR/base/HEAD/Story/required-CI/security/review/reviewed-SHA/tested-SHA/blocker fields. Missing or additional evidence fails closed rather than being guessed.
+## Deterministic reconciliation and merge gate
+Restart/re-entry compares persisted binding with normalized GitHub evidence. Story, baseline, PR or HEAD mismatch becomes `STATE_INCONSISTENT`. Recovery needs no AI.
 
-Reconciliation compares persisted binding to factual GitHub evidence. A mismatch in Story, baseline, PR or HEAD becomes `STATE_INCONSISTENT`. This recovery path has no AI dependency.
+Merge eligibility requires current binding, required CI green, security green, required review approved, reviewed SHA == HEAD, tested SHA == HEAD, PR Story == active Story and no blocker. AI assertion cannot populate these fields.
 
-## Repair and merge gates
-Repair remains inside the same Story/PR and `repair_attempts` cannot exceed `max_repair_attempts`; exhaustion becomes `BLOCKED_AUTOMATION`.
+## Bounded repair decision
+`tools/orchestrator_repair.py` authorizes AI repair only when factual evidence remains bound to the same Story/baseline/PR/HEAD and CI is actually failed. A repair increments the deterministic budget before invocation. Budget exhaustion becomes `BLOCKED_AUTOMATION`; stale evidence becomes `STATE_INCONSISTENT`; non-CI blockers do not invoke AI.
 
-Merge eligibility requires all of: current execution binding; required CI green; security green; required review approved; reviewed SHA equals current HEAD; tested SHA equals current HEAD; PR Story equals active Story; and no blocker. AI assertions cannot populate authoritative evidence.
-
-## Protected files and workflow integrity
-Canonical/control-plane documents, Orchestrator policy code/tests and `.github/workflows/**` are treated as protected security scope. Such changes require explicit security evidence and cannot silently auto-merge.
-
-Agentic `.md` workflow source is canonical. Generated `.lock.yml` is never hand-edited. Existing gh-aw generated workflows already carry generated metadata, pinned actions/containers and stale-lock checks. `tools/check_agentic_workflow_integrity.py` adds repository-side fail-closed validation without attempting to bypass the reviewed compiler/toolchain boundary.
+## Protected/workflow integrity
+Canonical/control-plane files and `.github/workflows/**` are protected security scope. Agentic `.md` is canonical and generated `.lock.yml` is never hand-edited. Existing gh-aw stale-lock/pinned-runtime machinery is reused; repository checks do not bypass reviewed integrity pins.
 
 ## Hardware boundary
-CI, mocks, simulation and AI claims are never `HARDWARE_VERIFIED`. Physical or destructive hardware work requires explicit authority and otherwise becomes `BLOCKED_HARDWARE` / `PHYSICAL_ACTION_REQUIRED`.
+CI, mocks, simulation and AI claims are never `HARDWARE_VERIFIED`. Physical/destructive hardware operation requires explicit authority.
 
-## Security invariants
-INV-01 AI never writes directly to main. INV-02 AI never receives production secrets. INV-03 AI output is always untrusted. INV-04 merge decisions are deterministic. INV-05 approval is bound to exact SHA. INV-06 control-plane/generated security files cannot silently auto-merge. INV-07 hardware verification requires physical evidence. INV-08 destructive hardware actions require explicit authority. INV-09 network access is deny-by-default where applicable. INV-10 critical runtimes/dependencies require integrity verification. INV-11 autonomous loops are bounded. INV-12 state transitions are validated. INV-13 stale executions cannot mutate current state. INV-14 security ambiguity fails closed. INV-15 recovery must not require an available AI engine.
+## Invariants
+INV-01 AI never writes directly to main. INV-02 AI never receives production secrets. INV-03 AI output is always untrusted. INV-04 merge decisions are deterministic. INV-05 approval is bound to exact SHA. INV-06 control-plane/generated security files cannot silently auto-merge. INV-07 hardware verification requires physical evidence. INV-08 destructive hardware actions require explicit authority. INV-09 network access is deny-by-default where applicable. INV-10 critical dependencies require integrity verification. INV-11 autonomous loops are bounded. INV-12 transitions are validated. INV-13 stale executions cannot mutate current state. INV-14 ambiguity fails closed. INV-15 recovery does not require AI.
 
-## Stop reasons
-`PHYSICAL_ACTION_REQUIRED`, `SECRET_REQUIRED`, `PRODUCT_DECISION_REQUIRED`, `SECURITY_REVIEW_REQUIRED`, `STATE_INCONSISTENT`, `STALE_EXECUTION`, `AI_ENGINE_UNAVAILABLE`, `AUTOMATION_BUDGET_EXCEEDED`.
+Stop reasons: `PHYSICAL_ACTION_REQUIRED`, `SECRET_REQUIRED`, `PRODUCT_DECISION_REQUIRED`, `SECURITY_REVIEW_REQUIRED`, `STATE_INCONSISTENT`, `STALE_EXECUTION`, `AI_ENGINE_UNAVAILABLE`, `AUTOMATION_BUDGET_EXCEEDED`.
