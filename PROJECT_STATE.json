@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "project": "FPV Uhyliant",
+  "planningEstimatePercent": 35,
+  "hardwareValidation": {
+    "epic": "E0",
+    "status": "DEFERRED",
+    "reasonCode": "physical-validation-deferred",
+    "physicalEvidenceComplete": false,
+    "summary": "Physical OpenIPC Hardware E2E remains required and must not be inferred from software validation."
+  },
+  "softwareTrack": {
+    "status": "READY",
+    "nextMilestone": "E5",
+    "summary": "Continue repository-only enabling work while physical validation is deferred."
+  },
+  "capabilities": {
+    "projectDoctor": "partial",
+    "unifiedHealthEvidence": "pending",
+    "nextBestAction": "pending",
+    "zeroConfigStartup": "pending",
+    "hardwareSimulator": "pending",
+    "scenarioDrivenCI": "pending"
+  }
+}
