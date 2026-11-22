@@ -9,6 +9,9 @@ permissions:
   issues: read
   pull-requests: read
   actions: read
+engine:
+  id: copilot
+  version: "1.0.114"
 network: defaults
 tools:
   github:
