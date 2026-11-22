@@ -4,10 +4,8 @@ on:
     paths:
       - 'ORCHESTRATOR_V2.md'
       - 'features/orchestrator_v2_security.feature'
-      - 'tools/orchestrator_v2.py'
-      - 'tools/orchestrator_state.py'
-      - 'tools/test_orchestrator_v2.py'
-      - 'tools/test_orchestrator_state.py'
+      - 'tools/orchestrator_*.py'
+      - 'tools/test_orchestrator*.py'
       - 'tools/check_orchestrator_security.py'
       - 'tools/check_agentic_workflow_integrity.py'
       - '.github/workflows/**'
@@ -23,7 +21,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Compile control plane
-        run: python -m py_compile tools/orchestrator_v2.py tools/orchestrator_state.py tools/test_orchestrator_v2.py tools/test_orchestrator_state.py tools/check_orchestrator_security.py tools/check_agentic_workflow_integrity.py
+        run: python -m py_compile tools/orchestrator_*.py tools/test_orchestrator*.py tools/check_orchestrator_security.py tools/check_agentic_workflow_integrity.py
       - name: Run executable P0 security scenarios
         working-directory: tools
         run: python check_orchestrator_security.py
@@ -44,6 +42,6 @@ jobs:
           if [ -z "${BASE_SHA:-}" ]; then exit 0; fi
           changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
           printf '%s\n' "$changed"
-          if printf '%s\n' "$changed" | grep -Eq '^(ORCHESTRATOR_V2.md|AUTONOMOUS_DEVELOPMENT.md|DEVELOPMENT_GUIDE.md|PROJECT_STATE.md|DELIVERY_ROADMAP.md|PRODUCT_UX.md|HARDWARE_E2E.md|tools/orchestrator_v2.py|tools/orchestrator_state.py|tools/check_orchestrator_security.py|tools/check_agentic_workflow_integrity.py|features/orchestrator_v2_security.feature|\.github/workflows/)'; then
+          if printf '%s\n' "$changed" | grep -Eq '^(ORCHESTRATOR_V2.md|AUTONOMOUS_DEVELOPMENT.md|DEVELOPMENT_GUIDE.md|PROJECT_STATE.md|DELIVERY_ROADMAP.md|PRODUCT_UX.md|HARDWARE_E2E.md|tools/orchestrator_|tools/check_orchestrator_security.py|tools/check_agentic_workflow_integrity.py|features/orchestrator_v2_security.feature|\.github/workflows/)'; then
             echo 'Protected security/control-plane files changed; merge eligibility must include security/review evidence for this exact HEAD.'
           fi
