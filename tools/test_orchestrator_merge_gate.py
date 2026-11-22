@@ -1,5 +1,5 @@
 import unittest
-from orchestrator_merge_gate import evaluate_event
+from orchestrator_merge_gate import evaluate_event,exit_code_for
 
 class MergeAuthorityTests(unittest.TestCase):
     def setUp(self):
@@ -15,4 +15,13 @@ class MergeAuthorityTests(unittest.TestCase):
         checks=[self.checks[0],dict(self.checks[1],conclusion="failure")];self.assertFalse(self.run_gate(checks=checks)["mergeEligible"])
     def test_stale_tested_sha_denied(self):
         checks=[dict(self.checks[0],head_sha="old"),self.checks[1]];self.assertFalse(self.run_gate(checks=checks)["mergeEligible"])
+    def test_running_required_check_is_nonterminal(self):
+        checks=[dict(self.checks[0],status="in_progress",conclusion=None),self.checks[1]]
+        result=self.run_gate(checks=checks)
+        self.assertFalse(result["mergeEligible"])
+        self.assertEqual(result["reasonCode"],"required-check-running")
+        self.assertEqual(exit_code_for(result),0)
+    def test_failed_check_remains_terminal(self):
+        checks=[dict(self.checks[0],conclusion="failure"),self.checks[1]]
+        self.assertEqual(exit_code_for(self.run_gate(checks=checks)),3)
 if __name__=="__main__":unittest.main()

@@ -10,6 +10,8 @@ from pathlib import Path
 from orchestrator_github_evidence import collect
 from orchestrator_v2 import Binding,evidence_binding_current
 
+NONTERMINAL_REASONS={"required-check-running","security-check-running"}
+
 
 def _solo_eligible(binding:Binding,evidence)->bool:
     return all((evidence_binding_current(binding,evidence),evidence.required_ci_green,evidence.security_green,evidence.tested_sha==evidence.head_sha,not evidence.blocker))
@@ -28,6 +30,12 @@ def evaluate_event(*,event:dict,checks:list[dict],reviews:list[dict],required_ch
     return {"mergeEligible":eligible,"reasonCode":"ready-to-merge" if eligible else reason,"pr":number,"storyId":story_id,"baselineSha":base,"headSha":head,"testedSha":evidence.tested_sha,"reviewedSha":evidence.reviewed_sha}
 
 
+def exit_code_for(result:dict)->int:
+    if result.get("mergeEligible"):return 0
+    if result.get("reasonCode") in NONTERMINAL_REASONS:return 0
+    return 3
+
+
 def main()->int:
     p=argparse.ArgumentParser();p.add_argument("--event",type=Path,required=True);p.add_argument("--checks",type=Path,required=True);p.add_argument("--reviews",type=Path,required=True);p.add_argument("--story-id",required=True);p.add_argument("--expected-head-sha");p.add_argument("--required-check",action="append",default=[]);p.add_argument("--security-check",action="append",default=[]);p.add_argument("--github-output",type=Path)
     a=p.parse_args()
@@ -41,5 +49,5 @@ def main()->int:
             f.write("merge_eligible="+("true" if result["mergeEligible"] else "false")+"\n")
             f.write("reason_code="+result["reasonCode"]+"\n")
             f.write("head_sha="+str(result.get("headSha", ""))+"\n")
-    return 0 if result["mergeEligible"] else 3
+    return exit_code_for(result)
 if __name__=="__main__":sys.exit(main())
