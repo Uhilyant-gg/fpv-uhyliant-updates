@@ -11,7 +11,6 @@ permissions:
   actions: read
 engine:
   id: copilot
-  version: "1.0.114"
 network: defaults
 tools:
   github:
