@@ -46,7 +46,7 @@ def _review(reviews:list[dict],head_sha:str)->tuple[bool,str]:
     return bool(approved) and not blocking, head_sha if approved and not blocking else ""
 
 
-def collect(*,pr:dict,checks:list[dict],reviews:list[dict],required_checks:set[str],security_checks:set[str],story_id:str)->tuple[GitHubEvidence,str]:
+def collect(*,pr:dict,checks:list[dict],reviews:list[dict],required_checks:set[str],security_checks:set[str],story_id:str,require_review:bool=True)->tuple[GitHubEvidence,str]:
     number=pr.get("number"); head=((pr.get("head") or {}).get("sha")); base=((pr.get("base") or {}).get("sha"))
     if not isinstance(number,int) or number<=0 or not head or not base or not story_id:raise ValueError("incomplete PR identity evidence")
     required_green,tested_sha,ci_reason=_required_checks(checks,required_checks)
@@ -56,7 +56,7 @@ def collect(*,pr:dict,checks:list[dict],reviews:list[dict],required_checks:set[s
     if not required_green:blocker=ci_reason
     elif not security_green:blocker=security_reason
     elif tested_sha!=head or security_tested!=head:blocker="tested-sha-stale"
-    elif not review_approved:blocker="review-not-approved-for-head"
+    elif require_review and not review_approved:blocker="review-not-approved-for-head"
     evidence=GitHubEvidence(number,head,base,story_id,required_green,security_green,review_approved,reviewed_sha,tested_sha or "",blocker)
     return evidence, blocker or "ready"
 

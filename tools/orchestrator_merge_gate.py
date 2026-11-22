@@ -1,13 +1,18 @@
 """GitHub Actions adapter for deterministic Orchestrator v2 merge authority.
 
-The workflow gathers GitHub facts. This module validates the event binding, normalizes
-checks/reviews through the existing collector and emits a decision. It never merges.
+The read-only gate supports solo development: ordinary PRs need exact required CI/security
+for the current HEAD, but do not invent an impossible self-approval. Privileged protected
+changes retain their separate external authorization boundary.
 """
 from __future__ import annotations
 import argparse,json,sys
 from pathlib import Path
 from orchestrator_github_evidence import collect
-from orchestrator_v2 import Binding,merge_eligible_from_evidence
+from orchestrator_v2 import Binding,evidence_binding_current
+
+
+def _solo_eligible(binding:Binding,evidence)->bool:
+    return all((evidence_binding_current(binding,evidence),evidence.required_ci_green,evidence.security_green,evidence.tested_sha==evidence.head_sha,not evidence.blocker))
 
 
 def evaluate_event(*,event:dict,checks:list[dict],reviews:list[dict],required_checks:set[str],security_checks:set[str],story_id:str,expected_head_sha:str|None=None)->dict:
@@ -17,9 +22,9 @@ def evaluate_event(*,event:dict,checks:list[dict],reviews:list[dict],required_ch
     base=(pr.get("base") or {}).get("sha")
     if not isinstance(number,int) or not head or not base:raise ValueError("pull_request event identity required")
     if expected_head_sha and expected_head_sha!=head:return {"mergeEligible":False,"reasonCode":"stale-execution","headSha":head}
-    evidence,reason=collect(pr={"number":number,"head":{"sha":head},"base":{"sha":base}},checks=checks,reviews=reviews,required_checks=required_checks,security_checks=security_checks,story_id=story_id)
+    evidence,reason=collect(pr={"number":number,"head":{"sha":head},"base":{"sha":base}},checks=checks,reviews=reviews,required_checks=required_checks,security_checks=security_checks,story_id=story_id,require_review=False)
     binding=Binding(story_id,base,number,head)
-    eligible=merge_eligible_from_evidence(binding,evidence)
+    eligible=_solo_eligible(binding,evidence)
     return {"mergeEligible":eligible,"reasonCode":"ready-to-merge" if eligible else reason,"pr":number,"storyId":story_id,"baselineSha":base,"headSha":head,"testedSha":evidence.tested_sha,"reviewedSha":evidence.reviewed_sha}
 
 
