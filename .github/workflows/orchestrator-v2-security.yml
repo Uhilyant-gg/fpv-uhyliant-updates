@@ -1,0 +1,26 @@
+name: orchestrator-v2-security
+on:
+  pull_request:
+    paths:
+      - 'ORCHESTRATOR_V2.md'
+      - 'features/orchestrator_v2_security.feature'
+      - 'tools/orchestrator_v2.py'
+      - 'tools/test_orchestrator_v2.py'
+      - 'tools/check_orchestrator_security.py'
+      - '.github/workflows/orchestrator-v2-security.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  p0-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile control plane
+        run: python -m py_compile tools/orchestrator_v2.py tools/test_orchestrator_v2.py tools/check_orchestrator_security.py
+      - name: Run executable P0 security scenarios
+        working-directory: tools
+        run: python check_orchestrator_security.py
