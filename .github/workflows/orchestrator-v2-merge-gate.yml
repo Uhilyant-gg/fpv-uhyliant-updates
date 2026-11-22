@@ -1,0 +1,58 @@
+name: orchestrator-v2-merge-gate
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+  check_suite:
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number
+        required: true
+        type: number
+      story_id:
+        description: Active Story ID
+        required: true
+        type: string
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+concurrency:
+  group: orchestrator-v2-merge-gate-${{ github.event.pull_request.number || github.event.check_suite.pull_requests[0].number || inputs.pr_number }}
+  cancel-in-progress: true
+jobs:
+  evidence:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number || github.event.check_suite.pull_requests[0].number
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve PR number
+        id: pr
+        env:
+          EVENT_PR: ${{ github.event.pull_request.number }}
+          CHECK_PR: ${{ github.event.check_suite.pull_requests[0].number }}
+          INPUT_PR: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          pr="${EVENT_PR:-${CHECK_PR:-${INPUT_PR:-}}}"
+          test -n "$pr"
+          echo "number=$pr" >> "$GITHUB_OUTPUT"
+      - name: Acquire exact GitHub evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.pr.outputs.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPO/pulls/$PR" > pr.json
+          head_sha="$(jq -r '.head.sha' pr.json)"
+          gh api --paginate "repos/$REPO/commits/$head_sha/check-runs?per_page=100" --jq '.check_runs[]' | jq -s '[.[] | {name,status,conclusion,head_sha}]' > checks.json
+          gh api --paginate "repos/$REPO/pulls/$PR/reviews?per_page=100" | jq -s 'add | [.[] | {state,commit_id,user:{login:.user.login}}]' > reviews.json
+          jq -n --argjson pull_request "$(cat pr.json)" '{pull_request:$pull_request,number:$pull_request.number}' > event.json
+      - name: Evaluate deterministic gate
+        env:
+          STORY_ID: ${{ inputs.story_id || format('PR-{0}', steps.pr.outputs.number) }}
+        run: |
+          set -euo pipefail
+          python tools/orchestrator_merge_gate.py --event event.json --checks checks.json --reviews reviews.json --story-id "$STORY_ID" --required-check verify --security-check p0-security
