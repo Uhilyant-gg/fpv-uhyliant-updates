@@ -1,4 +1,4 @@
-@security @P0 @state-machine @fail-closed @level2
+@security @P0 @state-machine @fail-closed
 Feature: Orchestrator v2 deterministic security boundary
   @stale-execution @concurrency
   Scenario: stale execution cannot mutate a newer PR head
@@ -45,3 +45,17 @@ Feature: Orchestrator v2 deterministic security boundary
     Given persisted binding and factual GitHub evidence
     When AI is unavailable
     Then reconciliation remains available
+  @adversarial @state-machine
+  Scenario: untrusted executor cannot advance lifecycle authority
+    Given a bounded executor request is bound to current Story baseline and state
+    When a valid proposal result is accepted
+    Then the deterministic lifecycle state does not advance
+  @adversarial @stale-execution
+  Scenario: stale executor result cannot affect current execution
+    Given a bounded executor request is bound to current Story baseline and state
+    When persisted Story baseline or state changes before result acceptance
+    Then the executor result is rejected
+  @hardware @physical-boundary
+  Scenario: executor physical stop remains an operator boundary
+    Given an executor reports PHYSICAL_ACTION_REQUIRED
+    Then deterministic state becomes BLOCKED_HARDWARE
