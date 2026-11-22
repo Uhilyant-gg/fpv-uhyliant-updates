@@ -12,7 +12,7 @@ Roadmap -> Story -> implementation -> tests -> PR -> CI -> bounded repair -> sec
 
 The adapter has only `contents: read`, `checks: read` and `pull-requests: read`. It deliberately cannot merge or write repository contents. A positive result is evidence that the deterministic policy considers this observed SHA eligible; it is not itself merge execution.
 
-The gate requires explicit required-check and security-check names. Missing, failed, duplicate or ambiguous checks fail closed. Tested SHA and approved review commit must equal the observed current PR HEAD. A stale expected HEAD is denied before merge policy evaluation.
+The gate requires explicit required-check and security-check names. Missing, failed, cancelled, duplicate or ambiguous checks fail closed. A cancelled run is non-green infrastructure evidence, not a test failure and not repair authority. Tested SHA and approved review commit must equal the observed current PR HEAD. A stale expected HEAD is denied before merge policy evaluation.
 
 For normal automatic runs the workflow uses a stable PR-derived Story placeholder until canonical Story identity is supplied by the persisted Orchestrator execution. Manual dispatch accepts the active Story ID explicitly. This placeholder is not authority to cross Story boundaries; actual privileged merge execution must use persisted Story binding.
 
