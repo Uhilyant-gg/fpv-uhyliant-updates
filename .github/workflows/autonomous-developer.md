@@ -11,6 +11,7 @@ permissions:
   actions: read
 engine:
   id: copilot
+model: router/robust
 network: defaults
 tools:
   github:
