@@ -9,7 +9,7 @@ permissions:
   issues: read
   pull-requests: read
   actions: read
-model: auto
+model: gpt-5-mini
 network: defaults
 tools:
   github:
