@@ -7,8 +7,13 @@ Roadmap -> Story -> implementation -> tests -> PR -> CI -> bounded repair -> sec
 
 Persisted strict state, factual GitHub evidence normalization and bounded repair are implemented in `tools/orchestrator_state.py`, `tools/orchestrator_github_evidence.py` and `tools/orchestrator_repair.py`. Missing, ambiguous, stale or cancelled evidence is non-green and fails closed.
 
+## Bounded AI executor
+`tools/orchestrator_executor.py` defines the deterministic boundary around an untrusted executor. A request is bound to Story and baseline, is allowed only during planning, implementation or bounded repair, has a finite step budget, and exposes only allowlisted proposal outputs. Returned results must match the same Story/baseline and budget. Physical, secret and product-decision stop reasons are preserved for the external operator.
+
+Executor output is proposal data only. It cannot authorize merge, write directly to `main`, establish hardware verification, supply secrets, or approve destructive actions. Lifecycle transitions and privileged effects remain outside the executor.
+
 ## Merge authority
-The read-only evidence gate acquires current PR/check/review facts. `tools/orchestrator_privileged_merge.py` is the final pure authorization policy immediately before mutation. It requires the persisted binding to match fresh PR Story/baseline/PR/HEAD evidence and reuses exact required-CI/security/review/tested-SHA policy.
+The read-only evidence gate acquires current PR/check/review facts. `tools/orchestrator_privileged_merge.py` is the final pure authorization policy immediately before mutation. It requires the persisted binding to match fresh PR Story/baseline/PR/HEAD evidence and exact required CI/security evidence. Ordinary solo-development changes do not fabricate self-approval; protected control-plane changes retain the external exact-HEAD security-review boundary.
 
 `.github/workflows/orchestrator-v2-privileged-merge.yml` is intentionally narrow. It is manual-dispatch only in this phase, receives the already-persisted Story/baseline/PR/HEAD binding, checks out the exact expected HEAD without persisted credentials, re-fetches GitHub facts, evaluates deterministic authorization, re-fetches HEAD once more immediately before mutation, and calls the GitHub merge API with that expected SHA.
 
@@ -20,4 +25,4 @@ Protected Orchestrator/workflow files require an approval bound to current HEAD 
 CI, mocks, simulation and AI claims are never `HARDWARE_VERIFIED`. Physical or destructive hardware actions require explicit operator authority and remain outside repository automation.
 
 ## Invariants
-INV-01 AI never writes directly to main. INV-02 AI never receives production secrets. INV-03 AI output is always untrusted. INV-04 merge decisions are deterministic. INV-05 approval is bound to exact SHA. INV-06 control-plane/generated security files cannot silently auto-merge. INV-07 hardware verification requires physical evidence. INV-08 destructive hardware actions require explicit authority. INV-09 network access is deny-by-default where applicable. INV-10 critical dependencies require integrity verification. INV-11 autonomous loops are bounded. INV-12 transitions are validated. INV-13 stale executions cannot mutate current state. INV-14 ambiguity fails closed. INV-15 recovery does not require AI.
+INV-01 AI never writes directly to main. INV-02 AI never receives production secrets. INV-03 AI output is always untrusted. INV-04 merge decisions are deterministic. INV-05 approval is bound to exact SHA where required by protected policy. INV-06 control-plane/generated security files cannot silently auto-merge. INV-07 hardware verification requires physical evidence. INV-08 destructive hardware actions require explicit authority. INV-09 network access is deny-by-default where applicable. INV-10 critical dependencies require integrity verification. INV-11 autonomous loops are bounded. INV-12 transitions are validated. INV-13 stale executions cannot mutate current state. INV-14 ambiguity fails closed. INV-15 recovery does not require AI.
