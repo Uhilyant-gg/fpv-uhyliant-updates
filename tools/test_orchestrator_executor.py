@@ -14,6 +14,8 @@ class ExecutorContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):validate_result(self.request,self.result(baseline_sha="other"))
     def test_step_budget_is_enforced(self):
         with self.assertRaises(ValueError):validate_result(self.request,self.result(steps_used=5))
+    def test_negative_steps_are_denied(self):
+        with self.assertRaises(ValueError):validate_result(self.request,self.result(steps_used=-1))
     def test_unapproved_output_is_denied(self):
         with self.assertRaises(ValueError):validate_result(self.request,self.result(output_type="merge"))
     def test_physical_stop_is_preserved(self):self.assertEqual(validate_result(self.request,self.result(stop_reason="PHYSICAL_ACTION_REQUIRED")),"PHYSICAL_ACTION_REQUIRED")
