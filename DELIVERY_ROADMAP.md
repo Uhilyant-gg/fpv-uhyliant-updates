@@ -16,7 +16,7 @@ Physical E0 remains incomplete and deferred until real OpenIPC evidence is captu
 
 E5 - Project Doctor and Machine-Readable Project State is complete at the repository-software boundary: canonical machine-readable state, capability validation, deterministic repository-only next-milestone derivation, drift detection, CI execution through Project Doctor, and fail-closed regression coverage are present. This completion does not imply physical Hardware E2E success.
 
-The next repository-only milestone selected by the canonical capability matrix is E2, while E0 remains the physical critical-path gate.
+E2 - Unified Health and Evidence Contract and E3 - Next Best Action Engine are complete at the repository-software boundary. The next repository-only milestone selected by the canonical capability matrix is E4 - Zero-Config Startup and Restore, while E0 remains the physical critical-path gate.
 
 ## Progress model
 Progress is reported in two layers so existing foundations are not confused with roadmap completion:
@@ -38,13 +38,13 @@ Next action: execute the current provenance-validated Hardware E2E artifact agai
 ### E1 - Automated Hardware Validation | READY AFTER E0
 Stories E1-S1..E1-S10: deterministic validation model; discovery/device selection; identity observation; firmware acquisition; immutable transaction; credential/host-key gates; explicit destructive confirmation; reboot/rediscovery/post-update verification; staged evidence/reason codes; compact guided validation UI.
 
-### E2 - Unified Health and Evidence Contract | NEXT REPOSITORY-ONLY MILESTONE
-Stories E2-S1..E2-S7. Common schema must expose state, health, summary, reasonCode, evidence and safeActions. User health vocabulary is only ready / attention / problem / unknown. Unknown never becomes ready without evidence.
+### E2 - Unified Health and Evidence Contract | COMPLETE
+Stories E2-S1..E2-S7. Common schema exposes state, health, summary, reasonCode, evidence and safeActions. User health vocabulary is only ready / attention / problem / unknown. Unknown never becomes ready without evidence.
 
-### E3 - Next Best Action Engine | PENDING, depends on E2
+### E3 - Next Best Action Engine | COMPLETE
 Stories E3-S1..E3-S6. Deterministic priority model with at most one primary normal-workflow action; safety gates remain authoritative.
 
-### E4 - Zero-Config Startup and Restore | PENDING, depends on E2/E3
+### E4 - Zero-Config Startup and Restore | NEXT REPOSITORY-ONLY MILESTONE
 Stories E4-S1..E4-S7. Target: `launch -> restore/discover -> verified usable camera -> video`; manual IP is fallback; ambiguity is never guessed.
 
 ### E5 - Project Doctor and Machine-Readable Project State | COMPLETE
@@ -92,7 +92,7 @@ Other dependencies: E8 depends on E2/E3 and feeds E14; E10 depends on E2/E4; E11
 ## Next largest safe batch
 **Physical boundary:** E0 still requires operator-controlled real-hardware validation.
 
-**Repository-only boundary:** E5 is complete. The canonical capability matrix selects E2 as the next software milestone. Work there must preserve the fact that E1 has not been physically accepted and must not manufacture E1/E0 evidence. If an E2 slice requires accepted E1 physical evidence rather than merely a presentation contract, stop at that dependency instead of guessing.
+**Repository-only boundary:** E5, E2 and E3 are complete at the repository-software boundary. The canonical capability matrix selects E4 as the next software milestone. Continue Zero-Config Startup and Restore while preserving the fact that E1 has not been physically accepted and never manufacture E1/E0 evidence. If an E4 slice requires accepted E1 physical evidence rather than repository-observable evidence, stop at that dependency instead of guessing.
 
 ## Handoff rule
 At each session start and after each successful merge:
@@ -103,4 +103,4 @@ At each session start and after each successful merge:
 5. Prefer the largest safe logically complete batch.
 6. Never restore historical chat code over current repository state.
 7. Stop only for physical hardware, secrets/credentials/keys, a genuine product decision, exhausted bounded automation, or unresolved inconsistent evidence.
-8. After one implementation commit, publish/refresh its reviewable PR and observe CI. Repair the same batch on red. On green, pass the existing merge gates, merge when authorized, refresh `main`, and continue automatically with the next dependency-valid batch.
+8. After one implementation commit, publish/refresh its reviewable PR and observe CI. Repair the same PR on red. On green, pass the existing merge gates, merge when authorized, refresh `main`, and continue automatically with the next dependency-valid batch.
