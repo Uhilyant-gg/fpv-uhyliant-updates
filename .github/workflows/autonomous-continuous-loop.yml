@@ -1,8 +1,6 @@
 name: autonomous-continuous-loop
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 permissions:
   actions: write
   contents: read
@@ -25,4 +23,4 @@ jobs:
             echo "Autonomous PR already active; not starting a competing batch."
             exit 0
           fi
-          gh workflow run autonomous-developer.lock.yml --repo "$REPO" -f aw_context='{"continuous_loop":true,"trigger":"main-push"}'
+          gh workflow run autonomous-developer.lock.yml --repo "$REPO" -f aw_context='{"continuous_loop":true,"trigger":"manual"}'
