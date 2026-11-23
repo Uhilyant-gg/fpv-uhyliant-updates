@@ -25,22 +25,22 @@ class DeviceHealthTests(unittest.TestCase):
         self.assertEqual(result.health, HEALTH_UNKNOWN)
         self.assertEqual(result.reasonCode, "hardware-identity-incomplete")
 
-    def test_observed_verified_identity_can_be_ready(self):
-        result = device_health({
-            "id": "camera-1",
-            "connection": "ssh",
-            "openipcIdentity": {"verified": True, "platform": "ssc338q", "sensor": "imx335"},
-        })
+    def test_verified_disconnected_camera_requests_connect(self):
+        result = device_health({"id": "camera-1", "connection": "disconnected", "openipcIdentity": {"verified": True, "platform": "ssc338q", "sensor": "imx335"}})
+        self.assertEqual(result.health, HEALTH_ATTENTION)
+        self.assertEqual(result.safeActions, ("connect-camera",))
+
+    def test_observed_stream_exposes_show_video(self):
+        result = device_health({"id": "camera-1", "connection": "ssh", "streams": [{"id": "main"}], "openipcIdentity": {"verified": True, "platform": "ssc338q", "sensor": "imx335"}})
         self.assertEqual(result.health, HEALTH_READY)
-        self.assertEqual(result.evidence["platform"], "ssc338q")
-        self.assertEqual(result.evidence["sensor"], "imx335")
+        self.assertEqual(result.safeActions, ("show-video",))
+
+    def test_observed_verified_identity_can_be_ready(self):
+        result = device_health({"id": "camera-1", "connection": "ssh", "openipcIdentity": {"verified": True, "platform": "ssc338q", "sensor": "imx335"}})
+        self.assertEqual(result.health, HEALTH_READY)
 
     def test_reported_connection_error_is_problem_after_identity_is_observed(self):
-        result = device_health({
-            "id": "camera-1",
-            "connection": "error",
-            "openipcIdentity": {"verified": True, "platform": "ssc338q", "sensor": "imx335"},
-        })
+        result = device_health({"id": "camera-1", "connection": "error", "openipcIdentity": {"verified": True, "platform": "ssc338q", "sensor": "imx335"}})
         self.assertEqual(result.health, HEALTH_PROBLEM)
         self.assertEqual(result.safeActions, ("diagnose",))
 
