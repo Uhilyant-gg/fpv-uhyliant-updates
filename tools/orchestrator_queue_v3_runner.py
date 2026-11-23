@@ -29,6 +29,7 @@ def decide_queue_action(
     plan: QueuePlan,
     *,
     active_story_id: str,
+    observed_baseline_sha: str,
     ci_status: str,
     merged: bool = False,
     blocker_status: str | None = None,
@@ -36,6 +37,11 @@ def decide_queue_action(
     max_repair_attempts: int = 3,
 ) -> QueueDecision:
     plan.validate()
+    observed_baseline_sha = observed_baseline_sha.strip()
+    if not observed_baseline_sha:
+        raise ValueError("runner-observed-baseline-required")
+    if observed_baseline_sha != plan.baseline_sha:
+        raise ValueError("runner-stale-baseline")
     if active_story_id != plan.active.story_id:
         raise ValueError("runner-active-story-mismatch")
     if repair_attempts < 0 or max_repair_attempts < 0:

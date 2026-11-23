@@ -12,7 +12,11 @@ class QueueV3RunnerTests(unittest.TestCase):
         )
 
     def decide(self, **kwargs):
-        values = {"active_story_id": "E2-S4", "ci_status": "running"}
+        values = {
+            "active_story_id": "E2-S4",
+            "observed_baseline_sha": "base",
+            "ci_status": "running",
+        }
         values.update(kwargs)
         return decide_queue_action(self.plan, **values)
 
@@ -47,6 +51,14 @@ class QueueV3RunnerTests(unittest.TestCase):
         for blocker in ("PHYSICAL_ACTION_REQUIRED", "SECRET_REQUIRED", "PRODUCT_DECISION_REQUIRED"):
             with self.subTest(blocker=blocker):
                 self.assertEqual(self.decide(blocker_status=blocker).action, QueueAction.STOP)
+
+    def test_missing_observed_baseline_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "runner-observed-baseline-required"):
+            self.decide(observed_baseline_sha="  ")
+
+    def test_stale_baseline_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "runner-stale-baseline"):
+            self.decide(observed_baseline_sha="new-main")
 
     def test_stale_active_story_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "runner-active-story-mismatch"):
