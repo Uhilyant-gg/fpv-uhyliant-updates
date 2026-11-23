@@ -15,13 +15,14 @@ _FAILURE={"failure","cancelled","timed_out","action_required","startup_failure",
 _APPROVED="APPROVED"
 
 
-def _required_checks(checks:list[dict],required:set[str])->tuple[bool,str|None,str]:
+def _required_checks(checks:list[dict],required:set[str],*,empty_allowed:bool=False)->tuple[bool,str|None,str]:
+    if not required:
+        return (True,None,"not-required") if empty_allowed else (False,None,"required-check-policy-empty")
     by_name={}
     for item in checks:
         name=item.get("name")
         if name in by_name: return False,None,"duplicate-required-check" if name in required else "duplicate-check"
         by_name[name]=item
-    if not required:return False,None,"required-check-policy-empty"
     missing=sorted(required-set(by_name))
     if missing:return False,None,"required-check-missing"
     tested={item.get("head_sha") for name,item in by_name.items() if name in required}
@@ -50,12 +51,13 @@ def collect(*,pr:dict,checks:list[dict],reviews:list[dict],required_checks:set[s
     number=pr.get("number"); head=((pr.get("head") or {}).get("sha")); base=((pr.get("base") or {}).get("sha"))
     if not isinstance(number,int) or number<=0 or not head or not base or not story_id:raise ValueError("incomplete PR identity evidence")
     required_green,tested_sha,ci_reason=_required_checks(checks,required_checks)
-    security_green,security_tested,security_reason=_required_checks(checks,security_checks)
+    security_green,security_tested,security_reason=_required_checks(checks,security_checks,empty_allowed=True)
     review_approved,reviewed_sha=_review(reviews,head)
     blocker=None
     if not required_green:blocker=ci_reason
     elif not security_green:blocker=security_reason
-    elif tested_sha!=head or security_tested!=head:blocker="tested-sha-stale"
+    elif tested_sha!=head:blocker="tested-sha-stale"
+    elif security_checks and security_tested!=head:blocker="tested-sha-stale"
     elif require_review and not review_approved:blocker="review-not-approved-for-head"
     evidence=GitHubEvidence(number,head,base,story_id,required_green,security_green,review_approved,reviewed_sha,tested_sha or "",blocker)
     return evidence, blocker or "ready"

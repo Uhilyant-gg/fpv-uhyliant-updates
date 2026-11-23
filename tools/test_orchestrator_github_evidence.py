@@ -12,6 +12,10 @@ class EvidenceCollectorTests(unittest.TestCase):
         args=dict(pr=self.pr,checks=self.checks,reviews=self.reviews,required_checks={"verify"},security_checks={"p0-security"},story_id="ORCH-S4"); args.update(overrides); return collect(**args)
     def test_exact_green_evidence(self):
         e,reason=self.collect(); self.assertEqual(reason,"ready"); self.assertTrue(e.required_ci_green and e.security_green and e.review_approved); self.assertEqual(e.tested_sha,"head")
+    def test_security_policy_may_be_explicitly_not_required(self):
+        e,reason=self.collect(checks=[self.checks[0]],security_checks=set(),require_review=False); self.assertEqual(reason,"ready"); self.assertTrue(e.required_ci_green and e.security_green); self.assertEqual(e.tested_sha,"head")
+    def test_required_ci_policy_cannot_be_empty(self):
+        e,reason=self.collect(required_checks=set()); self.assertFalse(e.required_ci_green); self.assertEqual(reason,"required-check-policy-empty")
     def test_missing_required_check_fails_closed(self):
         e,reason=self.collect(required_checks={"verify","missing"}); self.assertFalse(e.required_ci_green); self.assertEqual(reason,"required-check-missing")
     def test_stale_tested_sha_fails_closed(self):

@@ -1,8 +1,8 @@
 """GitHub Actions adapter for deterministic Orchestrator v2 merge authority.
 
-The read-only gate supports solo development: ordinary PRs need exact required CI/security
-for the current HEAD, but do not invent an impossible self-approval. Privileged protected
-changes retain their separate external authorization boundary.
+Ordinary PRs require exact required CI for the current HEAD. Security checks are required
+only when the current PR is in protected control-plane scope; callers express that scope
+by passing the relevant security-check names.
 """
 from __future__ import annotations
 import argparse,json,sys

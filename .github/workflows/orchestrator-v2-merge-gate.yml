@@ -49,10 +49,15 @@ jobs:
           head_sha="$(jq -r '.head.sha' pr.json)"
           gh api --paginate "repos/$REPO/commits/$head_sha/check-runs?per_page=100" --jq '.check_runs[]' | jq -s '[.[] | {name,status,conclusion,head_sha}]' > checks.json
           gh api --paginate "repos/$REPO/pulls/$PR/reviews?per_page=100" | jq -s 'add | [.[] | {state,commit_id,user:{login:.user.login}}]' > reviews.json
+          gh api "repos/$REPO/pulls/$PR/files?per_page=100" --paginate --jq '.[].filename' > changed-files.txt
           jq -n --argjson pull_request "$(cat pr.json)" '{pull_request:$pull_request,number:$pull_request.number}' > event.json
       - name: Evaluate deterministic gate
         env:
           STORY_ID: ${{ inputs.story_id || format('PR-{0}', steps.pr.outputs.number) }}
         run: |
           set -euo pipefail
-          python tools/orchestrator_merge_gate.py --event event.json --checks checks.json --reviews reviews.json --story-id "$STORY_ID" --required-check verify --security-check p0-security
+          args=(--event event.json --checks checks.json --reviews reviews.json --story-id "$STORY_ID" --required-check verify)
+          if grep -Eq '^(ORCHESTRATOR_V2.md|AUTONOMOUS_DEVELOPMENT.md|DEVELOPMENT_GUIDE.md|PROJECT_STATE.md|DELIVERY_ROADMAP.md|PRODUCT_UX.md|HARDWARE_E2E.md|tools/orchestrator_|tools/check_orchestrator_security.py|tools/check_agentic_workflow_integrity.py|features/orchestrator_v2_security.feature|\.github/workflows/)' changed-files.txt; then
+            args+=(--security-check p0-security)
+          fi
+          python tools/orchestrator_merge_gate.py "${args[@]}"
