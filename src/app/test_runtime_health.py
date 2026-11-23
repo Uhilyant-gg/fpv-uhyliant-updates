@@ -4,7 +4,7 @@ from runtime_health import runtime_health_snapshot
 
 
 class RuntimeHealthSnapshotTests(unittest.TestCase):
-    def test_snapshot_exposes_same_contract_for_all_boundaries(self):
+    def test_snapshot_exposes_same_contract_for_health_boundaries(self):
         result = runtime_health_snapshot(
             device={
                 "id": "cam-1",
@@ -14,18 +14,20 @@ class RuntimeHealthSnapshotTests(unittest.TestCase):
             vehicle_diagnostics={"issues": []},
         )
         expected = {"state", "health", "summary", "reasonCode", "evidence", "safeActions"}
-        self.assertEqual(set(result), {"camera", "vehicle", "station"})
-        for item in result.values():
-            self.assertEqual(set(item), expected)
+        self.assertEqual(set(result), {"camera", "vehicle", "station", "nextBestAction"})
+        for name in ("camera", "vehicle", "station"):
+            self.assertEqual(set(result[name]), expected)
         self.assertEqual(result["station"]["health"], "ready")
 
-    def test_missing_inputs_remain_unknown(self):
+    def test_missing_camera_drives_find_camera_without_promoting_health(self):
         result = runtime_health_snapshot(device=None, vehicle_snapshot=None, vehicle_diagnostics=None)
         self.assertEqual(result["camera"]["health"], "unknown")
         self.assertEqual(result["vehicle"]["health"], "unknown")
         self.assertEqual(result["station"]["health"], "unknown")
+        self.assertEqual(result["nextBestAction"]["action"], "find-camera")
+        self.assertEqual(result["nextBestAction"]["source"], "camera")
 
-    def test_camera_problem_propagates_to_station(self):
+    def test_camera_problem_drives_diagnose_and_propagates_problem(self):
         result = runtime_health_snapshot(
             device={
                 "id": "cam-1",
@@ -37,6 +39,8 @@ class RuntimeHealthSnapshotTests(unittest.TestCase):
         )
         self.assertEqual(result["camera"]["health"], "problem")
         self.assertEqual(result["station"]["health"], "problem")
+        self.assertEqual(result["nextBestAction"]["action"], "diagnose")
+        self.assertEqual(result["nextBestAction"]["source"], "camera")
 
 
 if __name__ == "__main__":
