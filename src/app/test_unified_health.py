@@ -70,6 +70,17 @@ class UnifiedHealthTests(unittest.TestCase):
         item = self.item(HEALTH_PROBLEM)
         self.assertEqual(item.safeActions, ())
 
+    def test_normal_camera_connection_action_is_canonical(self):
+        self.assertIn("connect-camera", SAFE_ACTION_VALUES)
+        item = health_evidence(
+            state="disconnected",
+            health=HEALTH_ATTENTION,
+            summary="Verified camera needs connection.",
+            reason_code="camera-connection-needed",
+            safe_actions=("connect-camera",),
+        )
+        self.assertEqual(item.safeActions, ("connect-camera",))
+
     def test_safe_action_vocabulary_is_closed(self):
         self.assertIn("diagnose", SAFE_ACTION_VALUES)
         with self.assertRaisesRegex(ValueError, "safe-action-not-allowed"):
