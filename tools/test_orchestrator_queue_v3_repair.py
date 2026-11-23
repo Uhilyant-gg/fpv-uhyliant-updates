@@ -24,11 +24,13 @@ class QueueV3RepairBridgeTests(unittest.TestCase):
         values = {
             "pr": 56,
             "head_sha": "head",
-            "baseline_sha": "base",
-            "required_checks": ("verify",),
-            "successful_checks": (),
+            "base_sha": "base",
+            "pr_story_id": "S1",
+            "required_ci_green": False,
+            "security_green": True,
             "review_approved": False,
-            "unresolved_threads": 0,
+            "reviewed_sha": "",
+            "tested_sha": "head",
             "blocker": "required-check-failed",
         }
         values.update(kwargs)
