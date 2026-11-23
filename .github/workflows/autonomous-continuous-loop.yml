@@ -1,0 +1,28 @@
+name: autonomous-continuous-loop
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  actions: write
+  contents: read
+concurrency:
+  group: fpv-uhyliant-autonomous-continuous-loop
+  cancel-in-progress: false
+jobs:
+  dispatch-next-batch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require clean autonomous queue and dispatch next batch
+        env:
+          GH_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          open="$(gh api "repos/$REPO/pulls?state=open&base=main&per_page=100" --jq '[.[] | select(.head.ref | startswith("automation/"))] | length')"
+          if [ "$open" != "0" ]; then
+            echo "Autonomous PR already active; not starting a competing batch."
+            exit 0
+          fi
+          gh workflow run autonomous-developer.lock.yml --repo "$REPO" -f aw_context='{"continuous_loop":true,"trigger":"main-push"}'
