@@ -11,12 +11,12 @@
   },
   "softwareTrack": {
     "status": "READY",
-    "nextMilestone": "E2",
-    "summary": "E5 repository-state foundation is complete; continue with the earliest dependency-valid product milestone while physical E0 remains deferred."
+    "nextMilestone": "E3",
+    "summary": "E2 unified health/evidence contract is complete at the repository-software boundary; continue with the Next Best Action milestone while physical E0 remains deferred."
   },
   "capabilities": {
     "projectDoctor": "complete",
-    "unifiedHealthEvidence": "pending",
+    "unifiedHealthEvidence": "complete",
     "nextBestAction": "pending",
     "zeroConfigStartup": "pending",
     "hardwareSimulator": "pending",
