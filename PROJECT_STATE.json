@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "FPV Uhyliant",
-  "planningEstimatePercent": 35,
+  "planningEstimatePercent": 19,
   "hardwareValidation": {
     "epic": "E0",
     "status": "DEFERRED",

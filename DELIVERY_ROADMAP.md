@@ -24,7 +24,7 @@ Progress is reported in two layers so existing foundations are not confused with
 - **Roadmap completion:** an Epic/Story is complete only when its acceptance criteria have repository or physical evidence.
 - **Engineering readiness:** existing foundations may materially support a future Story while it remains incomplete.
 
-The canonical planning estimate remains **35%** until a broader acceptance-based re-audit changes it. Do not mechanically increase this percentage for commits.
+The acceptance-based re-audit gives **19%** roadmap completion: 3 of 16 Epics (E2, E3 and E5) have complete acceptance evidence, rounded from 18.75%. Partial foundations, commits and PRs do not increase this figure until their Epic acceptance contract is complete. Physical E0 remains incomplete.
 
 ## Delivery order and status
 
