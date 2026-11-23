@@ -5,6 +5,7 @@ from unified_health import (
     HEALTH_PROBLEM,
     HEALTH_READY,
     HEALTH_UNKNOWN,
+    SAFE_ACTION_VALUES,
     aggregate_health,
     health_evidence,
     unknown_health,
@@ -68,6 +69,21 @@ class UnifiedHealthTests(unittest.TestCase):
     def test_safe_actions_are_explicit_not_inferred(self):
         item = self.item(HEALTH_PROBLEM)
         self.assertEqual(item.safeActions, ())
+
+    def test_safe_action_vocabulary_is_closed(self):
+        self.assertIn("diagnose", SAFE_ACTION_VALUES)
+        with self.assertRaisesRegex(ValueError, "safe-action-not-allowed"):
+            health_evidence(
+                state="fault",
+                health=HEALTH_PROBLEM,
+                summary="Problem.",
+                reason_code="problem",
+                safe_actions=("flash-firmware",),
+            )
+
+    def test_duplicate_safe_actions_fail_closed(self):
+        with self.assertRaisesRegex(ValueError, "safe-actions-duplicate"):
+            unknown_health(safe_actions=("diagnose", "diagnose"))
 
 
 if __name__ == "__main__":
