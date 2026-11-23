@@ -11,11 +11,11 @@
   },
   "softwareTrack": {
     "status": "READY",
-    "nextMilestone": "E5",
-    "summary": "Continue repository-only enabling work while physical validation is deferred."
+    "nextMilestone": "E2",
+    "summary": "E5 repository-state foundation is complete; continue with the earliest dependency-valid product milestone while physical E0 remains deferred."
   },
   "capabilities": {
-    "projectDoctor": "partial",
+    "projectDoctor": "complete",
     "unifiedHealthEvidence": "pending",
     "nextBestAction": "pending",
     "zeroConfigStartup": "pending",
