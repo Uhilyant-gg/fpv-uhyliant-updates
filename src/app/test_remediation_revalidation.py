@@ -1,8 +1,7 @@
-import unittest
 from remediation_revalidation import remediation_revalidation
-class Tests(unittest.TestCase):
- def test_failed_execution_problem(self):self.assertEqual(remediation_revalidation({}, {}, False)['health'],'problem')
- def test_missing_after_unknown(self):self.assertEqual(remediation_revalidation({'state':'problem'},None,True)['health'],'unknown')
- def test_ready_after_fix_revalidated(self):self.assertEqual(remediation_revalidation({'state':'problem'},{'state':'ready'},True)['health'],'ready')
- def test_no_change_is_attention(self):self.assertFalse(remediation_revalidation({'state':'problem'},{'state':'problem'},True)['changed'])
-if __name__=='__main__':unittest.main()
+
+def test_failed_execution_is_problem(): assert remediation_revalidation({'state':'problem'},None,False)['health']=='problem'
+def test_missing_revalidation_is_unknown(): assert remediation_revalidation({'state':'problem'},None,True)['health']=='unknown'
+def test_stale_revalidation_is_unknown(): assert remediation_revalidation({'state':'problem'},{'state':'ready'},True)['reasonCode']=='fresh-revalidation-required'
+def test_unchanged_fresh_finding_needs_attention(): assert remediation_revalidation({'state':'problem'},{'state':'problem','fresh':True},True)['health']=='attention'
+def test_fresh_ready_revalidation_completes(): assert remediation_revalidation({'state':'problem'},{'state':'ready','fresh':True},True)['health']=='ready'
