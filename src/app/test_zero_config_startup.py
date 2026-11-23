@@ -3,9 +3,15 @@ from zero_config_startup import zero_config_startup
 
 
 class ZeroConfigStartupTests(unittest.TestCase):
-    def test_verified_saved_camera_drives_restore_without_ready_claim(self):
+    def test_saved_camera_requires_revalidation_without_ready_claim(self):
         result = zero_config_startup({"verified": True, "host": "192.168.1.10"}, None, None, None)
-        self.assertEqual(result["action"], "restore-camera")
+        self.assertEqual(result["action"], "revalidate-camera")
+        self.assertEqual(result["health"], "unknown")
+
+    def test_saved_metadata_cannot_become_operational_from_unrelated_ready_fields(self):
+        result = zero_config_startup({"verified": True, "host": "192.168.1.10"}, None, {"health": "ready", "safeActions": []}, {"primaryId": "main"})
+        self.assertEqual(result["stage"], "restore")
+        self.assertEqual(result["action"], "revalidate-camera")
         self.assertNotEqual(result["health"], "ready")
 
     def test_verified_discovered_camera_drives_connect(self):
