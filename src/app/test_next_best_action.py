@@ -26,6 +26,31 @@ class NextBestActionTests(unittest.TestCase):
         self.assertEqual(result.action, "diagnose")
         self.assertEqual(result.source, "problem")
 
+    def test_normal_workflow_contract_covers_product_actions(self):
+        cases = {
+            "fix": "fix",
+            "connect-camera": "connect-camera",
+            "connect-controller": "connect-controller",
+            "calibrate-controller": "calibrate-controller",
+            "update": "update",
+        }
+        for safe_action, expected in cases.items():
+            with self.subTest(action=safe_action):
+                result = select_next_best_action({
+                    "component": {"health": "attention", "safeActions": [safe_action]},
+                })
+                self.assertEqual(result.action, expected)
+
+    def test_destructive_or_service_action_is_not_selected(self):
+        result = select_next_best_action({
+            "camera": {
+                "health": "problem",
+                "safeActions": ["fullflash", "manual-firmware", "sysupgrade"],
+            },
+        })
+        self.assertIsNone(result.action)
+        self.assertEqual(result.reasonCode, "no-safe-action")
+
     def test_unknown_action_is_not_invented_or_selected(self):
         result = select_next_best_action({
             "camera": {"health": "unknown", "safeActions": ["flash-camera"]},
