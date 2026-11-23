@@ -11,6 +11,14 @@ HEALTH_ATTENTION = "attention"
 HEALTH_PROBLEM = "problem"
 HEALTH_UNKNOWN = "unknown"
 HEALTH_VALUES = frozenset({HEALTH_READY, HEALTH_ATTENTION, HEALTH_PROBLEM, HEALTH_UNKNOWN})
+SAFE_ACTION_VALUES = frozenset({
+    "diagnose",
+    "find-camera",
+    "identify-camera",
+    "refresh-identity",
+    "show-video",
+    "verify-camera",
+})
 
 
 @dataclass(frozen=True)
@@ -35,6 +43,11 @@ class HealthEvidence:
             raise ValueError("evidence-must-be-mapping")
         if not isinstance(self.safeActions, tuple) or any(not isinstance(action, str) or not action.strip() for action in self.safeActions):
             raise ValueError("safe-actions-invalid")
+        if len(self.safeActions) != len(set(self.safeActions)):
+            raise ValueError("safe-actions-duplicate")
+        unknown_actions = set(self.safeActions).difference(SAFE_ACTION_VALUES)
+        if unknown_actions:
+            raise ValueError("safe-action-not-allowed:" + ",".join(sorted(unknown_actions)))
 
     def as_dict(self):
         return {
