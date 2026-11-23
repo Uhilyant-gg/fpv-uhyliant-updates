@@ -15,13 +15,20 @@ HEALTH_PRIORITY = {
     "ready": 3,
 }
 
+# Normal-workflow actions only. Destructive/service operations deliberately stay out
+# of the selector even if a malformed producer exposes them as safeActions.
 ACTION_PRIORITY = {
-    "diagnose": 0,
-    "find-camera": 10,
-    "identify-camera": 20,
-    "refresh-identity": 30,
-    "verify-camera": 40,
-    "show-video": 50,
+    "fix": 0,
+    "diagnose": 10,
+    "find-camera": 20,
+    "identify-camera": 30,
+    "refresh-identity": 40,
+    "verify-camera": 50,
+    "connect-camera": 60,
+    "show-video": 70,
+    "connect-controller": 80,
+    "calibrate-controller": 90,
+    "update": 100,
 }
 
 
