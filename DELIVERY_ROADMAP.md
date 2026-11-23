@@ -5,9 +5,11 @@ This file is the durable implementation plan for FPV Uhyliant. Current `main` pl
 ## Operating model
 Development is autonomous by default. Human participation is reserved for physical hardware actions, secrets/credentials/keys, and genuine product decisions.
 
-Strict loop: `current main -> largest safe logically complete batch -> tests -> one commit -> CI -> stop`.
+Continuous loop: `current main -> largest safe logically complete batch -> tests -> reviewable PR -> CI -> repair on red / gated merge on green -> refresh main -> replan -> next dependency-valid batch`.
 
-Never treat software CI as physical hardware evidence. Never start unrelated work on a red baseline.
+A green, safely mergeable batch must not require an intermediate human "continue" or "green" command. After merge, refresh from the new `main` and continue automatically while the next action is deterministically supported by repository state and evidence.
+
+Never treat software CI as physical hardware evidence. Never start unrelated work on a red baseline. Stop the continuous loop only for a physical action, secret/credential/key, genuine product decision, exhausted bounded automation/repair budget, or inconsistent/missing evidence that cannot be resolved safely.
 
 ## Current audited state
 Physical E0 remains incomplete and deferred until real OpenIPC evidence is captured. Software validation never closes that gate.
@@ -93,12 +95,12 @@ Other dependencies: E8 depends on E2/E3 and feeds E14; E10 depends on E2/E4; E11
 **Repository-only boundary:** E5 is complete. The canonical capability matrix selects E2 as the next software milestone. Work there must preserve the fact that E1 has not been physically accepted and must not manufacture E1/E0 evidence. If an E2 slice requires accepted E1 physical evidence rather than merely a presentation contract, stop at that dependency instead of guessing.
 
 ## Handoff rule
-At each session start:
-1. Read current `main` and all canonical documents.
+At each session start and after each successful merge:
+1. Read/refresh current `main` and canonical state relevant to the next decision.
 2. Run/inspect Project Doctor and current CI evidence when available.
 3. Validate `PROJECT_STATE.json` and use its deterministic repository-only `nextMilestone`.
 4. Determine the earliest incomplete Story in that milestone whose dependencies are actually satisfied.
 5. Prefer the largest safe logically complete batch.
 6. Never restore historical chat code over current repository state.
-7. Stop only for physical hardware, secrets/credentials/keys, or a genuine product decision.
-8. After one implementation commit, stop for CI; repair the same batch on red.
+7. Stop only for physical hardware, secrets/credentials/keys, a genuine product decision, exhausted bounded automation, or unresolved inconsistent evidence.
+8. After one implementation commit, publish/refresh its reviewable PR and observe CI. Repair the same batch on red. On green, pass the existing merge gates, merge when authorized, refresh `main`, and continue automatically with the next dependency-valid batch.
