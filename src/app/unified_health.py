@@ -12,6 +12,7 @@ HEALTH_PROBLEM = "problem"
 HEALTH_UNKNOWN = "unknown"
 HEALTH_VALUES = frozenset({HEALTH_READY, HEALTH_ATTENTION, HEALTH_PROBLEM, HEALTH_UNKNOWN})
 SAFE_ACTION_VALUES = frozenset({
+    "connect-camera",
     "diagnose",
     "find-camera",
     "identify-camera",
