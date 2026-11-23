@@ -6,7 +6,9 @@ Current `main` and canonical repository documents are the only project authority
 Before material work read `PRODUCT_UX.md`, `PROJECT_STATE.md`, `DEVELOPMENT_GUIDE.md`, `HARDWARE_E2E.md`, `DELIVERY_ROADMAP.md` and this file from current `main`.
 
 ## Autonomous operator contract
-Continue without intermediate questions whenever the next action is derivable from repository state, tests, CI, sanitized evidence and the canonical roadmap. Stop only for `PHYSICAL_ACTION_REQUIRED`, `SECRET_REQUIRED`, or `PRODUCT_DECISION_REQUIRED`.
+Continue without intermediate questions whenever the next action is derivable from repository state, tests, CI, sanitized evidence and the canonical roadmap. A confirmed green batch is not a human handoff: pass the existing merge gates, merge when authorized, refresh `main`, replan, and continue automatically.
+
+Stop only for `PHYSICAL_ACTION_REQUIRED`, `SECRET_REQUIRED`, `PRODUCT_DECISION_REQUIRED`, exhausted bounded automation/repair budget, or inconsistent/missing evidence that cannot be resolved safely.
 
 ## Work selection
 1. Read the current canonical roadmap and `PROJECT_STATE.json`.
@@ -16,9 +18,10 @@ Continue without intermediate questions whenever the next action is derivable fr
 5. Prefer the largest safe logically complete batch in that scope.
 6. Preserve all safety/product invariants.
 7. Repair the active batch before unrelated work if CI is red.
+8. After a green gated merge, refresh current `main`, derive the next dependency-valid batch, and continue without waiting for a manual "green" or "continue" message.
 
 ## Git contract
-Use `automation/<epic>-<short-purpose>` branches and reviewable PRs. Branch from current green `main`; keep one logically complete change; update tests/docs with the implementation; validate; publish a PR containing Story IDs, scope, tests and risks; repair the same PR on red CI; do not start the next roadmap batch before the current one is green and merged. Autonomous workflows do not directly mutate `main`.
+Use `automation/<epic>-<short-purpose>` branches and reviewable PRs. Branch from current green `main`; keep one logically complete change per PR; update tests/docs with the implementation; validate; publish a PR containing Story IDs, scope, tests and risks; repair the same PR on red CI. On confirmed green, use the existing merge authorization gates, merge only when authorized, refresh from the new `main`, and automatically start the next dependency-valid batch. Autonomous workflows do not directly mutate `main`.
 
 ## Project Doctor interface
 `tools/project_doctor.py` is implemented. It emits deterministic JSON, verifies canonical-file presence and machine-readable project state, rejects canonical drift, compiles Python sources, runs application tests and tool tests, and exits zero only for READY. Its output must never be interpreted as physical hardware validation.
@@ -29,6 +32,8 @@ Target Project Doctor fields are: `schemaVersion`, `status`, `area`, `stage`, `r
 
 ## CI repair loop
 On red CI identify the failing job/test/contract, compare it to the active diff and invariants, repair only the active batch and related regression coverage, rerun validation, and update the same PR. Never weaken a safety invariant or relabel missing physical evidence as success.
+
+On green CI do not pause merely for human acknowledgement. Apply the existing review/merge authorization contract, merge when authorized, observe the new `main`, refresh the queue from current evidence, and continue with the next dependency-valid batch.
 
 ## Agentic workflow security
 Agentic workflows are read-only by default and receive minimum permissions. Prefer reviewable PRs/issues/comments over direct mutation. Secrets never enter prompts, evidence, logs, PR bodies or agent-visible repository files. Autonomous workflows never execute physical destructive firmware operations; those remain in the guarded local application with explicit operator confirmation.
