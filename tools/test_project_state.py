@@ -12,8 +12,8 @@ class ProjectStateTests(unittest.TestCase):
         self.assertEqual(state["hardwareValidation"]["status"], "DEFERRED")
         self.assertFalse(state["hardwareValidation"]["physicalEvidenceComplete"])
         self.assertEqual(state["softwareTrack"]["status"], "READY")
-        self.assertEqual(derive_next_milestone(state), "E5")
-        self.assertEqual(state["softwareTrack"]["nextMilestone"], "E5")
+        self.assertEqual(derive_next_milestone(state), "E2")
+        self.assertEqual(state["softwareTrack"]["nextMilestone"], "E2")
 
     def write_state(self, state, directory):
         path = Path(directory) / "state.json"
