@@ -11,7 +11,7 @@ permissions:
   actions: read
 engine:
   id: copilot
-model: router/robust
+model: gpt-5-mini
 network: defaults
 tools:
   github:
@@ -41,3 +41,4 @@ Never expose secrets. Never perform destructive physical firmware actions. Never
 If CI information for the active autonomous change is available, investigate failures and keep repairs scoped to that same logical batch. If the evidence proves a physical, secret, or product-decision blocker, stop and report that blocker instead of guessing.
 
 Prefer reviewable pull requests and issues as safe outputs; do not write directly to `main`.
+
