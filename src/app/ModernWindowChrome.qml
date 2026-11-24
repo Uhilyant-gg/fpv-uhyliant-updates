@@ -22,6 +22,7 @@ Rectangle {
     RowLayout {
         anchors.fill: parent
         anchors.leftMargin: 16
+        anchors.rightMargin: 8
         spacing: 10
 
         Rectangle {
@@ -56,12 +57,6 @@ Rectangle {
             font.pixelSize: 15
             onClicked: window.visibility === Window.Maximized ? window.showNormal() : window.showMaximized()
             background: Rectangle { color: parent.hovered ? hover : "transparent"; radius: 7 }
-        }
-        ToolButton {
-            text: "×"; flat: true; Layout.preferredWidth: 46; Layout.fillHeight: true
-            font.pixelSize: 20
-            onClicked: window.close()
-            background: Rectangle { color: parent.hovered ? "#C42B3A" : "transparent"; radius: 7 }
         }
     }
 }

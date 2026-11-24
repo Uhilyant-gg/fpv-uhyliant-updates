@@ -1,13 +1,14 @@
 from pathlib import Path
 
 
-def test_modern_chrome_has_native_window_actions():
+def test_modern_chrome_has_safe_window_actions_without_close_button():
     source = Path(__file__).with_name("ModernWindowChrome.qml").read_text(encoding="utf-8")
     assert "startSystemMove" in source
     assert "showMinimized" in source
     assert "showMaximized" in source
     assert "showNormal" in source
-    assert "window.close()" in source
+    assert "window.close()" not in source
+    assert 'text: "×"' not in source
 
 
 def test_modern_chrome_uses_current_visual_tokens():
