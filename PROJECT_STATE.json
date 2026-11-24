@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "FPV Uhyliant",
-  "planningEstimatePercent": 25,
+  "planningEstimatePercent": 31,
   "hardwareValidation": {
     "epic": "E0",
     "status": "DEFERRED",
@@ -11,15 +11,15 @@
   },
   "softwareTrack": {
     "status": "READY",
-    "nextMilestone": "E6",
-    "summary": "E2, E3, E4 and E5 are complete at the repository-software boundary; E6 is the next deterministic repository-only capability milestone while physical E0 remains deferred."
+    "nextMilestone": "E7",
+    "summary": "E2, E3, E4, E5 and E6 are complete at the repository-software boundary; E7 scenario-driven CI is next while physical E0 remains deferred."
   },
   "capabilities": {
     "projectDoctor": "complete",
     "unifiedHealthEvidence": "complete",
     "nextBestAction": "complete",
     "zeroConfigStartup": "complete",
-    "hardwareSimulator": "pending",
+    "hardwareSimulator": "complete",
     "scenarioDrivenCI": "pending"
   }
 }
