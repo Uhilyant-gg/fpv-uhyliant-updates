@@ -1,0 +1,20 @@
+name: E7 Scenario CI
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scenario-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run deterministic simulator scenarios
+        working-directory: tools
+        run: python hardware_simulator_ci.py
+      - name: Run scenario CI regression tests
+        working-directory: tools
+        run: python -m unittest -v test_hardware_simulator_ci.py
