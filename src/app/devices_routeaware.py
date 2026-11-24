@@ -33,7 +33,7 @@ class ManualWorker(QThread):
 class Devices(LegacyDevices):
     manualChanged=Signal()
     def __init__(self):
-        super().__init__();self._manual_busy=False;self._manual_result={};self._manual_error="";self._manual_status="idle";self._manual_message="";self._manual_worker=None
+        super().__init__();self._manual_busy=False;self._manual_result={};self._manual_error="";self._manual_status="idle";self._manual_message="";self._manual_worker=None;self._manual_requested_host=""
         self._init_discovery_history()
     def _init_discovery_history(self):
         with self._connect() as db:db.execute("CREATE TABLE IF NOT EXISTS discovery_history(host TEXT PRIMARY KEY,last_seen INTEGER NOT NULL DEFAULT 0,openipc INTEGER NOT NULL DEFAULT 0)")
@@ -83,18 +83,27 @@ class Devices(LegacyDevices):
         for item in items:self._remember_host(item.get("host",""),item.get("openipc",False))
         self._discovered=items;self._scanning=False;self._worker=None;self._stage="Скасовано" if cancelled else ("Помилка" if error else "Готово");self._status=error or ("Пошук скасовано" if cancelled else "Пошук завершено");self._pd=self._pt;self._found=len(items);self.discoveryChanged.emit()
     @Slot(str)
+    def invalidateManualIp(self,value):
+        address=_safe_private_host(value)
+        current=_safe_private_host(self._manual_result.get("host","")) if self._manual_result else ""
+        if self._manual_status in ("verified","added","candidate","auth-required","error") and (not address or address!=current):
+            self._manual_result={};self._manual_requested_host="";self._set_manual("idle","","")
+    @Slot(str)
     def inspectManualIp(self,value):
         if self._manual_busy:return
         address=_safe_private_host(value)
-        self._manual_result={}
+        self._manual_result={};self._manual_requested_host=address
         if not address:self._set_manual("error","","Вкажіть коректну приватну IPv4-адресу");return
         self._remember_host(address,False);self._manual_busy=True;self._manual_status="checking";self._manual_message="Перевіряємо камеру…";self._manual_error="";self.manualChanged.emit()
         worker=ManualWorker(address);self._manual_worker=worker;worker.done.connect(self._on_manual_done);worker.start()
     def _on_manual_done(self,result,error):
+        requested=self._manual_requested_host
         self._manual_busy=False;self._manual_worker=None
         if error:self._manual_result={};self._set_manual("error","",error);return
+        result_host=_safe_private_host(result.get("host",""))
+        if not requested or result_host!=requested:self._manual_result={};self._set_manual("error","","Результат перевірки не відповідає поточній адресі");return
         if not result.get("camera"):self._manual_result={};self._set_manual("error","","На цій адресі не знайдено доступної камери");return
-        self._manual_result=result;self._remember_host(result.get("host",""),result.get("openipc",False))
+        self._manual_result=result;self._remember_host(result_host,result.get("openipc",False))
         if result.get("openipc") and result.get("identityVerified"):
             identity=normalize_openipc_identity(result.get("identity",{}),result.get("evidence",[]));self._manual_result["identity"]=identity;self._set_manual("verified","OpenIPC підтверджено")
         elif result.get("authRequired"):self._set_manual("auth-required","Камера доступна. Для підтвердження OpenIPC потрібен логін.")
@@ -116,14 +125,16 @@ class Devices(LegacyDevices):
         return did
     @Slot(str,str,bool,result=str)
     def addDiscovered(self,host,name,verified):
-        candidate=next((x for x in self._discovered if x.get("host")==host),None)
-        if not candidate and self._manual_result.get("host")==host:candidate=self._manual_result
+        address=_safe_private_host(host)
+        if not address:self._set_manual("error","","Некоректна адреса камери");return ""
+        candidate=next((x for x in self._discovered if _safe_private_host(x.get("host",""))==address),None)
+        if not candidate and _safe_private_host(self._manual_result.get("host",""))==address:candidate=self._manual_result
         identity=normalize_openipc_identity(candidate.get("identity",{}),candidate.get("evidence",[])) if candidate else normalize_openipc_identity()
         if not candidate or not candidate.get("openipc") or not candidate.get("identityVerified") or not identity.get("verified"):
             self._set_manual("error","","OpenIPC identity недостатньо підтверджена для додавання");return ""
-        self._remember_host(host,True);existing=next((x for x in self._items if x.get("host")==host),None)
+        self._remember_host(address,True);existing=next((x for x in self._items if _safe_private_host(x.get("host",""))==address),None)
         if existing:self._manual_result=candidate;self._set_manual("added","Камера вже додана");return existing["id"]
-        did=self.addDevice(name or "OpenIPC "+host,"OpenIPC",host,80,"Network","")
+        did=self.addDevice(name or "OpenIPC "+address,"OpenIPC",address,80,"Network","")
         if not did:self._set_manual("error","","Не вдалося зберегти камеру");return ""
         self._save_identity(did,identity)
         for stream in candidate.get("streams",[]):self.addStream(did,stream.get("name","Відео"),stream.get("name","main"),int(stream.get("port",554)),stream.get("path","/"),stream.get("protocol","rtsp"))

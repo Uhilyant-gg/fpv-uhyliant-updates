@@ -98,24 +98,29 @@ Item {
  Popup {
   id: manualPopup
   anchors.centerIn: parent; width: Math.min(500, root.width - 40); modal: true; padding: 20
+  property string verifiedHost: ""
+  property string addedHost: ""
+  function invalidateEvidence(hostText) { verifiedHost = ""; addedHost = ""; devicesModel.invalidateManualIp(hostText) }
   background: Rectangle { color: raised; radius: 18; border.color: line }
   ColumnLayout {
    width: parent.width; spacing: 13
    Text { text: "Вказати IP"; color: fg; font.pixelSize: 22; font.bold: true }
    Text { text: "Введіть адресу камери. Решту програма перевірить автоматично."; color: muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-   TextField { id: manualIp; Layout.fillWidth: true; placeholderText: "192.168.1.50"; inputMethodHints: Qt.ImhFormattedNumbersOnly; HoverHint { text: "Приватна IPv4-адреса камери для прямої перевірки." } }
+   TextField { id: manualIp; Layout.fillWidth: true; placeholderText: "192.168.1.50"; inputMethodHints: Qt.ImhFormattedNumbersOnly; onTextEdited: manualPopup.invalidateEvidence(text); HoverHint { text: "Приватна IPv4-адреса камери для прямої перевірки." } }
+   Connections { target: devicesModel; function onManualChanged() { if (devicesModel.manualStatus === "verified") manualPopup.verifiedHost = devicesModel.manualResult.host || ""; if (devicesModel.manualStatus === "added") manualPopup.addedHost = devicesModel.manualResult.host || "" } }
    Text { visible: devicesModel.manualBusy; text: "Перевіряємо камеру…"; color: blue }
    Text { visible: !devicesModel.manualBusy && devicesModel.manualMessage !== ""; text: devicesModel.manualMessage; color: devicesModel.manualStatus === "added" || devicesModel.manualStatus === "verified" ? accent : muted; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.bold: true }
    Text { visible: devicesModel.manualError !== ""; text: devicesModel.manualError; color: danger; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-   Rectangle { visible: devicesModel.manualResult.openipc === true; Layout.fillWidth: true; height: 104; radius: 12; color: "#15392f"; Column { anchors.fill: parent; anchors.margins: 10; spacing: 4; Text { text: "OpenIPC підтверджено"; color: accent; font.bold: true } Text { text: "Платформа / SoC: " + value(devicesModel.manualResult.identity.platform) + " / " + value(devicesModel.manualResult.identity.soc); color: fg } Text { text: "Сенсор: " + value(devicesModel.manualResult.identity.sensor); color: fg } Text { text: "Прошивка: " + value(devicesModel.manualResult.identity.firmware); color: fg } } }
+   Rectangle { visible: devicesModel.manualStatus === "verified" && manualPopup.verifiedHost !== "" && manualIp.text.trim() === manualPopup.verifiedHost && devicesModel.manualResult.openipc === true && devicesModel.manualResult.identityVerified === true; Layout.fillWidth: true; height: 104; radius: 12; color: "#15392f"; Column { anchors.fill: parent; anchors.margins: 10; spacing: 4; Text { text: "OpenIPC підтверджено"; color: accent; font.bold: true } Text { text: "Платформа / SoC: " + value(devicesModel.manualResult.identity.platform) + " / " + value(devicesModel.manualResult.identity.soc); color: fg } Text { text: "Сенсор: " + value(devicesModel.manualResult.identity.sensor); color: fg } Text { text: "Прошивка: " + value(devicesModel.manualResult.identity.firmware); color: fg } } }
+   Rectangle { visible: devicesModel.manualStatus === "added" && manualPopup.addedHost !== ""; Layout.fillWidth: true; height: 48; radius: 12; color: "#15392f"; Text { anchors.centerIn: parent; text: "Камеру " + manualPopup.addedHost + " додано до Моїх камер"; color: accent; font.bold: true } }
    RowLayout {
     Layout.fillWidth: true
     Button { text: devicesModel.manualBusy ? "Перевірка…" : "Перевірити"; enabled: !devicesModel.manualBusy; onClicked: devicesModel.inspectManualIp(manualIp.text); HoverHint { text: "Перевірити доступність, OpenIPC та спостережену ідентичність камери." } }
     Button {
      text: devicesModel.manualStatus === "added" ? "Додано" : "Додати"
-     enabled: !devicesModel.manualBusy && devicesModel.manualStatus !== "added" && devicesModel.manualResult.camera === true
-     onClicked: { if (devicesModel.manualResult.openipc && devicesModel.manualResult.identityVerified) { var id = devicesModel.addDiscovered(devicesModel.manualResult.host, "OpenIPC " + devicesModel.manualResult.host, true); if (id !== "") selectedSaved = null } else { root.authHost = devicesModel.manualResult.host; root.authName = "Камера " + devicesModel.manualResult.host; manualPopup.close(); authPopup.open() } }
-     HoverHint { text: "Зберегти підтверджену камеру або перейти до перевірки доступу." }
+     enabled: !devicesModel.manualBusy && devicesModel.manualStatus === "verified" && manualPopup.verifiedHost !== "" && manualIp.text.trim() === manualPopup.verifiedHost && devicesModel.manualResult.camera === true && devicesModel.manualResult.openipc === true && devicesModel.manualResult.identityVerified === true
+     onClicked: { var id = devicesModel.addDiscovered(manualPopup.verifiedHost, "OpenIPC " + manualPopup.verifiedHost, true); if (id !== "") { selectedSaved = null; manualPopup.addedHost = manualPopup.verifiedHost } }
+     HoverHint { text: "Зберегти лише поточну підтверджену OpenIPC-камеру." }
     }
     Item { Layout.fillWidth: true }
     Button { text: "Закрити"; flat: true; onClicked: manualPopup.close() }
