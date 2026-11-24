@@ -130,6 +130,19 @@ Critical operational information must remain glanceable without consuming the vi
 
 Account, sharing, controller and AI capabilities should surface contextually in the existing task flow rather than creating competing home screens.
 
+## Visual system
+The approved desktop shell is a modern frameless dark interface. The application owns its title chrome and uses only minimize and maximize/restore controls; there is no close button in the custom chrome to reduce accidental termination during operation.
+
+Use `Segoe UI Variable` as the primary Windows UI family with a compact, readable hierarchy. Prefer semibold page and section headings, regular body copy and subdued metadata rather than excessive all-caps labels.
+
+The visual palette is dark navy/charcoal with high-contrast off-white foreground, muted blue-gray secondary text, restrained saturated blue for primary actions and green only for observed healthy/ready state. Panels use subtle borders and modest rounded corners; decorative effects must not reduce readability.
+
+The disconnected camera workspace follows the approved composition: compact frameless chrome, persistent task navigation, one prominent Find/Add next action, separate Saved Cameras and Found on Network surfaces, and contextual guidance below the working area. Manual IP remains a fallback rather than the dominant path.
+
+Window controls, navigation, buttons, inputs, cards, empty states and dialogs should share the same spacing, typography, corner-radius and color tokens. Avoid native-looking light controls inside the dark shell.
+
+The shell must remain responsive at supported window sizes and must preserve the largest practical video area once a usable camera is connected. Visual modernization must not weaken evidence binding, health semantics, destructive-action confirmation or other safety contracts.
+
 ## Product decision tests
 For every visible control or requested decision ask:
 
