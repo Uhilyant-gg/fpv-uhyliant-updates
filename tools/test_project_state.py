@@ -12,10 +12,9 @@ class ProjectStateTests(unittest.TestCase):
         self.assertEqual(state["hardwareValidation"]["status"], "DEFERRED")
         self.assertFalse(state["hardwareValidation"]["physicalEvidenceComplete"])
         self.assertEqual(state["softwareTrack"]["status"], "READY")
-        self.assertEqual(state["capabilities"]["nextBestAction"], "complete")
-        self.assertEqual(state["capabilities"]["hardwareSimulator"], "complete")
-        self.assertEqual(derive_next_milestone(state), "E7")
-        self.assertEqual(state["softwareTrack"]["nextMilestone"], "E7")
+        self.assertEqual(state["capabilities"]["scenarioDrivenCI"], "complete")
+        self.assertIsNone(derive_next_milestone(state))
+        self.assertIsNone(state["softwareTrack"]["nextMilestone"])
 
     def write_state(self, state, directory):
         path = Path(directory) / "state.json"
@@ -48,8 +47,8 @@ class ProjectStateTests(unittest.TestCase):
 
     def test_next_milestone_is_derived_from_capabilities(self):
         state = load_project_state()
-        self.assertEqual(derive_next_milestone(state), "E7")
-        state["softwareTrack"]["nextMilestone"] = "E6"
+        self.assertIsNone(derive_next_milestone(state))
+        state["softwareTrack"]["nextMilestone"] = "E7"
         with tempfile.TemporaryDirectory() as tmp:
             path = self.write_state(state, tmp)
             with self.assertRaisesRegex(ValueError, "next-milestone"):
