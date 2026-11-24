@@ -11,11 +11,13 @@ class Tests(unittest.TestCase):
  def test_known_hosts_include_saved_and_last_seen(self):
   d=module.Devices();d.addDevice('Camera','OpenIPC','192.168.1.40',80,'Network','');d._remember_host('192.168.1.50',True);self.assertIn('192.168.1.40',d._known_hosts());self.assertIn('192.168.1.50',d._known_hosts())
  def test_manual_completion_clears_busy_and_exposes_verified_state(self):
-  d=module.Devices();d._manual_busy=True;d._on_manual_done(self.verified(),'');self.assertFalse(d.manualBusy);self.assertEqual(d.manualStatus,'verified');self.assertEqual(d.manualMessage,'OpenIPC підтверджено');self.assertEqual(d.manualResult['identity']['sensor'],'imx335')
+  d=module.Devices();d._manual_busy=True;d._manual_requested_host='192.168.1.50';d._on_manual_done(self.verified(),'');self.assertFalse(d.manualBusy);self.assertEqual(d.manualStatus,'verified');self.assertEqual(d.manualMessage,'OpenIPC підтверджено');self.assertEqual(d.manualResult['identity']['sensor'],'imx335')
  def test_manual_auth_candidate_has_explicit_state(self):
-  d=module.Devices();d._manual_busy=True;d._on_manual_done({'host':'192.168.1.50','camera':True,'openipc':False,'identityVerified':False,'authRequired':True},'');self.assertFalse(d.manualBusy);self.assertEqual(d.manualStatus,'auth-required');self.assertIn('логін',d.manualMessage)
+  d=module.Devices();d._manual_busy=True;d._manual_requested_host='192.168.1.50';d._on_manual_done({'host':'192.168.1.50','camera':True,'openipc':False,'identityVerified':False,'authRequired':True},'');self.assertFalse(d.manualBusy);self.assertEqual(d.manualStatus,'auth-required');self.assertIn('логін',d.manualMessage)
  def test_manual_no_camera_has_visible_error_state(self):
-  d=module.Devices();d._manual_busy=True;d._on_manual_done({},'');self.assertFalse(d.manualBusy);self.assertEqual(d.manualStatus,'error');self.assertTrue(d.manualError)
+  d=module.Devices();d._manual_busy=True;d._manual_requested_host='192.168.1.50';d._on_manual_done({},'');self.assertFalse(d.manualBusy);self.assertEqual(d.manualStatus,'error');self.assertTrue(d.manualError)
+ def test_manual_result_for_unrequested_host_fails_closed(self):
+  d=module.Devices();d._manual_busy=True;d._manual_requested_host='192.168.1.40';d._on_manual_done(self.verified(),'');self.assertFalse(d.manualBusy);self.assertEqual(d.manualStatus,'error');self.assertEqual(d.manualResult,{});self.assertIn('поточній адресі',d.manualError)
  def test_verified_manual_candidate_adds_and_reports_success(self):
   d=module.Devices();d._manual_result=self.verified();did=d.addDiscovered('192.168.1.50','Camera',True);self.assertTrue(did);self.assertEqual(d.count,1);self.assertEqual(d.manualStatus,'added');self.assertIn('додано',d.manualMessage.lower());saved=d.items[0];self.assertTrue(saved['openipcIdentity']['verified']);self.assertEqual(saved['openipcIdentity']['sensor'],'imx335')
  def test_duplicate_add_is_idempotent_and_visible(self):
