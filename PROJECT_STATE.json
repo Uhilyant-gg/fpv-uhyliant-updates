@@ -1,18 +1,42 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "project": "FPV Uhyliant",
   "planningEstimatePercent": 38,
+  "deliveryPolicy": {
+    "mode": "software-first",
+    "summary": "Continue all dependency-valid software work before final physical acceptance. Physical evidence remains mandatory for hardware claims and the production release gate."
+  },
   "hardwareValidation": {
     "epic": "E0",
     "status": "DEFERRED",
-    "reasonCode": "physical-validation-deferred",
+    "reasonCode": "physical-validation-deferred-to-final-integration",
     "physicalEvidenceComplete": false,
-    "summary": "Physical OpenIPC Hardware E2E remains required and must not be inferred from software validation."
+    "releaseBlocking": true,
+    "summary": "Physical OpenIPC Hardware E2E is intentionally deferred to final integration and must never be inferred from software validation."
   },
   "softwareTrack": {
     "status": "READY",
-    "nextMilestone": null,
-    "summary": "E2 through E7 repository-software capabilities are complete; return to the separate physical E0 Hardware E2E gate."
+    "nextSoftwareMilestone": "E8",
+    "nextPhysicalMilestone": "E0",
+    "summary": "E2-E7 repository-software capabilities are complete. Continue E8 and dependency-valid E9-E15 software work while E0 remains a separate final physical release gate."
+  },
+  "epics": {
+    "E0": {"status":"deferred","softwareReady":true,"physicalAcceptance":false,"releaseBlocking":true},
+    "E1": {"status":"planned","softwareReady":false,"physicalAcceptance":false,"releaseBlocking":true},
+    "E2": {"status":"complete","softwareReady":true,"physicalAcceptance":null,"releaseBlocking":false},
+    "E3": {"status":"complete","softwareReady":true,"physicalAcceptance":null,"releaseBlocking":false},
+    "E4": {"status":"complete","softwareReady":true,"physicalAcceptance":null,"releaseBlocking":false},
+    "E5": {"status":"complete","softwareReady":true,"physicalAcceptance":null,"releaseBlocking":false},
+    "E6": {"status":"complete","softwareReady":true,"physicalAcceptance":null,"releaseBlocking":false},
+    "E7": {"status":"complete","softwareReady":true,"physicalAcceptance":null,"releaseBlocking":false},
+    "E8": {"status":"in-progress","softwareReady":false,"physicalAcceptance":false,"releaseBlocking":false},
+    "E9": {"status":"pending","softwareReady":false,"physicalAcceptance":null,"releaseBlocking":false},
+    "E10": {"status":"pending","softwareReady":false,"physicalAcceptance":null,"releaseBlocking":false},
+    "E11": {"status":"pending","softwareReady":false,"physicalAcceptance":null,"releaseBlocking":false},
+    "E12": {"status":"pending","softwareReady":false,"physicalAcceptance":null,"releaseBlocking":false},
+    "E13": {"status":"pending","softwareReady":false,"physicalAcceptance":null,"releaseBlocking":false},
+    "E14": {"status":"pending","softwareReady":false,"physicalAcceptance":null,"releaseBlocking":false},
+    "E15": {"status":"pending","softwareReady":false,"physicalAcceptance":null,"releaseBlocking":true}
   },
   "capabilities": {
     "projectDoctor": "complete",
