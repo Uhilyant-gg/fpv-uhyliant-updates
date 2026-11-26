@@ -63,6 +63,8 @@ Use existing health evidence rather than building a parallel health engine. Pres
 
 A numeric health percentage is optional and must not be guessed. Add it only with a deterministic tested calculation.
 
+**Repository-software status:** complete. The operational Home now presents the canonical health state, verified-device counts, human-readable summary and one deterministic Next Best Action. Device and stream changes refresh the model without technical protocol details.
+
 ### P0.3 Device Center integration
 Create one presentation boundary for supported cameras, vehicles/flight controllers and operator controllers while preserving separate physical identities. Show name, type, observed version, health and last observed activity. Group automatically.
 

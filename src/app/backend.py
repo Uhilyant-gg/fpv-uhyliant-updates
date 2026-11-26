@@ -1,7 +1,35 @@
 import json, os
 from pathlib import Path
 from PySide6.QtCore import QObject, Property, Signal, Slot
+from home_dashboard import home_dashboard
 DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant'; DATA.mkdir(parents=True,exist_ok=True)
+
+class HomeDashboard(QObject):
+ changed=Signal()
+ def __init__(self,devices):
+  super().__init__()
+  self._devices=devices
+  self._model=home_dashboard(devices.items,devices.streams)
+  devices.changed.connect(self.refresh)
+  devices.streamsChanged.connect(self.refresh)
+  devices.discoveryChanged.connect(self.refresh)
+ def refresh(self):
+  self._model=home_dashboard(self._devices.items,self._devices.streams)
+  self.changed.emit()
+ @Property(str,notify=changed)
+ def health(self):return self._model["health"]
+ @Property(str,notify=changed)
+ def title(self):return self._model["title"]
+ @Property(str,notify=changed)
+ def summary(self):return self._model["summary"]
+ @Property(int,notify=changed)
+ def deviceCount(self):return self._model["deviceCount"]
+ @Property(int,notify=changed)
+ def verifiedCount(self):return self._model["verifiedCount"]
+ @Property(int,notify=changed)
+ def warningCount(self):return self._model["warningCount"]
+ @Property('QVariantMap',notify=changed)
+ def nextAction(self):return dict(self._model["nextAction"])
 class Station(QObject):
  changed=Signal(); notice=Signal(str)
  def __init__(self):
