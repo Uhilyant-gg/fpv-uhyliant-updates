@@ -57,6 +57,8 @@ Stories E7-S1..E7-S7. Repository-software acceptance is complete for behavioral 
 ### E8 - FPV/RC Controller Onboarding | PENDING, depends on E2/E3
 Stories E8-S1..E8-S9. Automatic detection/restore, observed inputs, calibration/mapping, safe profile persistence, unified health, Advanced-only manual transport.
 
+Software-only progress on this branch: validated input-sample calibration, explicit four-axis mapping, normalized controls, fail-closed profile application, and identity-bound restoration are implemented. E8 remains pending: local controller discovery/live input acquisition, durable non-secret profile persistence, and onboarding UI are not implemented or hardware-validated.
+
 ### E9 - Diagnostics 2.0 | PENDING, depends on E2/E3
 Stories E9-S1..E9-S8. Common findings/reason codes, automated evidence, deterministic non-destructive remediation and revalidation, sanitized support bundle, progressive disclosure, NBA integration.
 
@@ -90,7 +92,7 @@ Other dependencies: E8 depends on E2/E3 and feeds E14; E10 depends on E2/E4; E11
 ## Next largest safe batch
 **Physical boundary:** E0 still requires operator-controlled real-hardware validation.
 
-**Repository-only boundary:** E2, E3, E4, E5, E6 and E7 are complete at the repository-software boundary. The canonical capability matrix derives no next repository-only milestone. The largest remaining evidence-backed batch is real physical E0 Hardware E2E; this work remains blocked on an operator-controlled device and actual observed evidence. Do not substitute simulator or CI evidence for physical acceptance.
+**Repository-only boundary:** E2, E3, E4, E5, E6 and E7 are complete at the repository-software boundary. The canonical capability matrix's `nextMilestone: null` covers those enabling capabilities only; it does not mean later roadmap Epics E8-E15 are complete. E8 remains pending. After the controller profile core, the next largest software-only gap is wiring local controller discovery/live input acquisition and safe local profile persistence into the onboarding workflow. Real physical E0 Hardware E2E remains separately blocked on an operator-controlled device and actual observed evidence; do not substitute simulator or CI evidence for physical acceptance.
 
 ## Handoff rule
 At each session start and after each successful merge:
