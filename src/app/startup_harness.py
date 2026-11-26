@@ -1,5 +1,6 @@
 import importlib,json,os,platform,sys,time,traceback
 from pathlib import Path
+from startup_acceptance import read_startup_acceptance
 
 PROBES=(
  ('python-runtime',None),

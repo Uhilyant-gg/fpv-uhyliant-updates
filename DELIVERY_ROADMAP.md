@@ -43,7 +43,7 @@ Repository-software acceptance is complete. Simulator evidence is never physical
 Repository-software acceptance is complete.
 
 ## P0: Integrated user journey
-### P0.1 First-Run Acceptance Harness | NEXT
+### P0.1 First-Run Acceptance Harness | ACTIVE
 Create one deterministic integrated contract for:
 
 `install/start -> launch -> discovery/restore -> health -> devices -> next action -> usable operation`
@@ -57,6 +57,8 @@ Acceptance:
 - at most one primary next action;
 - blocked states provide a human explanation and recovery route;
 - test output provides machine-readable timing and failed stage.
+
+**Repository-software evidence:** startup records launch, restore, automatic discovery start, health, device counts and next action; `main.py --acceptance-report` evaluates the latest run and emits the exact failed stage plus health elapsed time against the 10-second target. Packaged and physical operation evidence remain separate gates.
 
 ### P0.2 Health Dashboard integration
 Use existing health evidence rather than building a parallel health engine. Present ready, attention, problem or unknown; a concise summary; affected device or station area; and one Next Best Action.

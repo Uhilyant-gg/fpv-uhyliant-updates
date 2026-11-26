@@ -18,9 +18,14 @@ def compile_qml_smoke(here):
   if component.isError():errors.extend(f'{path.name}: {error.toString()}' for error in component.errors())
  if errors:raise RuntimeError('QML smoke compile failed:\n'+'\n'.join(errors))
 def main():
- a=argparse.ArgumentParser(add_help=False);a.add_argument('--self-test',action='store_true');a.add_argument('--mavlink-self-test',action='store_true');a.add_argument('--smoke-test',action='store_true');a.add_argument('--smoke-marker');a.add_argument('--install-root');a.add_argument('--startup-token');a.add_argument('--startup-diagnostics',action='store_true');a.add_argument('--startup-marker');x,_=a.parse_known_args();here=Path(__file__).resolve().parent
- from startup_harness import StartupHarness,default_path,run_import_probes,run_qt_probe
- harness=StartupHarness(x.startup_marker or default_path(DATA),VERSION);harness.mark('main-entry')
+ a=argparse.ArgumentParser(add_help=False);a.add_argument('--self-test',action='store_true');a.add_argument('--mavlink-self-test',action='store_true');a.add_argument('--smoke-test',action='store_true');a.add_argument('--smoke-marker');a.add_argument('--install-root');a.add_argument('--startup-token');a.add_argument('--startup-diagnostics',action='store_true');a.add_argument('--startup-marker');a.add_argument('--acceptance-report',action='store_true');x,_=a.parse_known_args();here=Path(__file__).resolve().parent
+ from startup_harness import StartupHarness,default_path,read_startup_acceptance,run_import_probes,run_qt_probe
+ harness=StartupHarness(x.startup_marker or default_path(DATA),VERSION)
+ if x.acceptance_report:
+  report=read_startup_acceptance(harness.path)
+  print(json.dumps(report,ensure_ascii=False,separators=(',',':')))
+  return 0 if report['status']=='ready' else 1
+ harness.mark('main-entry')
  if x.self_test:harness.mark('self-test');print(json.dumps({'status':'ok','version':VERSION}));return 0
  if x.startup_diagnostics:
   try:run_import_probes(harness);return run_qt_probe(harness,sys.argv)
@@ -70,13 +75,22 @@ def main():
  if x.mavlink_self_test:QTimer.singleShot(0,m.start);QTimer.singleShot(350,app.quit);rc=app.exec();m.shutdown();msp_serial.stop();crsf_serial.stop();print(json.dumps({'status':'ok','backend':'mavlink','telemetry':'not simulated'}));return rc
  icon=here/'fpv-uhyliant.ico'
  if icon.exists():app.setWindowIcon(QIcon(str(icon)))
- harness.mark('application-objects-begin');QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();home=HomeDashboard(d);video=VideoWorkspaceRuntime(d);v=video.primary;secondary=video.secondary;streams=StreamWorkspace(d);fw=FirmwareCenter(d);acquisition=OpenIPCFirmwareAcquisition(fw,DATA/'firmware-cache');fwexec=FirmwareExecutor(fw);credentials=CameraCredentials();presets=CameraPresets(d);presetexec=CameraPresetExecutor(presets);links=LinkDiagnostics();backup=StationBackup(d);pairing=PairingRegistry(metadata_store=JsonMetadataStore(DATA/'pairing-trust.json'));telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate);diag_events=DiagnosticEvents();fwsession=FirmwareUpdateSession(fwexec,d,events=diag_events);diag=DiagnosticsRuntime(VERSION,d,links,telemetry,u,diag_events,DATA,video);hardware_e2e=HardwareE2ERuntime(d,diag,credentials,fw,fwsession);app._runtime_refs=(e,s,d,home,video,v,secondary,streams,fw,acquisition,fwexec,fwsession,credentials,presets,presetexec,links,backup,pairing,telemetry,vehicle,u,diag_events,diag,hardware_e2e,m,msp,crsf,msp_serial,crsf_serial);harness.mark('application-objects-complete')
+ harness.mark('application-objects-begin');QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();harness.mark('restore',detail={'savedDevices':d.count});home=HomeDashboard(d);video=VideoWorkspaceRuntime(d);v=video.primary;secondary=video.secondary;streams=StreamWorkspace(d);fw=FirmwareCenter(d);acquisition=OpenIPCFirmwareAcquisition(fw,DATA/'firmware-cache');fwexec=FirmwareExecutor(fw);credentials=CameraCredentials();presets=CameraPresets(d);presetexec=CameraPresetExecutor(presets);links=LinkDiagnostics();backup=StationBackup(d);pairing=PairingRegistry(metadata_store=JsonMetadataStore(DATA/'pairing-trust.json'));telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate);diag_events=DiagnosticEvents();fwsession=FirmwareUpdateSession(fwexec,d,events=diag_events);diag=DiagnosticsRuntime(VERSION,d,links,telemetry,u,diag_events,DATA,video);hardware_e2e=HardwareE2ERuntime(d,diag,credentials,fw,fwsession);app._runtime_refs=(e,s,d,home,video,v,secondary,streams,fw,acquisition,fwexec,fwsession,credentials,presets,presetexec,links,backup,pairing,telemetry,vehicle,u,diag_events,diag,hardware_e2e,m,msp,crsf,msp_serial,crsf_serial);harness.mark('application-objects-complete')
  d.streamsChanged.connect(streams.autoSelect);streams.autoSelect();pairing.reconcile();ctx=e.rootContext()
  for name,obj in [('station',s),('homeDashboard',home),('devicesModel',d),('videoRuntime',v),('secondaryVideoRuntime',secondary),('videoWorkspaceRuntime',video),('streamWorkspace',streams),('firmwareCenter',fw),('firmwareAcquisition',acquisition),('firmwareExecutor',fwexec),('firmwareUpdateSession',fwsession),('cameraCredentials',credentials),('cameraPresets',presets),('cameraPresetExecutor',presetexec),('linkDiagnostics',links),('stationBackup',backup),('pairingRegistry',pairing),('mavlinkRuntime',m),('mspSerial',msp_serial),('crsfSerial',crsf_serial),('telemetryRuntime',telemetry),('vehicleRuntime',vehicle),('updater',u),('diagnosticsRuntime',diag),('hardwareE2ERuntime',hardware_e2e)]:ctx.setContextProperty(name,obj)
  ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);harness.mark('qml-load-begin');e.load(QUrl.fromLocalFile(str(here/'Main.qml')));harness.mark('qml-load-complete')
  def shutdown():hardware_e2e.reset();credentials.clear();video.stopAll();links.clear();pairing.clearPending();m.shutdown();msp_serial.stop();crsf_serial.stop()
- if not e.rootObjects():shutdown();raise RuntimeError('QML root object failed to load')
- app.aboutToQuit.connect(shutdown);root=e.rootObjects()[0];QTimer.singleShot(0,root.showMaximized);QTimer.singleShot(0,m.start);QTimer.singleShot(1200,lambda:signal_ok(x.startup_token));QTimer.singleShot(1200,lambda:harness.mark('startup-ready'));harness.mark('event-loop-begin')
+ if not e.rootObjects():harness.mark('launch','error',{'reasonCode':'qml-root-not-created'});shutdown();raise RuntimeError('QML root object failed to load')
+ app.aboutToQuit.connect(shutdown);root=e.rootObjects()[0]
+ def start_discovery():
+  try:
+   d.discoverOpenIPC();harness.mark('discovery',detail={'started':True,'savedDevices':d.count})
+  except Exception as exc:harness.failed('discovery',exc)
+ def show_home():
+  root.showMaximized();app.processEvents();harness.mark('launch',detail={'windowVisible':root.isVisible()});start_discovery()
+  harness.mark('health',detail={'health':home.health});harness.mark('devices',detail={'savedCount':home.deviceCount,'verifiedCount':home.verifiedCount})
+  action_available=bool(home.nextAction.get('available'));harness.mark('next-action','ok' if action_available else 'error',{'available':action_available,'action':home.nextAction.get('action')})
+ QTimer.singleShot(0,show_home);QTimer.singleShot(0,m.start);QTimer.singleShot(1200,lambda:signal_ok(x.startup_token));QTimer.singleShot(1200,lambda:harness.mark('startup-ready'));harness.mark('event-loop-begin')
  return app.exec()
 if __name__=='__main__':
  try:raise SystemExit(main())
