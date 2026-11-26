@@ -16,11 +16,11 @@ PROBES=(
 )
 
 class StartupHarness:
- def __init__(self,path,version):
-  self.path=Path(path);self.version=version;self.started=time.time();self.path.parent.mkdir(parents=True,exist_ok=True)
+ def __init__(self,path,version,started_at=None):
+  self.path=Path(path);self.version=version;self.started=time.monotonic() if started_at is None else started_at;self.path.parent.mkdir(parents=True,exist_ok=True)
   self.latest=self.path.with_suffix('.latest.json')
  def mark(self,stage,status='ok',detail=None):
-  payload={'stage':stage,'status':status,'version':self.version,'pid':os.getpid(),'timestamp':time.time(),'elapsedMs':round((time.time()-self.started)*1000),'frozen':bool(getattr(sys,'frozen',False))}
+  payload={'stage':stage,'status':status,'version':self.version,'pid':os.getpid(),'timestamp':time.time(),'elapsedMs':round((time.monotonic()-self.started)*1000),'frozen':bool(getattr(sys,'frozen',False))}
   if detail is not None:payload['detail']=detail
   with self.path.open('a',encoding='utf-8') as f:f.write(json.dumps(payload,ensure_ascii=False,sort_keys=True)+'\n');f.flush();os.fsync(f.fileno())
   tmp=self.latest.with_suffix(self.latest.suffix+'.tmp');tmp.write_text(json.dumps(payload,ensure_ascii=False,indent=2),encoding='utf-8');os.replace(tmp,self.latest)

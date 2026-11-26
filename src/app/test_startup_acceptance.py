@@ -9,28 +9,30 @@ from startup_acceptance import startup_acceptance_report, read_startup_acceptanc
 def events(health_ms=8500):
     return [
         {"stage": "main-entry", "status": "ok", "pid": 7, "elapsedMs": 0},
+        {"stage": "launch", "status": "ok", "pid": 7, "elapsedMs": 50},
         {"stage": "restore", "status": "ok", "pid": 7, "elapsedMs": 120},
-        {"stage": "launch", "status": "ok", "pid": 7, "elapsedMs": 700},
-        {"stage": "discovery", "status": "ok", "pid": 7, "elapsedMs": 900},
-        {"stage": "health", "status": "ok", "pid": 7, "elapsedMs": health_ms, "detail": {"health": "unknown"}},
-        {"stage": "devices", "status": "ok", "pid": 7, "elapsedMs": health_ms},
-        {"stage": "next-action", "status": "ok", "pid": 7, "elapsedMs": health_ms},
+        {"stage": "discovery", "status": "ok", "pid": 7, "elapsedMs": 700},
+        {"stage": "window-visible", "status": "ok", "pid": 7, "elapsedMs": 900},
+        {"stage": "health", "status": "ok", "pid": 7, "elapsedMs": health_ms, "detail": {"health": "unknown", "summary": "Стан перевіряється"}},
+        {"stage": "devices", "status": "ok", "pid": 7, "elapsedMs": health_ms, "detail": {"devices": []}},
+        {"stage": "next-action", "status": "ok", "pid": 7, "elapsedMs": health_ms, "detail": {"available": True, "action": "find-camera"}},
     ]
 
 
 class StartupAcceptanceTests(unittest.TestCase):
-    def test_complete_software_journey_is_ready_but_not_physical_evidence(self):
+    def test_complete_software_journey_uses_shared_contract_without_claiming_physical_evidence(self):
         result = startup_acceptance_report(events())
-        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["status"], "accepted")
         self.assertEqual(result["elapsedMs"], 8500)
         self.assertEqual(result["thresholdMs"], 10_000)
-        self.assertEqual(result["operation"]["evidence"], "not-collected")
+        self.assertEqual(result["reasonCode"], "first-run-accepted")
+        self.assertEqual(result["physicalOperationEvidence"], "not-collected")
 
     def test_health_over_ten_seconds_reports_exact_failed_stage(self):
         result = startup_acceptance_report(events(10_001))
-        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["status"], "rejected")
         self.assertEqual(result["stage"], "health")
-        self.assertEqual(result["reasonCode"], "startup-health-over-threshold")
+        self.assertEqual(result["reasonCode"], "understandable-state-timeout")
 
     def test_missing_stage_reports_first_missing_stage(self):
         result = startup_acceptance_report(events()[:-1])
@@ -54,7 +56,7 @@ class StartupAcceptanceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             result = read_startup_acceptance(path)
-        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["status"], "rejected")
         self.assertEqual(result["stage"], "next-action")
 
 

@@ -5,12 +5,15 @@ import json
 from pathlib import Path
 from typing import Iterable, Mapping
 
+from first_run_acceptance import evaluate_first_run
+
 
 THRESHOLD_MS = 10_000
 UI_STAGES = (
     "launch",
     "restore",
     "discovery",
+    "window-visible",
     "health",
     "devices",
     "next-action",
@@ -49,10 +52,7 @@ def startup_acceptance_report(
     missing = [stage["stage"] for stage in stages if not stage["present"]]
     failed_stage = missing[0] if missing else None
     reason = "startup-stages-incomplete" if failed_stage else None
-    failed = next(
-        (stage for stage in stages if stage["present"] and stage["status"] == "error"),
-        None,
-    )
+    failed = next((stage for stage in stages if stage["present"] and stage["status"] != "ok"), None)
     if failed:
         failed_stage = failed["stage"]
         reason = "startup-stage-failed"
@@ -64,7 +64,7 @@ def startup_acceptance_report(
         reason = "startup-health-timing-missing"
     elif not failed_stage and health_ms > threshold_ms:
         failed_stage = "health"
-        reason = "startup-health-over-threshold"
+        reason = "understandable-state-timeout"
 
     elapsed_values = [
         int(event["elapsedMs"])
@@ -72,39 +72,42 @@ def startup_acceptance_report(
         if isinstance(event.get("elapsedMs"), int)
     ]
     elapsed_ms = max(elapsed_values, default=0)
-    ready = failed_stage is None
+    devices_event = by_stage.get("devices")
+    device_details = devices_event.get("detail", {}) if devices_event else {}
+    device_rows = device_details.get("devices", []) if isinstance(device_details, Mapping) else []
+    health_details = health.get("detail", {}) if health else {}
+    health_value = health_details.get("health") if isinstance(health_details, Mapping) else None
+    action_event = by_stage.get("next-action")
+    action_details = action_event.get("detail", {}) if action_event else {}
+    primary_action = action_details.get("action") if isinstance(action_details, Mapping) else None
+    health_summary = health_details.get("summary", "") if isinstance(health_details, Mapping) else ""
 
-    if ready:
-        return {
-            "status": "ready",
-            "stage": "health",
-            "reasonCode": "first-run-software-acceptance-ready",
-            "summary": "Зрозумілий стан системи показано в межах визначеного часу.",
-            "thresholdMs": threshold_ms,
-            "elapsedMs": health_ms,
-            "latestStageElapsedMs": elapsed_ms,
-            "stages": stages,
-            "operation": {
-                "present": "operation" in by_stage,
-                "usable": False,
-                "evidence": "not-collected",
-            },
-        }
-    return {
-        "status": "blocked",
-        "stage": failed_stage or "health",
-        "reasonCode": reason or "startup-state-unavailable",
-        "summary": "Перший запуск не пройшов повну перевірку.",
-        "thresholdMs": threshold_ms,
-        "elapsedMs": health_ms if isinstance(health_ms, int) else elapsed_ms,
-        "latestStageElapsedMs": elapsed_ms,
-        "stages": stages,
-        "operation": {
-            "present": "operation" in by_stage,
-            "usable": False,
-            "evidence": "not-collected",
-        },
+    snapshot = {
+        "stage": "next-action",
+        "health": health_value,
+        "devices": device_rows if isinstance(device_rows, (list, tuple)) else [],
+        "primaryActions": [primary_action] if primary_action else [],
+        "messages": [health_summary] if health_summary else [],
     }
+    result = evaluate_first_run(
+        snapshot,
+        elapsed_ms=health_ms if isinstance(health_ms, int) else elapsed_ms,
+        deadline_ms=threshold_ms,
+    ).as_dict()
+    if failed_stage:
+        result.update(
+            status="rejected",
+            stage=failed_stage,
+            reasonCode=reason or "startup-stage-failed",
+        )
+    result.update(
+        thresholdMs=threshold_ms,
+        healthElapsedMs=health_ms if isinstance(health_ms, int) else None,
+        latestStageElapsedMs=elapsed_ms,
+        startupStages=stages,
+        physicalOperationEvidence="not-collected",
+    )
+    return result
 
 
 def read_startup_acceptance(path: str | Path, *, threshold_ms: int = THRESHOLD_MS) -> dict:

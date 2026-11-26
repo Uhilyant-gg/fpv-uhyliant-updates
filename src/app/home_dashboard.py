@@ -18,6 +18,19 @@ def _human_state(health: str) -> str:
     }.get(health, "Стан перевіряється")
 
 
+def _human_summary(reason_code: str) -> str:
+    return {
+        "device-not-selected": "Камеру ще не додано. Знайдіть її автоматично.",
+        "device-identity-unknown": "Ідентичність камери ще не перевірена.",
+        "openipc-not-verified": "Камеру знайдено, але її тип ще не підтверджено.",
+        "hardware-identity-incomplete": "Камеру OpenIPC підтверджено, але даних про платформу або сенсор бракує.",
+        "camera-connection-problem": "Не вдалося підключитися до камери. Перевірте з’єднання.",
+        "camera-connection-needed": "Камера доступна, але ще не підключена.",
+        "camera-video-ready": "Камера підключена, відеопотік доступний.",
+        "camera-identity-ready": "Камеру OpenIPC і її апаратні дані підтверджено.",
+    }.get(reason_code, "Стан камери ще перевіряється.")
+
+
 def home_dashboard(
     devices: Iterable[Mapping[str, Any]] | None,
     streams: Iterable[Mapping[str, Any]] | None,
@@ -59,7 +72,7 @@ def home_dashboard(
     return {
         "health": combined.health,
         "title": _human_state(combined.health),
-        "summary": camera.summary,
+        "summary": _human_summary(camera.reasonCode),
         "deviceCount": len(items),
         "verifiedCount": verified,
         "warningCount": warning_count,

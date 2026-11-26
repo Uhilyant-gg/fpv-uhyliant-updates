@@ -1,5 +1,6 @@
 import argparse,json,os,sys,time,traceback
 from pathlib import Path
+PROCESS_STARTED_AT=time.monotonic()
 from version import VERSION, WINDOW_TITLE
 DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant'
 def write_json_atomic(path,payload):path.parent.mkdir(parents=True,exist_ok=True);tmp=path.with_suffix(path.suffix+'.tmp');tmp.write_text(json.dumps(payload),encoding='utf-8');os.replace(tmp,path)
@@ -20,12 +21,12 @@ def compile_qml_smoke(here):
 def main():
  a=argparse.ArgumentParser(add_help=False);a.add_argument('--self-test',action='store_true');a.add_argument('--mavlink-self-test',action='store_true');a.add_argument('--smoke-test',action='store_true');a.add_argument('--smoke-marker');a.add_argument('--install-root');a.add_argument('--startup-token');a.add_argument('--startup-diagnostics',action='store_true');a.add_argument('--startup-marker');a.add_argument('--acceptance-report',action='store_true');x,_=a.parse_known_args();here=Path(__file__).resolve().parent
  from startup_harness import StartupHarness,default_path,read_startup_acceptance,run_import_probes,run_qt_probe
- harness=StartupHarness(x.startup_marker or default_path(DATA),VERSION)
+ harness=StartupHarness(x.startup_marker or default_path(DATA),VERSION,PROCESS_STARTED_AT)
  if x.acceptance_report:
   report=read_startup_acceptance(harness.path)
   print(json.dumps(report,ensure_ascii=False,separators=(',',':')))
-  return 0 if report['status']=='ready' else 1
- harness.mark('main-entry')
+  return 0 if report['status']=='accepted' else 1
+ harness.mark('main-entry');harness.mark('launch',detail={'phase':'process-started'})
  if x.self_test:harness.mark('self-test');print(json.dumps({'status':'ok','version':VERSION}));return 0
  if x.startup_diagnostics:
   try:run_import_probes(harness);return run_qt_probe(harness,sys.argv)
@@ -87,8 +88,8 @@ def main():
    d.discoverOpenIPC();harness.mark('discovery',detail={'started':True,'savedDevices':d.count})
   except Exception as exc:harness.failed('discovery',exc)
  def show_home():
-  root.showMaximized();app.processEvents();harness.mark('launch',detail={'windowVisible':root.isVisible()});start_discovery()
-  harness.mark('health',detail={'health':home.health});harness.mark('devices',detail={'savedCount':home.deviceCount,'verifiedCount':home.verifiedCount})
+  root.showMaximized();app.processEvents();visible=root.isVisible();harness.mark('window-visible','ok' if visible else 'error',{'windowVisible':visible});start_discovery()
+  harness.mark('health',detail={'health':home.health,'summary':home.summary});harness.mark('devices',detail={'devices':[{'type':item.get('type','')} for item in d.items],'verifiedCount':home.verifiedCount})
   action_available=bool(home.nextAction.get('available'));harness.mark('next-action','ok' if action_available else 'error',{'available':action_available,'action':home.nextAction.get('action')})
  QTimer.singleShot(0,show_home);QTimer.singleShot(0,m.start);QTimer.singleShot(1200,lambda:signal_ok(x.startup_token));QTimer.singleShot(1200,lambda:harness.mark('startup-ready'));harness.mark('event-loop-begin')
  return app.exec()
