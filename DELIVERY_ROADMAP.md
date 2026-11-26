@@ -1,106 +1,140 @@
 # FPV Uhyliant canonical delivery roadmap
 
-This file is the durable implementation plan for FPV Uhyliant. Current `main` plus the canonical documents are authoritative.
+Current `main` plus the canonical documents are authoritative. This roadmap is ordered by user value, dependency and evidence, not by feature count.
 
-## Operating model
-Development is autonomous by default. Human participation is reserved for physical hardware actions, secrets/credentials/keys, and genuine product decisions.
+## Delivery policy
+The product is UX-first, automation-first and zero-config-first. Safety invariants remain authoritative.
 
-Continuous loop: `current main -> largest safe logically complete batch -> tests -> reviewable PR -> CI -> repair on red / gated merge on green -> refresh main -> replan -> next dependency-valid batch`.
+Continuous loop:
 
-A green, safely mergeable batch must not require an intermediate human "continue" or "green" command. After merge, refresh from the new `main` and continue automatically while the next action is deterministically supported by repository state and evidence.
+`audit current main -> largest verified user pain -> smallest high-value vertical slice -> tests -> reviewable PR -> repair red / authorized merge green -> refresh main -> re-audit`
 
-Never treat software CI as physical hardware evidence. Never start unrelated work on a red baseline. Stop the continuous loop only for a physical action, secret/credential/key, genuine product decision, exhausted bounded automation/repair budget, or inconsistent/missing evidence that cannot be resolved safely.
+Never treat software CI as physical hardware evidence. Never allow a deferred physical step to justify a physical success claim. Independent software UX work may continue while physical validation awaits hardware or operator action.
 
 ## Current audited state
-Physical E0 remains incomplete and deferred until real OpenIPC evidence is captured. Software validation never closes that gate.
+- Roadmap completion remains 38% under the existing acceptance model.
+- E2 Unified Health, E3 Next Best Action, E4 Zero-Config Startup, E5 Project Doctor, E6 Hardware Simulator and E7 Scenario-Driven CI are complete at the repository-software boundary.
+- E0 real OpenIPC Hardware E2E remains physically incomplete.
+- E8 controller calibration/mapping/profile core exists, but controller discovery, live acquisition, durable persistence and onboarding remain incomplete.
+- The largest product risk is the absence of one evidenced integrated first-run journey that proves the user can launch, understand state, see devices and receive a useful next action without documentation or configuration editing.
 
-E2 - Unified Health and Evidence Contract, E3 - Next Best Action Engine, E4 - Zero-Config Startup and Restore, E5 - Project Doctor and Machine-Readable Project State, E6 - Hardware Simulator and Fault Injection and E7 - Scenario-Driven CI are complete at the repository-software boundary. E0 remains the physical critical-path gate. The canonical capability matrix now derives no next repository-only milestone.
-
-## Progress model
-Progress is reported in two layers so existing foundations are not confused with roadmap completion:
-
-- **Roadmap completion:** an Epic/Story is complete only when its acceptance criteria have repository or physical evidence.
-- **Engineering readiness:** existing foundations may materially support a future Story while it remains incomplete.
-
-The acceptance-based re-audit gives **38%** roadmap completion: 6 of 16 Epics (E2, E3, E4, E5, E6 and E7) have complete repository-software acceptance evidence, rounded from 37.5%. Partial foundations, commits and PRs do not increase this figure until their Epic acceptance contract is complete. Physical E0 remains incomplete.
-
-## Delivery order and status
+## Canonical capability status
+These headings are retained as the machine-validated capability contract.
 
 ### E0 - Physical OpenIPC Hardware E2E | BLOCKED ON PHYSICAL EVIDENCE
-Stories: E0-S1..E0-S6.
-
-Acceptance: real OpenIPC camera; observed platform/sensor; verified bound artifact/preflight; session credentials and explicit host-key acceptance; deliberate guarded update; reboot-pending; bounded rediscovery; matching hardware continuity; non-empty observed post-update firmware; preserved sanitized preflight and terminal evidence.
-
-Next action: execute the current provenance-validated Hardware E2E artifact against real hardware. If it fails, repair only the evidence-backed blocker and repeat.
-
-### E1 - Automated Hardware Validation | READY AFTER E0
-Stories E1-S1..E1-S10: deterministic validation model; discovery/device selection; identity observation; firmware acquisition; immutable transaction; credential/host-key gates; explicit destructive confirmation; reboot/rediscovery/post-update verification; staged evidence/reason codes; compact guided validation UI.
+Real-hardware acceptance remains incomplete and release-blocking for hardware-dependent claims. Simulation and CI cannot satisfy it.
 
 ### E2 - Unified Health and Evidence Contract | COMPLETE
-Stories E2-S1..E2-S7. Common schema exposes state, health, summary, reasonCode, evidence and safeActions. User health vocabulary is only ready / attention / problem / unknown. Unknown never becomes ready without evidence.
+Repository-software acceptance is complete.
 
 ### E3 - Next Best Action Engine | COMPLETE
-Stories E3-S1..E3-S6. Deterministic priority model with at most one primary normal-workflow action; safety gates remain authoritative.
+Repository-software acceptance is complete.
 
 ### E4 - Zero-Config Startup and Restore | COMPLETE
-Stories E4-S1..E4-S7. Repository-software acceptance is complete: `launch -> restore/discover -> verified usable camera -> video`; manual IP remains fallback and ambiguity is never guessed.
+Repository-software acceptance is complete.
 
 ### E5 - Project Doctor and Machine-Readable Project State | COMPLETE
-Completed repository-software contract: canonical machine-readable project state and capability matrix; schema/status validation; deterministic next-milestone derivation; canonical hardware-boundary drift checks; Project Doctor integration in repository CI; fail-closed regression coverage. Project Doctor remains software evidence only and can never establish physical E0 completion.
+Repository-software acceptance is complete. Project Doctor remains software evidence only.
 
 ### E6 - Hardware Simulator and Fault Injection | COMPLETE
-Stories E6-S1..E6-S7. Repository-software acceptance is complete for deterministic OpenIPC identity/update/reboot/DHCP/multi-device and fault-injection scenarios. Simulator evidence can never be labeled physical validation.
+Repository-software acceptance is complete. Simulator evidence is never physical evidence.
 
 ### E7 - Scenario-Driven CI | COMPLETE
-Stories E7-S1..E7-S7. Repository-software acceptance is complete for behavioral startup, discovery/video, firmware, recovery and later controller scenarios with machine-readable failure summaries.
+Repository-software acceptance is complete.
 
-### E8 - FPV/RC Controller Onboarding | PENDING, depends on E2/E3
-Stories E8-S1..E8-S9. Automatic detection/restore, observed inputs, calibration/mapping, safe profile persistence, unified health, Advanced-only manual transport.
+## P0: Integrated user journey
+### P0.1 First-Run Acceptance Harness | NEXT
+Create one deterministic integrated contract for:
 
-Software-only progress on this branch: validated input-sample calibration, explicit four-axis mapping, normalized controls, fail-closed profile application, and identity-bound restoration are implemented. E8 remains pending: local controller discovery/live input acquisition, durable non-secret profile persistence, and onboarding UI are not implemented or hardware-validated.
+`install/start -> launch -> discovery/restore -> health -> devices -> next action -> usable operation`
 
-### E9 - Diagnostics 2.0 | PENDING, depends on E2/E3
-Stories E9-S1..E9-S8. Common findings/reason codes, automated evidence, deterministic non-destructive remediation and revalidation, sanitized support bundle, progressive disclosure, NBA integration.
+Acceptance:
+- defined measurement starts at application launch;
+- understandable state appears in less than 10 seconds under declared fixture and packaged-test conditions;
+- no terminal or configuration editing;
+- manual IP appears only as fallback;
+- normal UI exposes no raw technical errors;
+- at most one primary next action;
+- blocked states provide a human explanation and recovery route;
+- test output provides machine-readable timing and failed stage.
 
-### E10 - Accounts and Synchronized Device Registry | PENDING, depends on E2/E4
-Stories E10-S1..E10-S8. Account remains optional for local FPV; cloud metadata never substitutes for fresh local observation.
+### P0.2 Health Dashboard integration
+Use existing health evidence rather than building a parallel health engine. Present ready, attention, problem or unknown; a concise summary; affected device or station area; and one Next Best Action.
 
-### E11 - Device Sharing and Ownership Transfer | PENDING, depends on E10
-Stories E11-S1..E11-S7. Explicit least-privilege sharing, revocation and deliberate ownership transfer without sharing credentials or bypassing local safety gates.
+A numeric health percentage is optional and must not be guessed. Add it only with a deterministic tested calculation.
 
-### E12 - AI Diagnostic Assistant | PENDING, depends on E9
-Stories E12-S1..E12-S8. Sanitized structured evidence only; advisory explanations/actions only; no authority over identity, compatibility, ownership, firmware success or destructive operations.
+### P0.3 Device Center integration
+Create one presentation boundary for supported cameras, vehicles/flight controllers and operator controllers while preserving separate physical identities. Show name, type, observed version, health and last observed activity. Group automatically.
 
-### E13 - Automated UI Review Harness | PENDING, depends on E2/E3
-Stories E13-S1..E13-S7. Deterministic UI fixtures, render/startup harness, canonical states, screenshots/review artifacts and CI smoke validation.
+### P0.4 Human Message Layer audit
+Audit QML and backend presentation boundaries for raw exception, socket, RTSP, SSH, transport, traceback and internal reason-code leakage. Every normal failure must show practical impact and recommended action. Technical details remain progressively disclosed.
 
-### E14 - Video-First UX Finalization | PENDING, depends on E3/E4/E8/E9
-Stories E14-S1..E14-S9. Video gets largest practical area; remove duplicated/dead normal workflows; integrate health/NBA/controller/diagnostics/account/AI contextually; finalize Advanced vs Service Mode and responsive polish.
+### P0.5 Timeline integration
+Convert meaningful startup, discovery, configuration, backup, update and recovery events into human-readable chronological entries. Do not make raw logs the normal experience.
 
-### E15 - Release, Installer and OTA Production Readiness | PENDING, depends on E14; E7 strongly preferred
-Stories E15-S1..E15-S9. Production packages, installer layout, signed manifest/package integrity, OTA, startup acknowledgement, atomic rollback, packaged smoke, provenance and production release gate.
+### P0.6 Backup and one-click recovery
+Before critical reversible configuration changes, create an identity-bound validated backup and provide a clear restore action. Ambiguous or invalid restore fails closed with a human explanation.
 
-## Dependency graph
-Physical critical path: `E0 -> E1`.
+### P0.7 Physical OpenIPC Hardware E2E | RELEASE-BLOCKING PHYSICAL EVIDENCE
+Complete real-hardware evidence for verified identity, compatible artifact, guarded update, reboot-pending, bounded rediscovery, hardware continuity, observed post-update firmware and sanitized staged evidence.
 
-Product path after the physical gate: `E1 -> E2 -> E3 -> E4 -> E9 -> E14 -> E15`.
+This gate blocks hardware-dependent production claims. It does not replace P0 user-journey work and cannot be satisfied by simulation or CI.
 
-Enabling path: `E5 -> E2 -> E6 -> E7 -> E15`, subject to each Epic's stated dependencies.
+## P1: Extensibility and recovery quality
+### P1.1 Plugin Host
+Define a versioned plugin contract for metadata, capabilities, discovery hooks, health hooks and safe actions. Plugins cannot bypass common presentation, backup, secret or safety boundaries.
 
-Other dependencies: E8 depends on E2/E3 and feeds E14; E10 depends on E2/E4; E11 depends on E10 and feeds E14; E12 depends on E9 and feeds E14; E13 depends on E2/E3 and supports E14.
+### P1.2 Diagnostics 2.0
+Complete practical finding -> evidence -> known safe fix -> revalidation. Integrate with Health, Timeline and Next Best Action. Preserve sanitized support bundles and progressive disclosure.
+
+### P1.3 Controller onboarding
+Complete automatic local discovery/restore, live input acquisition, durable non-secret profile persistence, health integration and task-oriented calibration/mapping. Keep manual transport in Advanced.
+
+### P1.4 Smart Search
+Support natural task language and route to the relevant action or surface rather than exposing internal component names.
+
+### P1.5 Automated UI Review Harness
+Add canonical UI states, render/startup smoke, screenshots or equivalent review artifacts and Windows/QML CI validation before final UI consolidation.
+
+## P2: Later product layers
+### P2.1 Optional accounts and synchronized device registry
+Local operation remains usable offline. Cloud metadata never substitutes for fresh local observation.
+
+### P2.2 Sharing and ownership transfer
+Use explicit least-privilege permissions. Never share credentials or bypass local safety gates.
+
+### P2.3 In-app assistant
+Consume sanitized structured evidence only. Advisory explanations are allowed; safety authority is not.
+
+### P2.4 Predictive diagnostics and analytics
+Introduce only after diagnostic evidence and privacy boundaries are stable. Do not add dashboards without a clear user decision they improve.
+
+### P2.5 Profile system
+Synchronize eligible non-secret user preferences only after local identity, restore and conflict behavior are deterministic.
+
+## Release readiness
+After the integrated operator journey is stable:
+- finalize video-first UX and remove duplicated/dead normal workflows;
+- confirm Advanced versus Service Mode boundaries;
+- validate Windows packaging, installer layout and startup readiness;
+- preserve signed manifest/package integrity and atomic rollback;
+- run packaged first-run acceptance;
+- complete physical Hardware E2E for hardware-dependent claims;
+- publish production release only when software, packaged and physical evidence gates are satisfied.
+
+## Progress reporting
+Report separate measures for product-journey acceptance, repository-software acceptance, packaged application acceptance, physical hardware acceptance and production release readiness.
+
+Do not combine them into a misleading single success claim. If a percentage is used, state its denominator and completion criteria.
 
 ## Next largest safe batch
-**Physical boundary:** E0 still requires operator-controlled real-hardware validation.
-
-**Repository-only boundary:** E2, E3, E4, E5, E6 and E7 are complete at the repository-software boundary. The canonical capability matrix's `nextMilestone: null` covers those enabling capabilities only; it does not mean later roadmap Epics E8-E15 are complete. E8 remains pending. After the controller profile core, the next largest software-only gap is wiring local controller discovery/live input acquisition and safe local profile persistence into the onboarding workflow. Real physical E0 Hardware E2E remains separately blocked on an operator-controlled device and actual observed evidence; do not substitute simulator or CI evidence for physical acceptance.
+The next highest-value batch is **P0.1 First-Run Acceptance Harness** using the existing E2/E3/E4 foundations. It must expose exact failed stage and timing, establish the less-than-10-second health target under declared conditions, and protect the normal path from manual configuration and raw technical messages.
 
 ## Handoff rule
-At each session start and after each successful merge:
-1. Read/refresh current `main` and canonical state relevant to the next decision.
-2. Run/inspect Project Doctor and current CI evidence when available.
-3. Validate `PROJECT_STATE.json` and use its deterministic repository-only `nextMilestone`.
-4. Determine the earliest incomplete Story in that milestone whose dependencies are actually satisfied.
-5. Prefer the largest safe logically complete batch.
-6. Never restore historical chat code over current repository state.
-7. Stop only for physical hardware, secrets/credentials/keys, a genuine product decision, exhausted bounded automation, or unresolved inconsistent evidence.
-8. After one implementation commit, publish/refresh its reviewable PR and observe CI. Repair the same PR on red. On green, pass the existing merge gates, merge when authorized, refresh `main`, and continue automatically with the next dependency-valid batch.
+1. Refresh current `main` and inspect active PR/CI state.
+2. Repair an active red baseline before unrelated work.
+3. Validate canonical state and safety invariants.
+4. Select the highest user-value dependency-valid vertical slice.
+5. Update implementation, tests and canonical documentation together.
+6. On authorized green merge, refresh `main`, re-audit User Effort and continue.
+7. Stop only for physical action, secret, genuine product decision, exhausted bounded automation or unresolved evidence inconsistency.
