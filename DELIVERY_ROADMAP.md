@@ -16,7 +16,31 @@ Never treat software CI as physical hardware evidence. Never allow a deferred ph
 - E2 Unified Health, E3 Next Best Action, E4 Zero-Config Startup, E5 Project Doctor, E6 Hardware Simulator and E7 Scenario-Driven CI are complete at the repository-software boundary.
 - E0 real OpenIPC Hardware E2E remains physically incomplete.
 - E8 controller calibration/mapping/profile core exists, but controller discovery, live acquisition, durable persistence and onboarding remain incomplete.
-- The largest product risk is not a missing subsystem. It is the absence of one evidenced integrated first-run journey that proves the user can launch, understand state, see devices and receive a useful next action without documentation or configuration editing.
+- The largest product risk is the absence of one evidenced integrated first-run journey that proves the user can launch, understand state, see devices and receive a useful next action without documentation or configuration editing.
+
+## Canonical capability status
+These headings are retained as the machine-validated capability contract.
+
+### E0 - Physical OpenIPC Hardware E2E | BLOCKED ON PHYSICAL EVIDENCE
+Real-hardware acceptance remains incomplete and release-blocking for hardware-dependent claims. Simulation and CI cannot satisfy it.
+
+### E2 - Unified Health and Evidence Contract | COMPLETE
+Repository-software acceptance is complete.
+
+### E3 - Next Best Action Engine | COMPLETE
+Repository-software acceptance is complete.
+
+### E4 - Zero-Config Startup and Restore | COMPLETE
+Repository-software acceptance is complete.
+
+### E5 - Project Doctor and Machine-Readable Project State | COMPLETE
+Repository-software acceptance is complete. Project Doctor remains software evidence only.
+
+### E6 - Hardware Simulator and Fault Injection | COMPLETE
+Repository-software acceptance is complete. Simulator evidence is never physical evidence.
+
+### E7 - Scenario-Driven CI | COMPLETE
+Repository-software acceptance is complete.
 
 ## P0: Integrated user journey
 ### P0.1 First-Run Acceptance Harness | NEXT
@@ -99,12 +123,7 @@ After the integrated operator journey is stable:
 - publish production release only when software, packaged and physical evidence gates are satisfied.
 
 ## Progress reporting
-Report separate measures for:
-- product-journey acceptance;
-- repository-software acceptance;
-- packaged application acceptance;
-- physical hardware acceptance;
-- production release readiness.
+Report separate measures for product-journey acceptance, repository-software acceptance, packaged application acceptance, physical hardware acceptance and production release readiness.
 
 Do not combine them into a misleading single success claim. If a percentage is used, state its denominator and completion criteria.
 
