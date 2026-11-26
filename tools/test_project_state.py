@@ -64,6 +64,58 @@ class ProjectStateTests(unittest.TestCase):
             self.assertIn("roadmap-hardware-boundary", errors)
             self.assertIn("project-state-hardware-boundary", errors)
 
+    def test_completed_capabilities_match_complete_roadmap_epics(self):
+        state = load_project_state()
+        root = Path(__file__).resolve().parents[1]
+        roadmap = (root / "DELIVERY_ROADMAP.md").read_text(encoding="utf-8")
+        for capability, epic in (
+            ("zeroConfigStartup", "E4"),
+            ("hardwareSimulator", "E6"),
+            ("scenarioDrivenCI", "E7"),
+        ):
+            self.assertEqual(state["capabilities"][capability], "complete")
+            heading_prefix = f"### {epic} - "
+            matching_headings = [
+                line.strip()
+                for line in roadmap.splitlines()
+                if line.strip().startswith(heading_prefix)
+            ]
+            self.assertEqual(len(matching_headings), 1)
+            self.assertTrue(
+                matching_headings[0].endswith(" | COMPLETE"),
+                matching_headings[0],
+            )
+
+    def test_roadmap_epic_status_drift_fails_closed(self):
+        state = load_project_state()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "DELIVERY_ROADMAP.md").write_text(
+                "### E4 - Zero-Config Startup and Restore | NEXT REPOSITORY-ONLY MILESTONE\n"
+                "### E6 - Hardware Simulator and Fault Injection | PENDING\n"
+                "### E7 - Scenario-Driven CI | PENDING\n",
+                encoding="utf-8",
+            )
+            (root / "PROJECT_STATE.md").write_text(
+                "Complete Hardware E2E first",
+                encoding="utf-8",
+            )
+            errors = canonical_drift_errors(state, root)
+            pending_headings = [
+                line.strip()
+                for line in (root / "DELIVERY_ROADMAP.md").read_text(
+                    encoding="utf-8"
+                ).splitlines()
+                if line.strip().startswith("### E4 - ")
+            ]
+            self.assertEqual(
+                pending_headings,
+                ["### E4 - Zero-Config Startup and Restore | NEXT REPOSITORY-ONLY MILESTONE"],
+            )
+            self.assertIn("roadmap-E4-complete", errors)
+            self.assertIn("roadmap-E6-complete", errors)
+            self.assertIn("roadmap-E7-complete", errors)
+
 
 if __name__ == "__main__":
     unittest.main()

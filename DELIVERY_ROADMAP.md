@@ -14,9 +14,7 @@ Never treat software CI as physical hardware evidence. Never start unrelated wor
 ## Current audited state
 Physical E0 remains incomplete and deferred until real OpenIPC evidence is captured. Software validation never closes that gate.
 
-E5 - Project Doctor and Machine-Readable Project State is complete at the repository-software boundary: canonical machine-readable state, capability validation, deterministic repository-only next-milestone derivation, drift detection, CI execution through Project Doctor, and fail-closed regression coverage are present. This completion does not imply physical Hardware E2E success.
-
-E2 - Unified Health and Evidence Contract and E3 - Next Best Action Engine are complete at the repository-software boundary. The next repository-only milestone selected by the canonical capability matrix is E4 - Zero-Config Startup and Restore, while E0 remains the physical critical-path gate.
+E2 - Unified Health and Evidence Contract, E3 - Next Best Action Engine, E4 - Zero-Config Startup and Restore, E5 - Project Doctor and Machine-Readable Project State, E6 - Hardware Simulator and Fault Injection and E7 - Scenario-Driven CI are complete at the repository-software boundary. E0 remains the physical critical-path gate. The canonical capability matrix now derives no next repository-only milestone.
 
 ## Progress model
 Progress is reported in two layers so existing foundations are not confused with roadmap completion:
@@ -24,7 +22,7 @@ Progress is reported in two layers so existing foundations are not confused with
 - **Roadmap completion:** an Epic/Story is complete only when its acceptance criteria have repository or physical evidence.
 - **Engineering readiness:** existing foundations may materially support a future Story while it remains incomplete.
 
-The acceptance-based re-audit gives **19%** roadmap completion: 3 of 16 Epics (E2, E3 and E5) have complete acceptance evidence, rounded from 18.75%. Partial foundations, commits and PRs do not increase this figure until their Epic acceptance contract is complete. Physical E0 remains incomplete.
+The acceptance-based re-audit gives **38%** roadmap completion: 6 of 16 Epics (E2, E3, E4, E5, E6 and E7) have complete repository-software acceptance evidence, rounded from 37.5%. Partial foundations, commits and PRs do not increase this figure until their Epic acceptance contract is complete. Physical E0 remains incomplete.
 
 ## Delivery order and status
 
@@ -44,17 +42,17 @@ Stories E2-S1..E2-S7. Common schema exposes state, health, summary, reasonCode, 
 ### E3 - Next Best Action Engine | COMPLETE
 Stories E3-S1..E3-S6. Deterministic priority model with at most one primary normal-workflow action; safety gates remain authoritative.
 
-### E4 - Zero-Config Startup and Restore | NEXT REPOSITORY-ONLY MILESTONE
-Stories E4-S1..E4-S7. Target: `launch -> restore/discover -> verified usable camera -> video`; manual IP is fallback; ambiguity is never guessed.
+### E4 - Zero-Config Startup and Restore | COMPLETE
+Stories E4-S1..E4-S7. Repository-software acceptance is complete: `launch -> restore/discover -> verified usable camera -> video`; manual IP remains fallback and ambiguity is never guessed.
 
 ### E5 - Project Doctor and Machine-Readable Project State | COMPLETE
 Completed repository-software contract: canonical machine-readable project state and capability matrix; schema/status validation; deterministic next-milestone derivation; canonical hardware-boundary drift checks; Project Doctor integration in repository CI; fail-closed regression coverage. Project Doctor remains software evidence only and can never establish physical E0 completion.
 
-### E6 - Hardware Simulator and Fault Injection | PENDING, depends on E1/E2
-Stories E6-S1..E6-S7. Simulate OpenIPC identity/update/reboot/DHCP/multi-device behavior and required failure modes. Simulator evidence can never be labeled physical validation.
+### E6 - Hardware Simulator and Fault Injection | COMPLETE
+Stories E6-S1..E6-S7. Repository-software acceptance is complete for deterministic OpenIPC identity/update/reboot/DHCP/multi-device and fault-injection scenarios. Simulator evidence can never be labeled physical validation.
 
-### E7 - Scenario-Driven CI | PENDING, depends on E5/E6
-Stories E7-S1..E7-S7. Behavioral startup, discovery/video, firmware, recovery and later controller scenarios with machine-readable failure summaries.
+### E7 - Scenario-Driven CI | COMPLETE
+Stories E7-S1..E7-S7. Repository-software acceptance is complete for behavioral startup, discovery/video, firmware, recovery and later controller scenarios with machine-readable failure summaries.
 
 ### E8 - FPV/RC Controller Onboarding | PENDING, depends on E2/E3
 Stories E8-S1..E8-S9. Automatic detection/restore, observed inputs, calibration/mapping, safe profile persistence, unified health, Advanced-only manual transport.
@@ -92,7 +90,7 @@ Other dependencies: E8 depends on E2/E3 and feeds E14; E10 depends on E2/E4; E11
 ## Next largest safe batch
 **Physical boundary:** E0 still requires operator-controlled real-hardware validation.
 
-**Repository-only boundary:** E5, E2 and E3 are complete at the repository-software boundary. The canonical capability matrix selects E4 as the next software milestone. Continue Zero-Config Startup and Restore while preserving the fact that E1 has not been physically accepted and never manufacture E1/E0 evidence. If an E4 slice requires accepted E1 physical evidence rather than repository-observable evidence, stop at that dependency instead of guessing.
+**Repository-only boundary:** E2, E3, E4, E5, E6 and E7 are complete at the repository-software boundary. The canonical capability matrix derives no next repository-only milestone. The largest remaining evidence-backed batch is real physical E0 Hardware E2E; this work remains blocked on an operator-controlled device and actual observed evidence. Do not substitute simulator or CI evidence for physical acceptance.
 
 ## Handoff rule
 At each session start and after each successful merge:
