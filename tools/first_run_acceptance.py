@@ -5,19 +5,26 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "src" / "app" / "first_run_acceptance.py"
+CONTRACT_MODULE = "fpv_first_run_acceptance_contract"
 
 
 def _load_contract():
     """Load the app contract under a unique name to avoid tools module shadowing."""
-    spec = importlib.util.spec_from_file_location("fpv_first_run_acceptance_contract", CONTRACT_PATH)
+    spec = importlib.util.spec_from_file_location(CONTRACT_MODULE, CONTRACT_PATH)
     if spec is None or spec.loader is None:
         raise RuntimeError("first-run acceptance contract is unavailable")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    sys.modules[CONTRACT_MODULE] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(CONTRACT_MODULE, None)
+        raise
     return module
 
 
