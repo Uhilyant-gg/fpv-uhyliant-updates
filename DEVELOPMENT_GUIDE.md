@@ -43,6 +43,9 @@ Normalized telemetry is tri-state and fallback synthesizes no values. Video runt
 ## Workflow
 Inspect actual `main` and all canonical documents before material product work. `DELIVERY_ROADMAP.md` defines delivery order, dependencies, stories and acceptance criteria. `AUTONOMOUS_DEVELOPMENT.md` defines autonomous work selection, stop conditions, branch/PR behavior, CI repair and the Project Doctor interface.
 
+## Local project bootstrap
+On a fresh Windows workstation, run `BOOTSTRAP.bat` from the repository root. It prepares `.venv`, installs declared dependencies and performs a bounded QML launch smoke check. The command requires Python 3.10-3.13; otherwise it stops with a clear installation prerequisite instead of creating an incompatible environment. The command reports machine-readable stages with `python tools/project_bootstrap.py --json` for automation and a short human-readable result by default.
+
 Work in one substantial, logically complete batch at a time. After each batch, stop for CI evidence. If CI fails, repair that batch before accumulating further product work. Never claim CI or physical hardware success without evidence. Hardware-dependent validation remains explicit.
 
 Autonomous development should proceed without intermediate questions when the answer is derivable from current main, canonical contracts, tests, CI or sanitized evidence. Human intervention is reserved for physical actions, secrets/credentials/keys and genuine product decisions.

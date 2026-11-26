@@ -18,6 +18,7 @@ The approved product direction is:
 - FPV workspace as the operational center;
 - one common user-facing health vocabulary: ready / attention / problem / unknown;
 - a Next Best Action model instead of exposing subsystem navigation as the primary workflow;
+- an operational Home health surface that reuses canonical health evidence and one deterministic next action;
 - manual IP as automatic-discovery fallback;
 - simplified normal firmware experience;
 - practical problem -> diagnose -> known safe fix;

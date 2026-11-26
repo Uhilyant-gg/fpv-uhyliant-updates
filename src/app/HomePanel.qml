@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 Item {
  id:root
- signal openDevices();signal openFirmware();signal openUpdate();signal openDiagnostics();signal connectDevice(string deviceId)
+ signal openDevices();signal openFirmware();signal openUpdate();signal openDiagnostics();signal connectDevice(string deviceId);signal runNextAction(string action)
  property color fg:"#f5f8fc";property color sub:"#8799ad";property color surface:"#0d1723";property color elevated:"#132235";property color line:"#203348";property color green:"#35e0a1"
  function canEnterFpv(deviceId){if(!deviceId)return false;for(var i=0;i<devicesModel.items.length;i++)if(devicesModel.items[i].id===deviceId){var streams=devicesModel.streams;for(var n=0;n<streams.length;n++)if(streams[n].device_id===deviceId&&streams[n].enabled===true)return true;return false}return false}
  Rectangle{anchors.fill:parent;color:"#08111b"}
@@ -22,6 +22,18 @@ Item {
    Text{text:devicesModel.count?devicesModel.count+" збережено":"немає збережених";color:sub;font.pixelSize:11}
    Item{Layout.fillWidth:true}
    Button{text:"Знайти / додати";Layout.preferredHeight:36;font.bold:true;onClicked:root.openDevices();HoverHint{text:"Знайти камери автоматично або вказати IP вручну."}}
+  }
+  Rectangle{Layout.fillWidth:true;height:112;radius:14;color:surface;border.color:homeDashboard.health==="problem"? "#ff6678":(homeDashboard.health==="attention"? "#ffb84d":(homeDashboard.health==="ready"?green:line))
+   RowLayout{anchors.fill:parent;anchors.margins:14;spacing:14
+    Rectangle{width:56;height:56;radius:28;color:homeDashboard.health==="ready"? "#15392f":(homeDashboard.health==="problem"? "#3a1d27":(homeDashboard.health==="attention"? "#3a301b":"#172334"))
+     Text{anchors.centerIn:parent;text:homeDashboard.health==="ready"?"✓":(homeDashboard.health==="problem"?"!":"?");color:homeDashboard.health==="ready"?green:(homeDashboard.health==="problem"?"#ff6678":"#ffb84d");font.pixelSize:24;font.bold:true}}
+    ColumnLayout{Layout.fillWidth:true;spacing:4
+     Text{text:"Стан системи: "+homeDashboard.title;color:fg;font.pixelSize:17;font.bold:true}
+     Text{text:homeDashboard.summary;color:sub;font.pixelSize:12;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+     Text{text:"Пристрої: "+homeDashboard.verifiedCount+" перевірено · "+homeDashboard.warningCount+" потребують уваги";color:sub;font.pixelSize:11}
+    }
+    Button{visible:homeDashboard.nextAction.available;text:homeDashboard.nextAction.label;font.bold:true;Layout.preferredHeight:44;onClicked:root.runNextAction(homeDashboard.nextAction.action);HoverHint{text:"Рекомендована наступна дія для поточного стану."}}
+   }
   }
   Rectangle{Layout.fillWidth:true;Layout.fillHeight:true;radius:14;color:surface;border.color:line
    ListView{id:list;anchors.fill:parent;anchors.margins:8;clip:true;spacing:4;model:devicesModel.items
