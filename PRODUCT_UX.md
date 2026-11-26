@@ -1,144 +1,204 @@
-# FPV Uhyliant product and UX principles
+# FPV Uhyliant Product Constitution
 
-## Product goal
-FPV Uhyliant should feel like an appliance, not a collection of technical screens: launch -> automatically discover/connect -> show video -> operate. The operator should spend almost all normal operating time in the video workspace.
+This document is the primary product decision authority. When feature growth, technical convenience, schedule pressure or subsystem ownership conflicts with the normal user journey, this constitution wins unless a safety invariant requires otherwise.
 
-## Primary rule
-Minimize operator effort while maximizing useful automation. Complexity stays hidden until it is needed. Organize the product around user tasks and next actions, not around internal subsystems or transports.
+## Product mission
+FPV Uhyliant must feel like an appliance, not a collection of technical screens.
 
-## Default journey
-The normal path is:
+The normal user should be able to:
+1. install the application;
+2. launch it;
+3. see all available supported devices;
+4. understand system state in less than 10 seconds;
+5. avoid manual configuration editing;
+6. avoid external documentation for normal tasks;
+7. receive explanations and recommended actions in plain human language.
 
-`launch -> automatic discovery/restore -> verified usable device -> video -> operate`
+Target journey:
 
-If no usable camera is found, keep the operator in the same task flow and offer the next safe action. Manual IP is a fallback after automatic discovery, not a peer default workflow.
+`install -> launch -> automatic discovery/restore -> system state -> verified usable device -> video -> operate`
 
-When something fails, prefer:
+If a normal first-run or recovery journey requires README instructions, a terminal, configuration editing, knowledge of IP addresses or interpretation of technical errors, treat that as a product defect.
 
-`practical problem -> diagnose -> known safe fix`
+## Decision hierarchy
+Evaluate every proposed change in this order:
+1. Does it remove a verified user pain?
+2. Does it reduce clicks, elapsed time, manual input or documentation dependency?
+3. Can the application perform it automatically and safely?
+4. Can technical parameters remain hidden from the normal workflow?
+5. Does the result explain itself in human language?
+6. Does it improve stability, recovery or confidence?
+7. Only then consider feature breadth.
 
-Technical evidence remains available on demand.
+A change that adds capability but does not improve the user journey is lower priority.
 
-## Video workspace is home during operation
-The FPV/video workspace is the product center once a usable working camera is known. Do not force a returning operator through a dashboard before video. First-run, disconnected and recovery states may overlay a minimal onboarding/task surface on the video workspace.
+## Principle 1: UX First
+Every feature is evaluated by user impact. Prefer completing one coherent journey over adding another subsystem screen.
 
-The video area gets the largest useful space. Persistent UI contains only information required for operation, safety, current health and the next useful action. Secondary controls belong in contextual popups, drawers or detail views.
+The UI is task-centered and state-centered. Internal modules, transports and protocols must not define primary navigation.
 
-## Zero-config first
-Automatic discovery, identification, capability detection, stream selection, safe defaults, compatible firmware selection, artifact verification, rediscovery and post-update verification are preferred wherever they can be determined from trustworthy evidence.
+## Principle 2: Automation First
+Any action that can be determined and completed safely from trustworthy observed evidence must be automated.
 
-Manual IP addresses, ports, protocol details and other technical controls remain fallback or Advanced controls unless required for the current task.
+Ask the user only for decisions the application cannot safely make, including session credentials, genuinely ambiguous choices, destructive confirmation and recovery decisions.
 
-## Automation budget
-Every new user-facing decision must answer: can the application determine this safely and unambiguously from observed evidence?
+## Principle 3: Zero Config First
+Any parameter that can be discovered or derived safely must not be requested in the normal flow.
 
-If yes, automate it and do not ask the operator. If no, ask only for the missing decision or input. Typical operator-owned inputs are session credentials, genuinely ambiguous choices, destructive confirmation and recovery decisions.
+Manual IP, ports, protocols, stream details and transport selection are fallback or Advanced controls. They are never peer defaults beside automatic discovery.
 
-Automation must never invent unknown identity, telemetry, compatibility or success.
+Automation must never invent identity, telemetry, compatibility, ownership, firmware success or physical acceptance. Unknown remains unknown.
 
-## Device-centered model
-Present a camera or controller as one device rather than exposing transport implementation details as separate concepts. Device details may expose Video, Status, Settings, Firmware and Diagnostics when relevant.
+## Principle 4: Human Language Only
+Normal UI must not expose raw transport, protocol, socket, exception or traceback text.
 
-Cameras, vehicles/flight controllers and operator RC controllers remain distinct physical entities. The FPV workspace composes them into one operational context instead of conflating their identity, ownership, health or configuration.
+Every user-facing problem uses this shape:
+- what happened;
+- what it means for the current task;
+- likely causes when evidence supports them;
+- one recommended next action;
+- optional technical details behind progressive disclosure.
 
-## Accounts, device registry and portability
-An account layer is a post-Hardware-E2E product capability, not a prerequisite for local operation. Local FPV operation must remain usable when the account service or Internet is unavailable.
+Example:
 
-An authenticated user may have a portable registry of added devices and user-owned configuration so that signing in on another workstation can restore the user's device inventory and eligible preferences. Cloud records are metadata and ownership records, not live hardware evidence: cached identity, address, firmware, telemetry or health must never be treated as freshly observed merely because it was synchronized.
+`Не вдалося підключитися.`
 
-Stable device identity must be separated from mutable network coordinates such as IP addresses. Local discovery/restore remains responsible for proving current reachability and current hardware state.
+`Можливі причини: пристрій недоступний або мережеве з'єднання ще не готове.`
 
-Device access supports two explicit concepts:
+`Рекомендована дія: перевірити підключення.`
 
-- sharing grants revocable access while preserving the existing owner;
-- transfer moves ownership through a deliberate handoff and revokes the previous ownership relationship when completed.
+Stable internal reason codes remain available for tests, support and diagnostics, but are not the primary message.
 
-Permissions must be explicit and least-privilege. A useful product model distinguishes viewing/status access, normal operation, device management and ownership administration. Cloud permission never bypasses local destructive-action validation, firmware compatibility, observed identity, session authentication or explicit approval.
+## Principle 5: Documentation Last
+The ideal normal user never opens README. Documentation supports developers, service work and exceptional recovery. It must not compensate for an unclear normal workflow.
 
-Session credentials, passwords, accepted SSH host-key state and other ephemeral destructive-operation authority are not normal cloud-synchronized device metadata.
+## User Effort Score
+Assess each normal task by:
+- number of clicks;
+- elapsed time;
+- number of manually entered values;
+- number of navigation changes;
+- need for external documentation;
+- need for terminal or configuration editing;
+- recovery effort after failure.
 
-## FPV / RC controller onboarding
-Operator controllers belong in the same zero-config product journey without becoming another permanent subsystem screen. A normal controller path should prefer automatic local detection and restore, then expose manual transport/port choices only as an Advanced fallback.
+Prefer the smallest safe change that produces the largest measurable reduction in User Effort Score.
 
-Controller onboarding should cover observed connection state, input/channel availability, calibration, switch/stick mapping and restoration of the last valid configuration. Unknown controller capabilities or inputs remain unknown rather than synthesized.
+## Primary product surfaces
+### Operational home
+When a verified usable camera exists, video is the operational home and receives the largest useful area. Health and next action remain glanceable without displacing video.
 
-Controller health uses the same ready / attention / problem / unknown vocabulary. Disconnection, unavailable input, invalid mapping or missing calibration should produce a practical next action or diagnostic path instead of raw transport errors.
+### Health Dashboard
+First-run, disconnected and recovery states show a compact health surface that answers within 10 seconds:
+- Is the system ready?
+- What is working?
+- What needs attention?
+- What should I do now?
 
-Controller profiles and non-secret preferences may later follow the signed-in user across workstations, while current physical presence, live inputs and safety-relevant state must always come from local observation.
+Use the common vocabulary only:
+- `ready`: normal operation can continue;
+- `attention`: user input or a non-critical prerequisite is needed;
+- `problem`: normal operation is blocked or degraded;
+- `unknown`: evidence is insufficient.
 
-## Unified health vocabulary
-User-facing health uses only four concepts:
+Do not convert unknown evidence into a guessed score. A percentage may be displayed only when its calculation is deterministic, understandable and tested.
 
-- ready: normal operation can continue;
-- attention: operator input or a non-critical prerequisite is needed;
-- problem: normal operation is blocked or degraded and action is required;
-- unknown: evidence is insufficient.
+### Device Center
+Show supported cameras, vehicles/flight controllers and operator controllers in one discoverable place while preserving their separate physical identities.
 
-Subsystem state machines may remain more detailed internally. Technical states such as reconnecting, stalled, reboot-pending or stale are translated into the common health model for normal UI and remain visible in technical details.
+For each device show a human name, type, observed version when available, health and last observed activity. Group automatically. Do not expose transport implementation as separate devices.
 
-Unknown remains unknown and must never be converted into guessed telemetry, device identity or health.
+### Timeline
+Replace raw logs in normal UI with chronological human events such as application started, configuration applied, device found, backup created, update started and verification completed.
 
-## Next Best Action
-The default UI should emphasize one contextually useful next action rather than a permanent toolbar of subsystem destinations.
+Raw logs and correlation evidence remain available only in technical details or Service Mode.
 
-Examples:
-- no camera -> Find camera;
-- discovered usable camera -> Connect;
-- connected camera with usable stream -> Show video;
-- missing controller -> Connect controller;
-- controller requiring calibration -> Calibrate controller;
-- verified compatible update -> Update;
-- recoverable non-destructive fault -> Fix;
-- unresolved fault -> Diagnose.
+### Next Best Action
+Normal UI emphasizes at most one primary contextually useful action. Examples: find device, connect, show video, calibrate controller, diagnose, apply a known safe fix, update, restore backup, or no action needed.
 
-A next action must respect all existing safety boundaries. Destructive actions remain deliberate and explicit.
+The engine must respect all safety boundaries. Destructive actions remain deliberate and explicit.
+
+## Core platform boundaries
+The core platform consists of:
+- Health Engine;
+- Device Manager;
+- Discovery Engine;
+- Timeline Engine;
+- Smart Search Engine;
+- Next Best Action Engine;
+- Backup Engine;
+- Plugin Host;
+- Update Manager;
+- Settings Manager;
+- Human Message Layer.
+
+Device, service and plugin implementations emit normalized evidence. Health interprets evidence. Human Message Layer explains it. Next Best Action selects the safest useful response. UI consumes presentation models rather than raw exceptions or protocol states.
+
+## Discovery and identity
+After launch, scan bounded trustworthy sources for supported USB, COM/serial, network devices and local services. New devices should appear without restarting the application.
+
+Discovery remains route-aware and bounded. Generic reachability is not proof of device identity. A remembered address is a candidate, not fresh hardware evidence. Manual IP is fallback after automatic discovery or restore has not produced a usable device.
+
+## Plugins
+New device families should integrate through versioned plugin contracts rather than changes to core workflow code. A plugin describes identity, vendor, version, capabilities, discovery hooks, health hooks and presentation metadata.
+
+Plugins may contribute normalized evidence and safe actions. They may not bypass common health vocabulary, human-message policy, secret boundaries, backup policy or destructive-action gates.
+
+## Backup and recovery
+Create an automatic backup before every critical reversible configuration change. Recovery must be available as one clear action when safe.
+
+Backups must be identity-bound, versioned and validated before restore. Failed or ambiguous restore remains blocked and explained in human language.
+
+## Smart search and in-app assistance
+Search accepts natural task language and routes the user to the relevant action or surface. It should answer task questions, not expose internal file or component names.
+
+AI assistance is a later advisory layer over sanitized structured evidence. It may explain and suggest, but never becomes authority for identity, telemetry, compatibility, credentials, ownership, firmware success, destructive approval or execution.
 
 ## Progressive disclosure
-Normal mode stays simple and task-oriented.
+Normal mode contains only information and actions needed for the current task.
 
-Advanced contains additional controls for normal operation: manual IP/ports, stream choices, controller transport/mapping details, protocol details, telemetry details and diagnostic evidence.
+Advanced contains manual network/transport choices, stream options, protocol detail, controller mapping detail and expanded diagnostic evidence.
 
-Service Mode contains specialist, recovery or developer/maintenance workflows: recovery/fullflash, manual firmware operations, low-level configuration, developer diagnostics and Hardware E2E validation.
+Service Mode contains recovery/fullflash, manual firmware, low-level configuration, developer diagnostics and Hardware E2E validation.
 
-Hardware E2E is a Service/Validation workflow, not a normal operator feature. The normal firmware lifecycle performs the same required verification internally without exposing a separate Hardware E2E step.
+Hardware E2E is mandatory evidence for physical claims but is not a normal operator feature.
 
-## Safe automation and AI assistance
-A one-click fix is appropriate only for deterministic, non-destructive remediation. Destructive operations continue through existing validation and approval boundaries.
+## Safety and evidence
+UX convenience never overrides safety. Software CI, simulators, mocks, cached state and cloud metadata never count as physical hardware evidence.
 
-AI assistance is a later product layer over sanitized structured evidence. It may explain practical faults, summarize evidence and propose diagnostic or known-safe remediation paths. AI is advisory: it never becomes authority for device identity, telemetry, compatibility, credentials, ownership, firmware success, destructive approval or destructive execution.
+Destructive firmware operations require current observed device identity, compatibility, verified artifact integrity, session authentication, explicit approval and post-operation verification. Successful dispatch means reboot pending, not successful update.
 
-AI assistance must consume the same sanitized evidence boundary used by diagnostics and preserve unknown values rather than filling gaps with guesses.
+## First-run acceptance contract
+A release candidate must demonstrate the integrated journey:
 
-## Firmware experience
-For a normal operator, firmware should reduce to device identity, observed current firmware, verified available update, a short practical status and one deliberate Update action.
+`install -> launch -> automatic discovery/restore -> health -> devices -> next action -> usable operation`
 
-Catalog resolution, compatible profile derivation, download, SHA-256/size integrity, immutable device binding, execution plan, reboot rediscovery and post-update verification remain internal unless intervention is required.
+Normal acceptance requires:
+- first understandable state in less than 10 seconds under defined test conditions;
+- no configuration-file editing;
+- no terminal requirement;
+- manual IP only as fallback;
+- no raw technical errors in normal UI;
+- at most one primary next action;
+- a recovery route for every blocked normal state;
+- physical evidence for hardware-dependent success claims.
 
-Credentials are requested only for the session when they are actually required. Ambiguous catalog selection belongs in Advanced. Manual firmware, recovery and fullflash belong in Service Mode and must never be presented as the recommended normal update path.
+Missing acceptance evidence is not success.
 
-## Diagnostics experience
-Show the practical fault first. Offer Diagnose when more evidence is required, and Fix only when a deterministic non-destructive remediation is known. Technical errors, logs, evidence and correlation details stay behind an explicit details path.
+## Definition of Done
+A product change is complete only when:
+- its user scenario and acceptance evidence are defined;
+- the default path minimizes User Effort Score;
+- safe automatic detection or derivation is used;
+- user-facing failures use human language;
+- Next Best Action is present where action is needed;
+- critical reversible changes are protected by backup;
+- meaningful events appear in Timeline;
+- negative and recovery paths are tested;
+- documentation is not required for the normal path;
+- CI or physical evidence supports every completion claim.
 
-Diagnostic exports remain sanitized, preserve unknown values and support staged evidence capture for hardware validation. The same structured evidence is the boundary for later AI-assisted diagnosis.
+## Product success criterion
+A first-time user installs and launches FPV Uhyliant, understands system state, sees available devices and completes all basic actions without documentation, configuration editing or technical knowledge.
 
-## UI quality rules
-Do not expose dead controls. If an action is unavailable, explain the practical reason and, where known, the missing prerequisite.
-
-Do not require navigation to learn that an obvious next action is available. Do not duplicate the same normal workflow across Home, Devices, Firmware and Diagnostics.
-
-Critical operational information must remain glanceable without consuming the video workspace with low-priority data.
-
-Account, sharing, controller and AI capabilities should surface contextually in the existing task flow rather than creating competing home screens.
-
-## Product decision tests
-For every visible control or requested decision ask:
-
-1. Does it make the operator faster, safer or the situation clearer?
-2. Can the application determine it safely without asking?
-3. Is it needed during normal operation, or does it belong in Advanced/Service Mode?
-4. Is the operator being shown the practical problem before implementation detail?
-5. Does the change preserve the largest useful video area?
-6. Is synchronized/cloud state being kept distinct from fresh local hardware evidence?
-7. Does any AI or remote permission preserve the local safety authority boundaries?
-
-If a visible element fails these tests, automate it, move it behind progressive disclosure or remove it from the normal workflow.
+If this is not true, the gap is a product defect and receives priority according to user impact.
