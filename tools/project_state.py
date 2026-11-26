@@ -23,6 +23,22 @@ SOFTWARE_ORDER = (
     ("scenarioDrivenCI", "E7"),
 )
 TERMINAL_CAPABILITY_STATUS = {"complete"}
+CAPABILITY_EPIC = {
+    "projectDoctor": "E5",
+    "unifiedHealthEvidence": "E2",
+    "nextBestAction": "E3",
+    "zeroConfigStartup": "E4",
+    "hardwareSimulator": "E6",
+    "scenarioDrivenCI": "E7",
+}
+EPIC_NAMES = {
+    "E2": "Unified Health and Evidence Contract",
+    "E3": "Next Best Action Engine",
+    "E4": "Zero-Config Startup and Restore",
+    "E5": "Project Doctor and Machine-Readable Project State",
+    "E6": "Hardware Simulator and Fault Injection",
+    "E7": "Scenario-Driven CI",
+}
 
 
 def derive_next_milestone(data):
@@ -50,6 +66,17 @@ def canonical_drift_errors(data, root=ROOT):
     recorded = data.get("softwareTrack", {}).get("nextMilestone")
     if recorded != derived:
         errors.append(f"next-milestone:{recorded}->{derived}")
+
+    capabilities = data.get("capabilities", {})
+    for capability, epic in CAPABILITY_EPIC.items():
+        status = capabilities.get(capability)
+        heading = f"### {epic} - {EPIC_NAMES[epic]}"
+        if status == "complete":
+            if heading not in roadmap or f"{heading} | COMPLETE" not in roadmap:
+                errors.append(f"roadmap-{epic}-complete")
+        elif heading in roadmap:
+            if f"{heading} | COMPLETE" in roadmap:
+                errors.append(f"roadmap-{epic}-not-complete")
     return errors
 
 
