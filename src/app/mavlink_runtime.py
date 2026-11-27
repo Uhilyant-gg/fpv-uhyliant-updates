@@ -26,7 +26,7 @@ GROUP_FIELDS = {
     "heartbeat": ("armed", "flightMode"),
     "battery": ("batteryVoltage", "current", "batteryRemaining"),
     "gps": ("gpsFix", "satellites", "hdop"),
-    "position": ("altitude", "groundSpeed", "heading", "homeDistance"),
+    "position": ("altitude", "groundSpeed", "heading", "homeDistance", "homeBearing"),
     "attitude": ("roll", "pitch", "yaw"),
     "radio": ("rssi", "rssiSource"),
     "home": (),
@@ -50,6 +50,18 @@ def _distance_m(a, b):
     dlat, dlon = lat2 - lat1, lon2 - lon1
     h = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
     return 6371000.0 * 2 * math.atan2(math.sqrt(h), math.sqrt(max(0.0, 1.0 - h)))
+
+
+def _bearing_deg(frm, to):
+    """Initial great-circle bearing from `frm` to `to` in degrees (0 = north), or None."""
+    if not frm or not to or (frm[0] == to[0] and frm[1] == to[1]):
+        return None
+    lat1, lon1 = map(math.radians, frm)
+    lat2, lon2 = map(math.radians, to)
+    dlon = lon2 - lon1
+    x = math.sin(dlon) * math.cos(lat2)
+    y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dlon)
+    return (math.degrees(math.atan2(x, y)) + 360.0) % 360.0
 
 
 def _enum_name(prefix, value):
@@ -276,6 +288,7 @@ class MavlinkWorker(QThread):
                 altitude=msg.relative_alt / 1000.0,
                 heading=None if hdg == 65535 else hdg / 100.0,
                 homeDistance=_distance_m(self._home, self._position),
+                homeBearing=_bearing_deg(self._position, self._home),
             )
         elif kind == "VFR_HUD":
             self._emit(
@@ -284,6 +297,7 @@ class MavlinkWorker(QThread):
                 heading=float(msg.heading),
                 altitude=float(msg.alt),
                 homeDistance=_distance_m(self._home, self._position),
+                homeBearing=_bearing_deg(self._position, self._home),
             )
         elif kind == "ATTITUDE":
             self._emit(
@@ -310,7 +324,11 @@ class MavlinkWorker(QThread):
             if lat or lon:
                 self._home = (lat, lon)
                 self._touch("home")
-            self._emit("position", homeDistance=_distance_m(self._home, self._position))
+            self._emit(
+                "position",
+                homeDistance=_distance_m(self._home, self._position),
+                homeBearing=_bearing_deg(self._position, self._home),
+            )
         else:
             self.telemetry.emit(self._snapshot())
 

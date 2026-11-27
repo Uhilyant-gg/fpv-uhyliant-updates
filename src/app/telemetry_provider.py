@@ -16,6 +16,7 @@ NORMALIZED_FIELDS = (
     "groundSpeed",
     "heading",
     "homeDistance",
+    "homeBearing",
     "roll",
     "pitch",
     "yaw",
