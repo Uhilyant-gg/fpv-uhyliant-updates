@@ -79,7 +79,9 @@ class VideoRuntime(QObject):
   elif self._stream_id:self.invalidateIfSourceChanged()
  @Slot(str)
  def markStalled(self,message=''):
-  if self._stream_id and self._source_unchanged():self._set('stalled',message or 'Відеопотік зупинився або більше не передає кадри.')
+  if self._stream_id and self._source_unchanged():
+   safe_messages={'Основний відеопотік несподівано зупинився.','Додатковий відеопотік несподівано зупинився.','Не вдалося автоматично відновити основний відеопотік.','Не вдалося автоматично відновити додатковий відеопотік.'}
+   self._set('stalled',message if message in safe_messages else 'Відеопотік зупинився або більше не передає кадри.')
   elif self._stream_id:self.invalidateIfSourceChanged()
  @Slot()
  def stop(self):self._clear_selection();self._set('stopped')

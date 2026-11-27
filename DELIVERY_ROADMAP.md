@@ -74,7 +74,7 @@ Create one presentation boundary for supported cameras, vehicles/flight controll
 ### P0.4 Human Message Layer audit
 Audit QML and backend presentation boundaries for raw exception, socket, RTSP, SSH, transport, traceback and internal reason-code leakage. Every normal failure must show practical impact and recommended action. Technical details remain progressively disclosed.
 
-**Implemented foundation (repository software):** video connection/playback failures, camera-discovery errors, unreadable firmware files, pairing storage failures, updater network/filesystem failures, and firmware catalog/download failures now use human explanations and recovery hints; raw player/transport errors, probe exceptions, OS-store details and local filesystem paths are not surfaced in those messages. A complete audit of remaining telemetry and firmware surfaces is still required.
+**Implemented foundation (repository software):** the existing normal QML boundaries for video, pairing and firmware now use human explanations and recovery hints. Video player failures ignore raw backend strings, stall messages allow only known human text, and catalog/download failures hide transport and filesystem details. The remaining telemetry diagnostic surfaces still need a scoped Service Mode review.
 
 ### P0.5 Timeline integration
 Convert meaningful startup, discovery, configuration, backup, update and recovery events into human-readable chronological entries. Do not make raw logs the normal experience.

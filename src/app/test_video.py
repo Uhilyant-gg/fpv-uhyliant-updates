@@ -53,6 +53,12 @@ class VideoRuntimeTests(unittest.TestCase):
   self.assertNotIn('Unknown exception',r.error)
   self.assertNotIn('RTSP',r.diagnostics['error'])
  @patch('video.socket.create_connection')
+ def test_stalled_messages_do_not_expose_arbitrary_details(self,c):
+  c.return_value.__enter__.return_value=object();r=VideoRuntime(FakeDevices());self.assertTrue(r.prepare('main'))
+  r.markStalled('RTSP timeout: Connection refused')
+  self.assertEqual(r.error,'Відеопотік зупинився або більше не передає кадри.')
+  self.assertNotIn('RTSP',r.diagnostics['error'])
+ @patch('video.socket.create_connection')
  def test_reconnect_fails_closed_if_stream_was_removed(self,c):
   c.return_value.__enter__.return_value=object();d=FakeDevices();r=VideoRuntime(d);self.assertTrue(r.prepare('main'));d.streams=[];self.assertFalse(r.reconnect());self.assertEqual(r.state,'error');self.assertEqual(r.streamId,'');self.assertIsNone(r.diagnostics['endpointCheckMs'])
  @patch('video.socket.create_connection')
