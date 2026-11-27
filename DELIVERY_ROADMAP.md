@@ -59,7 +59,7 @@ Acceptance:
 - blocked states provide a human explanation and recovery route;
 - test output provides machine-readable timing and failed stage.
 
-**Repository-software evidence:** startup records launch, restore, automatic discovery start, health, device counts and next action; `main.py --acceptance-report` evaluates the latest run and emits the exact failed stage plus health elapsed time against the 10-second target. A controlled offscreen full-app run passed all seven stages with health evidence in 1.67 seconds; simulated discovery recorded its start/completion in Timeline, while updater and MAVLink side effects were stubbed. Packaged and physical operation evidence remain separate gates.
+**Repository-software evidence:** startup records launch, restore, automatic discovery start, health, device counts and next action; `main.py --acceptance-report` evaluates the latest run and emits the exact failed stage plus health elapsed time against the 10-second target. A controlled offscreen full-app run passed all seven stages with health evidence in 1.67 seconds. A Windows CI workflow now builds the packaged app and checks that its visible empty-device first-run state and `find-camera` action appear within 10 seconds, using a network-free fixture that explicitly suppresses discovery requests. This verifies the packaged UI path, not live device discovery; physical operation evidence remains uncollected.
 
 ### P0.2 Health Dashboard integration
 Use existing health evidence rather than building a parallel health engine. Present ready, attention, problem or unknown; a concise summary; affected device or station area; and one Next Best Action.
@@ -199,7 +199,7 @@ Report separate measures for product-journey acceptance, repository-software acc
 Do not combine them into a misleading single success claim. If a percentage is used, state its denominator and completion criteria.
 
 ## Next largest safe batch
-The next highest-value batch is **P0.1 First-Run Acceptance Harness** using the existing E2/E3/E4 foundations. It must expose exact failed stage and timing, establish the less-than-10-second health target under declared conditions, and protect the normal path from manual configuration and raw technical messages.
+The next highest-value batch is **P0.3 Device Center integration** using the existing discovery and device-health evidence. Present device name, type, observed version, state and last activity in a naturally grouped view, with fixture-backed software tests and no claim of physical discovery until authorized hardware is available.
 
 ## Handoff rule
 1. Refresh current `main` and inspect active PR/CI state.
