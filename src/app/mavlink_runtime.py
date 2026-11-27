@@ -49,12 +49,13 @@ class MavlinkWorker(QThread):
   total=self._received+self._lost;loss=(100.0*self._lost/total) if total else 0.0
   return {"messagesReceived":self._received,"packetsLost":self._lost,"packetLossPercent":loss,"badData":self._bad,"messageRate":len(self._window)/5.0,"lastPacketAge":None if not self._last_packet else now-self._last_packet,"uptime":now-self._started,"messageTypes":dict(self._types.most_common(12)),"rxErrors":self._data.get("rxErrors"),"fixedErrors":self._data.get("fixedErrors"),"txBuffer":self._data.get("txBuffer"),"localNoise":self._data.get("localNoise"),"remoteNoise":self._data.get("remoteNoise"),"remoteRssi":self._data.get("remoteRssi")}
  def _snapshot(self):
-  now=time.monotonic();out=dict(self._data);ages={}
+  now=time.monotonic();out=dict(self._data);ages={};freshness={}
   for group,limit in STALE_AFTER.items():
    seen=self._seen.get(group);age=None if seen is None else max(0.0,now-seen);ages[group]=age;fresh=age is not None and age<limit;out[group+"Fresh"]=fresh
+   for field in GROUP_FIELDS[group]:freshness[field]=fresh if seen is not None else None
    if not fresh:
     for field in GROUP_FIELDS[group]:out[field]=None
-  connected=self._last_heartbeat>0 and now-self._last_heartbeat<HEARTBEAT_TIMEOUT;out["connected"]=connected;out["heartbeat"]=connected;out["ages"]=ages;out["link"]=self._link(now);out["health"]="connected" if connected else ("traffic-no-heartbeat" if self._last_packet and now-self._last_packet<3 else "disconnected")
+  connected=self._last_heartbeat>0 and now-self._last_heartbeat<HEARTBEAT_TIMEOUT;out["connected"]=connected;out["heartbeat"]=connected;out["ages"]=ages;out["freshness"]=freshness;out["link"]=self._link(now);out["health"]="connected" if connected else ("traffic-no-heartbeat" if self._last_packet and now-self._last_packet<3 else "disconnected")
   return out
  def _emit(self,group=None,**values):
   if group:self._touch(group)

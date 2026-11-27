@@ -63,7 +63,7 @@ class MspRuntime(QObject):
  @Property('QVariantMap',notify=changed)
  def telemetry(self):
   now=self._clock();observed=self._last_frame>0;fresh=observed and now-self._last_frame<=self.STALE_SECONDS;data={k:v for k,v in self._values.items() if now-self._updated.get(k,0)<=self.STALE_SECONDS}
-  data.update({'connected':True if fresh else (False if observed else None),'armed':None,'flightMode':None,'health':'ok' if fresh else ('stale' if observed else None),'ages':{k:round(now-v,3) for k,v in self._updated.items()},'link':{'protocol':'MSP','fcVariant':self._fc_variant or None,'fcVersion':self._fc_version or None,'apiVersion':self._api_version or None,'frames':self._parser.frames,'checksumErrors':self._parser.checksum_errors}});return data
+  data.update({'connected':True if fresh else (False if observed else None),'armed':None,'flightMode':None,'health':'ok' if fresh else ('stale' if observed else None),'ages':{k:round(now-v,3) for k,v in self._updated.items()},'freshness':{k:now-stamp<=self.STALE_SECONDS for k,stamp in self._updated.items()},'link':{'protocol':'MSP','fcVariant':self._fc_variant or None,'fcVersion':self._fc_version or None,'apiVersion':self._api_version or None,'frames':self._parser.frames,'checksumErrors':self._parser.checksum_errors}});return data
  @Property(str,notify=changed)
  def error(self):return self._error
  @Slot(bytes)

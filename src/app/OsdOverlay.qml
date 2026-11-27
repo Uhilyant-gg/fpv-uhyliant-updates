@@ -17,8 +17,20 @@ Item {
   var number = Number(value)
   return (isFinite(number) ? number.toFixed(digits || 0) : String(value)) + (suffix || "")
  }
- function telemetryText(value, suffix, digits) {
-  return telemetry.connected === true ? valueText(value, suffix, digits) : "—"
+ function telemetryUnavailable(field) {
+  var freshness = telemetry.freshness || {}
+  return freshness[field] === false ? "застаріло" : "—"
+ }
+ function telemetryText(field, value, suffix, digits) {
+  if (telemetry.connected !== true) return "—"
+  if (value === undefined || value === null || value === "") return telemetryUnavailable(field)
+  return valueText(value, suffix, digits)
+ }
+ function optionalTelemetryText(field, value, suffix, digits) {
+  if (value === undefined || value === null || value === "") {
+   return telemetry.connected === true && telemetryUnavailable(field) === "застаріло" ? " · застаріло" : ""
+  }
+  return " · " + telemetryText(field, value, suffix, digits)
  }
  function speedSuffix() {
   return telemetry.provider === "CRSF" ? " км/год" : " м/с"
@@ -30,6 +42,11 @@ Item {
   if (fix <= 1) return "немає"
   if (fix === 2) return "2D"
   return "3D"
+ }
+ function gpsFixDisplay() {
+  if (telemetry.connected !== true) return "—"
+  if (telemetry.gpsFix === undefined || telemetry.gpsFix === null || telemetry.gpsFix === "") return telemetryUnavailable("gpsFix")
+  return gpsFixText(telemetry.gpsFix)
  }
  function linkLabel() {
   if (telemetry.connected === true) return "Телеметрія: актуальна"
@@ -69,7 +86,7 @@ Item {
     font.bold: true
    }
    Text {
-    text: "Режим: " + root.telemetryText(telemetry.flightMode)
+    text: "Режим: " + root.telemetryText("flightMode", telemetry.flightMode)
     color: root.foreground
     font.pixelSize: 11 * root.scaleFactor
     font.bold: true
@@ -77,9 +94,8 @@ Item {
     Layout.maximumWidth: 150
    }
    Text {
-    text: "АКБ: " + root.telemetryText(telemetry.batteryVoltage, " В", 1) +
-      (telemetry.connected === true && telemetry.batteryRemaining !== null && telemetry.batteryRemaining !== undefined
-       ? " · " + root.valueText(telemetry.batteryRemaining, "%", 0) : "")
+    text: "АКБ: " + root.telemetryText("batteryVoltage", telemetry.batteryVoltage, " В", 1) +
+      root.optionalTelemetryText("batteryRemaining", telemetry.batteryRemaining, "%", 0)
     color: root.foreground
     font.pixelSize: 11 * root.scaleFactor
     font.bold: true
@@ -90,15 +106,14 @@ Item {
    Layout.fillWidth: true
    spacing: 10
    Text {
-    text: "GPS: " + (telemetry.connected === true ? root.gpsFixText(telemetry.gpsFix) : "—") +
-      (telemetry.connected === true && telemetry.satellites !== null && telemetry.satellites !== undefined
-       ? " · " + root.valueText(telemetry.satellites, " супутн.", 0) : "")
+    text: "GPS: " + root.gpsFixDisplay() +
+      root.optionalTelemetryText("satellites", telemetry.satellites, " супутн.", 0)
     color: root.muted
     font.pixelSize: 10 * root.scaleFactor
    }
-   Text { text: "Висота: " + root.telemetryText(telemetry.altitude, " м", 0); color: root.foreground; font.pixelSize: 10 * root.scaleFactor; font.bold: true }
-   Text { text: "Швидкість: " + root.telemetryText(telemetry.groundSpeed, root.speedSuffix(), 1); color: root.foreground; font.pixelSize: 10 * root.scaleFactor; font.bold: true }
-   Text { text: "Напрямок: " + root.telemetryText(telemetry.heading, "°", 0); color: root.foreground; font.pixelSize: 10 * root.scaleFactor; font.bold: true }
+   Text { text: "Висота: " + root.telemetryText("altitude", telemetry.altitude, " м", 0); color: root.foreground; font.pixelSize: 10 * root.scaleFactor; font.bold: true }
+   Text { text: "Швидкість: " + root.telemetryText("groundSpeed", telemetry.groundSpeed, root.speedSuffix(), 1); color: root.foreground; font.pixelSize: 10 * root.scaleFactor; font.bold: true }
+   Text { text: "Напрямок: " + root.telemetryText("heading", telemetry.heading, "°", 0); color: root.foreground; font.pixelSize: 10 * root.scaleFactor; font.bold: true }
    Item { Layout.fillWidth: true }
    Text {
     text: "Відео: " + (video.streamId ? (video.state === "playing" ? "активне" : "перевіряється") : "немає")

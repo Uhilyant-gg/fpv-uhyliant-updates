@@ -52,6 +52,12 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
                 with self.subTest(file=name, phrase=phrase):
                     self.assertNotIn(phrase, visible)
 
+    def test_osd_distinguishes_stale_fields_from_unavailable_values(self):
+        source = self.qml["OsdOverlay.qml"]
+        self.assertIn("telemetry.freshness", source)
+        self.assertIn('"застаріло"', source)
+        self.assertIn("optionalTelemetryText", source)
+
     def test_shared_hover_hint_contract_is_five_seconds(self):
         hint = self.qml["HoverHint.qml"]
         self.assertIn("property int delay:5000", hint)
