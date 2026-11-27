@@ -17,7 +17,7 @@ Never treat software CI as physical hardware evidence. Never allow a deferred ph
 - E0 real OpenIPC Hardware E2E remains physically incomplete.
 - E8 controller calibration/mapping/profile core exists, but controller discovery, live acquisition, durable persistence and onboarding remain incomplete.
 - The largest product risk is the absence of one evidenced integrated first-run journey that proves the user can launch, understand state, see devices and receive a useful next action without documentation or configuration editing.
-- A controlled offscreen full-app run now records all seven first-run stages and is accepted: health evidence appears in 1.34 seconds, with a useful `find-camera` action and no manual configuration or raw UI error. Discovery, updater and MAVLink side effects were stubbed; this is repository-software evidence, not packaged or physical acceptance. A normal desktop and hardware-backed journey remain unverified.
+- A controlled offscreen full-app run now records all seven first-run stages and is accepted: health evidence appears in 1.49 seconds, with a useful `find-camera` action and no manual configuration or raw UI error. Discovery, updater and MAVLink side effects were stubbed; this is repository-software evidence, not packaged or physical acceptance. A normal desktop and hardware-backed journey remain unverified.
 
 ## Canonical capability status
 These headings are retained as the machine-validated capability contract.
@@ -59,7 +59,7 @@ Acceptance:
 - blocked states provide a human explanation and recovery route;
 - test output provides machine-readable timing and failed stage.
 
-**Repository-software evidence:** startup records launch, restore, automatic discovery start, health, device counts and next action; `main.py --acceptance-report` evaluates the latest run and emits the exact failed stage plus health elapsed time against the 10-second target. A controlled offscreen full-app run passed all seven stages with health evidence in 1.34 seconds; discovery, updater and MAVLink side effects were stubbed. Packaged and physical operation evidence remain separate gates.
+**Repository-software evidence:** startup records launch, restore, automatic discovery start, health, device counts and next action; `main.py --acceptance-report` evaluates the latest run and emits the exact failed stage plus health elapsed time against the 10-second target. A controlled offscreen full-app run passed all seven stages with health evidence in 1.49 seconds; discovery, updater and MAVLink side effects were stubbed. Packaged and physical operation evidence remain separate gates.
 
 ### P0.2 Health Dashboard integration
 Use existing health evidence rather than building a parallel health engine. Present ready, attention, problem or unknown; a concise summary; affected device or station area; and one Next Best Action.
@@ -74,7 +74,7 @@ Create one presentation boundary for supported cameras, vehicles/flight controll
 ### P0.4 Human Message Layer audit
 Audit QML and backend presentation boundaries for raw exception, socket, RTSP, SSH, transport, traceback and internal reason-code leakage. Every normal failure must show practical impact and recommended action. Technical details remain progressively disclosed.
 
-**Implemented foundation (repository software):** video connection/playback failures, camera-discovery errors and unreadable firmware files now show human explanations and recovery hints; raw player/transport errors, probe exceptions and local filesystem paths are not included in those user-facing messages. A complete audit of remaining telemetry, update and firmware surfaces is still required.
+**Implemented foundation (repository software):** video connection/playback failures, camera-discovery errors, unreadable firmware files, pairing storage failures, and updater network/filesystem failures now use human explanations and recovery hints; raw player/transport errors, probe exceptions, OS-store details and local filesystem paths are not surfaced in those messages. A complete audit of remaining telemetry and firmware surfaces is still required.
 
 ### P0.5 Timeline integration
 Convert meaningful startup, discovery, configuration, backup, update and recovery events into human-readable chronological entries. Do not make raw logs the normal experience.

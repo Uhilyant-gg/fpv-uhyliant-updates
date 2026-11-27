@@ -31,6 +31,9 @@ class Tests(unittest.TestCase):
  def test_pairing_requires_both_stores(self):
   self.assertEqual(PairingRegistry(secret_store=Store(),metadata_store=MetadataStore()).begin('Ground','peer'),{})
   self.assertEqual(PairingRegistry(secret_store=SecretStore(),metadata_store=Meta()).begin('Ground','peer'),{})
+ def test_unavailable_secret_store_hides_backend_error(self):
+  store=SecretStore();store.error='WinError 1062: raw keyring detail';registry=PairingRegistry(store,Meta())
+  self.assertNotIn('WinError',registry.secretStoreError);self.assertIn('Перевірте',registry.secretStoreError)
  def test_confirm_failure_preserves_pending_for_retry(self):
   s=Store();m=Meta();r=PairingRegistry(s,m);p=r.begin('Ground','peer');m.fail=True;self.assertFalse(r.confirm(p['id'],True));self.assertEqual(len(r.pending),1);self.assertEqual(s.data,{})
  def test_confirm_rollback_failure_blocks_new_pairing_until_reconcile(self):
@@ -49,7 +52,10 @@ class Tests(unittest.TestCase):
  def test_revoke_removes_secret_and_metadata(self):
   s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);self.assertTrue(r.revoke(p['id']));self.assertEqual(s.data,{});self.assertEqual(m.records,[]);self.assertEqual(r.trusted,[])
  def test_secret_failure_is_reported_without_fabricating_absence(self):
-  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);s.fail='contains';self.assertFalse(r.reconcile());self.assertEqual(len(r.trusted),1);self.assertIn('contains fail',r.secretStoreError);self.assertNotEqual(r.recoveryError,'')
+  s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);s.fail='contains';self.assertFalse(r.reconcile());self.assertEqual(len(r.trusted),1);self.assertNotIn('contains fail',r.secretStoreError);self.assertIn('Перевірте',r.secretStoreError);self.assertNotEqual(r.recoveryError,'')
+ def test_storage_errors_are_human_readable(self):
+  s=Store();m=Meta();m.load_fail=True;r=PairingRegistry(s,m,Clock());self.assertNotIn('load fail',r.metadataError);self.assertIn('довіри',r.metadataError)
+  m.load_fail=False;self.assertTrue(r.reconcile());m.fail=True;p=r.begin('Ground','peer');self.assertFalse(r.confirm(p['id'],True));self.assertNotIn('fail',r.metadataError);self.assertIn('зберегти',r.metadataError)
  def test_reconcile_metadata_write_failure_stays_blocking(self):
   s=Store();m=Meta();r=PairingRegistry(s,m,Clock());p=r.begin('Ground','peer');r.confirm(p['id'],True);s.data.clear();m.fail=True;self.assertFalse(r.reconcile());self.assertEqual(len(r.trusted),1);self.assertNotEqual(r.metadataError,'');self.assertNotEqual(r.recoveryError,'');self.assertEqual(r.begin('Other','peer2'),{});m.fail=False;self.assertTrue(r.reconcile());self.assertEqual(r.trusted,[]);self.assertEqual(r.recoveryError,'')
  def test_reconcile_reloads_after_transient_metadata_load_error(self):

@@ -48,6 +48,12 @@ def validate_install_root(root):
  if root is None:return None
  r=Path(root).resolve();helper=r/'FPV-Uhyliant-Update.exe';launcher=r/'FPV-Uhyliant-Launcher.exe';current=r/'app'/'current'/'FPV-Uhyliant.exe'
  return r if helper.is_file() and launcher.is_file() and current.is_file() else None
+def human_update_error(action,error):
+ if isinstance(error,RuntimeError):return str(error)
+ if isinstance(error,(urllib.error.URLError,TimeoutError,ConnectionError)):
+  return 'Не вдалося перевірити оновлення. Перевірте мережу і спробуйте ще раз.' if action=='check' else 'Не вдалося завантажити оновлення. Перевірте мережу і спробуйте ще раз.'
+ if isinstance(error,OSError):return 'Не вдалося зберегти оновлення. Перевірте доступ до диска і вільне місце.'
+ return 'Не вдалося завершити операцію оновлення. Перевірте мережу і спробуйте ще раз.'
 class W(QThread):
  done=Signal(bool,object);progress=Signal(int,str)
  def __init__(self,a,p):super().__init__();self.a=a;self.p=p
@@ -70,7 +76,7 @@ class W(QThread):
     os.replace(part,t)
    except Exception:part.unlink(missing_ok=True);raise
    ready={'version':o['version'],'package':str(t),'sha256':digest};tmp=UP/'ready.tmp';tmp.write_text(json.dumps(ready),encoding='utf-8');os.replace(tmp,UP/'ready.json');self.done.emit(True,ready)
-  except Exception as e:self.done.emit(False,str(e))
+  except Exception as e:self.done.emit(False,human_update_error(self.a,e))
 class Updater(QObject):
  changed=Signal();progressChanged=Signal()
  def __init__(self,root=None,guard=None):super().__init__();self.root=validate_install_root(root);self.guard=guard or (lambda:(True,''));self.url=DEFAULT;self.state='idle';self.status='Готово';self.available='';self.notes=[];self.p=0;self.m={};self.w=None
@@ -104,7 +110,8 @@ class Updater(QObject):
   if decision=='blocked':self.state='blocked';self.status=why;self.changed.emit();return
   if decision=='unavailable':self.state='error';self.status='Компонент оновлення недоступний: запустіть встановлену програму через FPV-Uhyliant-Launcher.exe';self.changed.emit();return
   try:r=stage_ready_package(self.root,load_ready(self.m));args=helper_args(self.root/'FPV-Uhyliant-Update.exe',self.root,r,os.getpid());subprocess.Popen(args,cwd=self.root,creationflags=getattr(subprocess,'DETACHED_PROCESS',0))
-  except (RuntimeError,OSError,ValueError) as e:self.state='error';self.status=str(e);self.changed.emit();return
+  except RuntimeError as e:self.state='error';self.status=str(e);self.changed.emit();return
+  except (OSError,ValueError) as e:self.state='error';self.status=human_update_error('install',e);self.changed.emit();return
   QTimer.singleShot(300,QCoreApplication.quit)
  def _start(self,a,p,s):
   if self.busy:self.status='Операція оновлення вже виконується';self.changed.emit();return

@@ -20,4 +20,10 @@ class Tests(unittest.TestCase):
   nested=self.root/'nested';nested.mkdir();package=nested/'package.zip';package.write_bytes(b'payload');(self.root/'ready.json').write_text(json.dumps({'version':'2.0.11','package':str(package),'sha256':self.digest}),encoding='utf-8');self.assertRaises(RuntimeError,updater_engine.load_ready,self.manifest)
  def test_install_root_requires_full_installed_layout(self):
   install=self.root/'install';install.mkdir();self.assertIsNone(updater_engine.validate_install_root(install));(install/'FPV-Uhyliant-Update.exe').write_bytes(b'');(install/'FPV-Uhyliant-Launcher.exe').write_bytes(b'');(install/'app'/'current').mkdir(parents=True);(install/'app'/'current'/'FPV-Uhyliant.exe').write_bytes(b'');self.assertEqual(updater_engine.validate_install_root(install),install.resolve())
+ def test_update_errors_hide_transport_and_filesystem_details(self):
+  import urllib.error
+  for action,message in (('check','Не вдалося перевірити оновлення'),('download','Не вдалося завантажити оновлення')):
+   text=updater_engine.human_update_error(action,urllib.error.URLError('socket error at https://example.invalid'))
+   self.assertIn(message,text);self.assertNotIn('socket error',text);self.assertNotIn('https://',text)
+  self.assertIn('доступ до диска',updater_engine.human_update_error('download',OSError('C:\\\\private\\\\updates')))
 if __name__=='__main__':unittest.main()
