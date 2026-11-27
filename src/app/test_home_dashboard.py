@@ -10,6 +10,7 @@ class HomeDashboardTests(unittest.TestCase):
         self.assertEqual(result["title"], "Стан перевіряється")
         self.assertTrue(result["nextAction"]["available"])
         self.assertEqual(result["nextAction"]["action"], "find-camera")
+        self.assertIn("Камеру ще не додано", result["summary"])
 
     def test_verified_active_camera_with_stream_is_ready_and_shows_video(self):
         devices = [{
@@ -34,6 +35,7 @@ class HomeDashboardTests(unittest.TestCase):
         self.assertEqual(result["health"], "attention")
         self.assertEqual(result["warningCount"], 1)
         self.assertEqual(result["nextAction"]["action"], "verify-camera")
+        self.assertIn("не підтверджено", result["summary"])
 
 
 if __name__ == "__main__":

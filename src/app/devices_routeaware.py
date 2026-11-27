@@ -5,6 +5,8 @@ from devices import Devices as LegacyDevices, interfaces
 from openipc_device import normalize_openipc_identity
 from route_discovery import discover_targets, fingerprint, plan_targets, system_routes
 
+DISCOVERY_ERROR_MESSAGE="Не вдалося завершити пошук камер. Перевірте мережу та спробуйте ще раз."
+MANUAL_CHECK_ERROR_MESSAGE="Не вдалося перевірити камеру. Перевірте її адресу, живлення та мережеве з’єднання."
 
 def _safe_private_host(value):
     try:address=ipaddress.ip_address(str(value).strip())
@@ -21,19 +23,21 @@ class DiscoveryWorker(QThread):
             self.progress.emit("Перевірка маршрутів",0,len(self.targets),0)
             def update(done,total,found):self.progress.emit("Пошук камер",done,total,found)
             items=discover_targets(self.targets,self.cancel,update);self.live.emit(items);self.done.emit(items,self.cancel.is_set(),"")
-        except Exception as exc:self.done.emit([],self.cancel.is_set(),str(exc))
+        except Exception:self.done.emit([],self.cancel.is_set(),"discovery-failed")
 
 class ManualWorker(QThread):
     done=Signal(object,str)
     def __init__(self,host):super().__init__();self.host=host;self.cancel=threading.Event()
     def run(self):
         try:self.done.emit(fingerprint(self.host,self.cancel),"")
-        except Exception as exc:self.done.emit({},str(exc))
+        except Exception:self.done.emit({},"inspection-failed")
 
 class Devices(LegacyDevices):
     manualChanged=Signal()
+    scanStateChanged=Signal()
     def __init__(self):
         super().__init__();self._manual_busy=False;self._manual_result={};self._manual_error="";self._manual_status="idle";self._manual_message="";self._manual_worker=None;self._manual_requested_host=""
+        self.discoveryChanged.connect(self.scanStateChanged)
         self._init_discovery_history()
     def _init_discovery_history(self):
         with self._connect() as db:db.execute("CREATE TABLE IF NOT EXISTS discovery_history(host TEXT PRIMARY KEY,last_seen INTEGER NOT NULL DEFAULT 0,openipc INTEGER NOT NULL DEFAULT 0)")
@@ -60,13 +64,13 @@ class Devices(LegacyDevices):
     def manualStatus(self):return self._manual_status
     @Property(str,notify=manualChanged)
     def manualMessage(self):return self._manual_message
-    @Property(str,notify=LegacyDevices.discoveryChanged)
+    @Property(str,notify=scanStateChanged)
     def scanStage(self):return self._stage
-    @Property(str,notify=LegacyDevices.discoveryChanged)
+    @Property(str,notify=scanStateChanged)
     def scanStatus(self):return self._status
-    @Property(int,notify=LegacyDevices.discoveryChanged)
+    @Property(int,notify=scanStateChanged)
     def scanDone(self):return self._pd
-    @Property(int,notify=LegacyDevices.discoveryChanged)
+    @Property(int,notify=scanStateChanged)
     def scanTotal(self):return self._pt
     @Slot()
     def discoverOpenIPC(self):
@@ -81,7 +85,7 @@ class Devices(LegacyDevices):
     def _on_live(self,items):self._discovered=items;self._found=len(items);self.discoveryChanged.emit()
     def _on_done(self,items,cancelled,error):
         for item in items:self._remember_host(item.get("host",""),item.get("openipc",False))
-        self._discovered=items;self._scanning=False;self._worker=None;self._stage="Скасовано" if cancelled else ("Помилка" if error else "Готово");self._status=error or ("Пошук скасовано" if cancelled else "Пошук завершено");self._pd=self._pt;self._found=len(items);self.discoveryChanged.emit()
+        self._discovered=items;self._scanning=False;self._worker=None;self._stage="Скасовано" if cancelled else ("Помилка" if error else "Готово");self._status=DISCOVERY_ERROR_MESSAGE if error else ("Пошук скасовано" if cancelled else "Пошук завершено");self._pd=self._pt;self._found=len(items);self.discoveryChanged.emit()
     @Slot(str)
     def invalidateManualIp(self,value):
         address=_safe_private_host(value)
@@ -99,7 +103,7 @@ class Devices(LegacyDevices):
     def _on_manual_done(self,result,error):
         requested=self._manual_requested_host
         self._manual_busy=False;self._manual_worker=None
-        if error:self._manual_result={};self._set_manual("error","",error);return
+        if error:self._manual_result={};self._set_manual("error","",MANUAL_CHECK_ERROR_MESSAGE);return
         result_host=_safe_private_host(result.get("host",""))
         if not requested or result_host!=requested:self._manual_result={};self._set_manual("error","","Результат перевірки не відповідає поточній адресі");return
         if not result.get("camera"):self._manual_result={};self._set_manual("error","","На цій адресі не знайдено доступної камери");return
@@ -144,6 +148,7 @@ class Devices(LegacyDevices):
         name=name.strip();host=host.strip();from devices import valid_host
         if not name or not valid_host(host):return False
         try:
-            with self._connect() as db:db.execute("UPDATE devices SET name=?,host=?,port=?,notes=? WHERE id=?",(name,host,max(1,min(int(port),65535)),notes.strip(),did))
+            with self._connect() as db:changed=db.execute("UPDATE devices SET name=?,host=?,port=?,notes=? WHERE id=?",(name,host,max(1,min(int(port),65535)),notes.strip(),did)).rowcount>0
         except Exception:return False
-        self._remember_host(host,False);self._load();self.changed.emit();return True
+        if not changed:return False
+        self._remember_host(host,False);self._load();self.changed.emit();self.deviceUpdated.emit();return True

@@ -56,7 +56,7 @@ class FirmwareCenter(QObject):
   try:
    with p.open("rb") as f:
     for chunk in iter(lambda:f.read(1024*1024),b""):h.update(chunk);size+=len(chunk)
-  except OSError as exc:self._artifact={"path":str(p),"sha256":"","expectedSha256":expected,"size":0,"verified":False,"error":str(exc)};self.changed.emit();return False
+  except OSError:self._artifact={"path":str(p),"sha256":"","expectedSha256":expected,"size":0,"verified":False,"error":"Не вдалося прочитати файл прошивки. Перевірте доступ до файлу."};self.changed.emit();return False
   actual=h.hexdigest();valid=len(expected)==64 and all(c in "0123456789abcdef" for c in expected);verified=valid and actual==expected;self._artifact={"path":str(p),"sha256":actual,"expectedSha256":expected,"size":size,"verified":verified,"error":"" if verified else ("Некоректний очікуваний SHA-256" if not valid else "SHA-256 не збігається")};self.changed.emit();return verified
  def _approval_token(self,device_id,profile,mode,device,identity):
   material="|".join((device_id,str((device or {}).get("host","")).strip(),profile,mode,self._artifact["sha256"],str(self._artifact["size"]),str(identity.get("platform","")).lower(),str(identity.get("sensor","")).lower(),str(bool(identity.get("verified")))));return hashlib.sha256(material.encode()).hexdigest()
