@@ -8,4 +8,3 @@
 *.bat text eol=crlf
 *.zip binary
 
-.github/workflows/*.lock.yml linguist-generated=true
