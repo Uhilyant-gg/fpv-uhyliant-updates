@@ -1,5 +1,6 @@
 import hashlib,tempfile,unittest
 from pathlib import Path
+from unittest.mock import patch
 from firmware_center import FirmwareCenter
 class Devices:
  def __init__(self,identity):self.items=[{"id":"cam","host":"192.168.1.50","openipcIdentity":identity}]
@@ -23,6 +24,14 @@ class FirmwareCenterTests(unittest.TestCase):
   f=self.center({"verified":True,"platform":"ssc30kq","sensor":"imx335"});self.assertTrue(f.precheck("cam","ssc30kq-imx335","upgrade",False,False));self.assertTrue(f.approvalMatches("cam","ssc30kq-imx335","upgrade"));self.assertFalse(f.approvalMatches("cam","ssc30kq-imx335","primary"))
  def test_host_change_invalidates_approval_and_execution_plan(self):
   f=self.center({"verified":True,"platform":"ssc30kq","sensor":"imx335"});self.assertTrue(f.precheck("cam","ssc30kq-imx335","upgrade",False,False));f.devices.items[0]["host"]="192.168.1.99";self.assertFalse(f.approvalMatches("cam","ssc30kq-imx335","upgrade"));self.assertFalse(f.prepareExecution("cam","ssc30kq-imx335","upgrade"));self.assertFalse(f.executionPlan["ready"])
+ def test_unreadable_firmware_file_has_a_human_error_without_path_details(self):
+  f=FirmwareCenter(Devices({"verified":True,"platform":"ssc30kq","sensor":"imx335"}))
+  with patch.object(Path,"open",side_effect=PermissionError("C:\\private\\firmware.bin: access denied")):
+   self.assertFalse(f.verifyImage(str(self.image),self.sha))
+  error=f.artifact["error"]
+  self.assertIn("Перевірте доступ до файлу",error)
+  self.assertNotIn("PermissionError",error)
+  self.assertNotIn(str(self.image),error)
  def test_execution_plan_requires_matching_approval(self):
   f=self.center({"verified":True,"platform":"ssc30kq","sensor":"imx335"});self.assertFalse(f.prepareExecution("cam","ssc30kq-imx335","upgrade"));self.assertTrue(f.precheck("cam","ssc30kq-imx335","upgrade",False,False));self.assertTrue(f.prepareExecution("cam","ssc30kq-imx335","upgrade"));self.assertTrue(f.executionPlan["ready"]);self.assertIn("Повторно виявити пристрій",f.executionPlan["steps"]);self.assertIn("Перевірити ідентичність OpenIPC і прошивку",f.executionPlan["steps"])
  def test_fullflash_plan_explicitly_requires_verified_custom_openipc(self):

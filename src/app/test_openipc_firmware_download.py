@@ -24,7 +24,16 @@ class Tests(unittest.TestCase):
    center=Center();service=OpenIPCFirmwareAcquisition(center,td,opener=lambda *a,**k:responses.pop(0));self.assertTrue(service.refresh());selected=service.selectForDevice('cam','nightly','b1','lite');self.assertTrue(selected['ready']);self.assertTrue(service.downloadSelected('cam'));self.assertEqual(service.status['state'],'verified');self.assertTrue(Path(service.status['selection']['path']).is_file());self.assertEqual(len(center.calls),1)
  def test_redirect_outside_policy_is_rejected(self):
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=False):
-   service=OpenIPCFirmwareAcquisition(Center(),td,opener=lambda *a,**k:Response(b'{}'));self.assertFalse(service.refresh());self.assertEqual(service.status['state'],'error')
+   service=OpenIPCFirmwareAcquisition(Center(),td,opener=lambda *a,**k:Response(b'{}'));self.assertFalse(service.refresh());self.assertEqual(service.status['state'],'error');self.assertIn('офіційному джерелу',service.status['reason']);self.assertNotIn('redirected outside',service.status['reason'])
+ def test_catalog_failure_does_not_expose_transport_details(self):
+  with tempfile.TemporaryDirectory() as td:
+   def fail(*args,**kwargs):raise OSError(r'C:\private\cache\connection detail')
+   service=OpenIPCFirmwareAcquisition(Center(),td,opener=fail);self.assertFalse(service.refresh());reason=service.status['reason'];self.assertIn('Перевірте з’єднання',reason);self.assertNotIn('private',reason);self.assertNotIn('OSError',reason)
+ def test_download_failure_does_not_expose_transport_details(self):
+  data=b'firmware'
+  with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
+   def fail(*args,**kwargs):raise TimeoutError(r'C:\private\cache\connection detail')
+   service,_=self.selected_service(td,data,fail);self.assertFalse(service.downloadSelected('cam'));reason=service.status['reason'];self.assertIn('Перевірте мережу',reason);self.assertNotIn('private',reason);self.assertNotIn('TimeoutError',reason)
  def test_bad_download_never_reaches_center(self):
   data=b'firmware'
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
@@ -41,9 +50,9 @@ class Tests(unittest.TestCase):
  def test_cache_directory_failure_is_reported_without_network_or_center_handoff(self):
   data=b'firmware'
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True):
-   cache=Path(td)/'cache';cache.write_bytes(b'not-a-directory');calls=[];service,center=self.selected_service(cache,data,lambda *a,**k:calls.append(1));self.assertFalse(service.downloadSelected('cam'));self.assertEqual(service.status['state'],'error');self.assertIn('кеш прошивки',service.status['reason']);self.assertEqual(calls,[]);self.assertEqual(center.calls,[])
+   cache=Path(td)/'cache';cache.write_bytes(b'not-a-directory');calls=[];service,center=self.selected_service(cache,data,lambda *a,**k:calls.append(1));self.assertFalse(service.downloadSelected('cam'));self.assertEqual(service.status['state'],'error');self.assertIn('місце для завантаження',service.status['reason']);self.assertNotIn(str(cache),service.status['reason']);self.assertEqual(calls,[]);self.assertEqual(center.calls,[])
  def test_temp_file_failure_is_reported_without_network_or_center_handoff(self):
   data=b'firmware'
   with tempfile.TemporaryDirectory() as td,patch('openipc_firmware_acquisition._official_url',return_value=True),patch('openipc_firmware_acquisition.tempfile.mkstemp',side_effect=OSError('denied')):
-   calls=[];service,center=self.selected_service(td,data,lambda *a,**k:calls.append(1));self.assertFalse(service.downloadSelected('cam'));self.assertEqual(service.status['state'],'error');self.assertIn('тимчасовий файл',service.status['reason']);self.assertEqual(calls,[]);self.assertEqual(center.calls,[])
+   calls=[];service,center=self.selected_service(td,data,lambda *a,**k:calls.append(1));self.assertFalse(service.downloadSelected('cam'));self.assertEqual(service.status['state'],'error');self.assertIn('місце для завантаження',service.status['reason']);self.assertEqual(calls,[]);self.assertEqual(center.calls,[])
 if __name__=='__main__':unittest.main()

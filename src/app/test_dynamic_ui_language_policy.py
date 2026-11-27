@@ -8,8 +8,8 @@ class DynamicUiLanguagePolicyTests(unittest.TestCase):
         self.sources={name:(here/name).read_text(encoding='utf-8') for name in names}
     def test_video_user_errors_are_ukrainian(self):
         source=self.sources['video.py']
-        for obsolete in ('Video profile','runtime підтримує','endpoint metadata','metadata змінилися'):self.assertNotIn(obsolete,source)
-        for expected in ('Відеопрофіль','модуль відтворення','Метадані кінцевої точки RTSP','метадані змінилися'):self.assertIn(expected,source)
+        for obsolete in ('Video profile','runtime підтримує','endpoint metadata','metadata змінилися','RTSP {self._host}','Connection refused'):self.assertNotIn(obsolete,source)
+        for expected in ('Не вдалося підключитися до камери','Формат цього відеопотоку не підтримується','Перевірте адресу камери','Дані відеопотоку змінилися'):self.assertIn(expected,source)
     def test_msp_dynamic_error_is_ukrainian(self):self.assertIn('MSP: відповідь із помилкою для команди',self.sources['msp_runtime.py']);self.assertNotIn('MSP error response for command',self.sources['msp_runtime.py'])
     def test_firmware_dynamic_copy_is_ukrainian_without_changing_enum_values(self):
         source=self.sources['firmware_center.py']

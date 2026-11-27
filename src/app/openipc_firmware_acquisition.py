@@ -76,6 +76,27 @@ def _read_response(response,limit):
  data=response.read(limit+1)
  if len(data)>limit:raise ValueError('response is too large')
  return data
+def human_firmware_error(error,stage):
+ message=str(error)
+ safe_messages={
+  'Каталог OpenIPC не містить придатних образів':'Не вдалося знайти придатні версії прошивки в каталозі. Спробуйте ще раз пізніше.',
+  'redirected outside official OpenIPC hosts':'Посилання на завантаження не належить офіційному джерелу. Завантаження зупинено.',
+  'SHA-256 або розмір завантаження не збігається':'Перевірка цілісності прошивки не пройдена. Завантажте її ще раз.',
+  'Ідентичність пристрою або каталог змінилися під час завантаження':'Список пристроїв змінився під час завантаження. Перевірте сумісність ще раз.',
+  'Центр прошивки відхилив завантажений образ':'Не вдалося безпечно перевірити завантажену прошивку. Завантажте її ще раз.',
+ }
+ if message in safe_messages:return safe_messages[message]
+ if message=='invalid response size':
+  return 'Не вдалося перевірити розмір каталогу прошивок.' if stage=='catalog' else 'Не вдалося перевірити розмір завантаження. Завантаження зупинено.'
+ if message=='response is too large':
+  return 'Каталог прошивок перевищує дозволений розмір. Спробуйте ще раз пізніше.' if stage=='catalog' else 'Файл перевищує дозволений розмір. Завантаження зупинено.'
+ if isinstance(error,(urllib.error.URLError,TimeoutError,ConnectionError)):
+  return 'Не вдалося завантажити дані прошивки. Перевірте мережу та спробуйте ще раз.'
+ if isinstance(error,OSError):
+  if stage=='catalog':return 'Не вдалося перевірити каталог прошивок. Перевірте з’єднання та спробуйте ще раз.'
+  return 'Не вдалося зберегти файл прошивки. Перевірте вільне місце й доступ до папки та спробуйте ще раз.'
+ if stage=='catalog':return 'Не вдалося перевірити каталог прошивок. Спробуйте ще раз.'
+ return 'Не вдалося перевірити завантажену прошивку. Повторіть завантаження.'
 class OpenIPCFirmwareAcquisition(QObject):
  changed=Signal()
  def __init__(self,firmware_center,cache_dir,opener=None):super().__init__();self.center=firmware_center;self.cache=Path(cache_dir);self.opener=opener or urllib.request.urlopen;self._catalog=[];self._generation=0;self._status={'state':'idle','reason':'','count':0,'selection':{}}
@@ -107,7 +128,7 @@ class OpenIPCFirmwareAcquisition(QObject):
    with self.opener(request,timeout=NETWORK_TIMEOUT) as response:raw=_read_response(response,MAX_MANIFEST_BYTES)
    catalog=parse_catalog(raw)
    if not catalog:raise ValueError('Каталог OpenIPC не містить придатних образів')
-  except (OSError,urllib.error.URLError,ValueError,TypeError) as exc:self._set('error',str(exc));return False
+  except (OSError,urllib.error.URLError,ValueError,TypeError) as exc:self._set('error',human_firmware_error(exc,'catalog'));return False
   self._catalog=catalog;self._set('ready');return True
  @Slot(str,str,str,str,result='QVariantMap')
  def selectForDevice(self,device_id,channel,build,variant):
@@ -141,7 +162,7 @@ class OpenIPCFirmwareAcquisition(QObject):
   if not _official_url(artifact.get('url')) or not expected or size<=0 or size>MAX_FIRMWARE_BYTES:self._set('error','Невалідні метадані прошивки',selection=selection);return False
   self._set('downloading',selection=selection)
   try:self.cache.mkdir(parents=True,exist_ok=True)
-  except OSError as exc:self._set('error','Не вдалося підготувати кеш прошивки: '+str(exc),selection=selection);return False
+  except OSError:self._set('error','Не вдалося підготувати місце для завантаження. Перевірте вільне місце й доступ до папки.',selection=selection);return False
   target=self.cache/('openipc-'+expected[:16]+'.tgz')
   if target.is_file() and verify_download(target,artifact):
    if self._selection_current(selection) and self.center.verifyImage(str(target),expected):selection['path']=str(target);self._set('verified',selection=selection);return True
@@ -149,7 +170,7 @@ class OpenIPCFirmwareAcquisition(QObject):
   try:target.unlink(missing_ok=True)
   except OSError:pass
   try:fd,tmp=tempfile.mkstemp(prefix='openipc-',suffix='.part',dir=self.cache);os.close(fd)
-  except OSError as exc:self._set('error','Не вдалося створити тимчасовий файл прошивки: '+str(exc),selection=selection);return False
+  except OSError:self._set('error','Не вдалося підготувати місце для завантаження. Перевірте вільне місце й доступ до папки.',selection=selection);return False
   try:
    request=urllib.request.Request(artifact['url'],headers={'Accept':'application/octet-stream','User-Agent':'FPV-Uhyliant/firmware-acquisition'})
    with self.opener(request,timeout=NETWORK_TIMEOUT) as response:data=_read_response(response,size)
@@ -161,7 +182,7 @@ class OpenIPCFirmwareAcquisition(QObject):
   except (OSError,urllib.error.URLError,ValueError,TypeError) as exc:
    try:Path(tmp).unlink(missing_ok=True)
    except OSError:pass
-   self._set('error',str(exc),selection=selection);return False
+   self._set('error',human_firmware_error(exc,'download'),selection=selection);return False
   selection['path']=str(target);self._set('verified',selection=selection);return True
  @Slot()
  def reset(self):self._generation+=1;self._catalog=[];self._set('idle')

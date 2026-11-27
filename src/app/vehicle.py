@@ -23,8 +23,8 @@ class VehicleRuntime(QObject):
         issues=[];connected=telemetry.get("connected")
         if provider.error:issues.append({"severity":"error","source":provider.name,"message":provider.error})
         elif connected is not True:issues.append({"severity":"warning","source":provider.name,"message":"Немає підтвердженої актуальної телеметрії"})
-        if self.video.error:issues.append({"severity":"error" if video_state=="error" else "warning","source":"RTSP","message":self.video.error})
-        elif video_state=="stalled":issues.append({"severity":"warning","source":"RTSP","message":"Відеопотік зупинено"})
+        if self.video.error:issues.append({"severity":"error" if video_state=="error" else "warning","source":"Відео","message":self.video.error})
+        elif video_state=="stalled":issues.append({"severity":"warning","source":"Відео","message":"Відеопотік зупинено"})
         health="error" if any(item["severity"]=="error" for item in issues) else ("warning" if issues else "ok")
         self._diagnostics={"health":health,"issues":issues,"generatedUtc":datetime.now(timezone.utc).isoformat(),"telemetryProvider":provider.name,"telemetryConnected":connected,"telemetryHealth":telemetry.get("health"),"videoState":video_state}
         self.changed.emit()
