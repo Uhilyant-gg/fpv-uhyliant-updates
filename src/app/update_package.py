@@ -16,7 +16,7 @@ def safe_members(info_list,base,max_files=10000,max_uncompressed=2*1024*1024*102
  base=Path(base).resolve();seen=set();total=0;out=[]
  if len(info_list)>max_files:raise ValueError('too many ZIP members')
  for info in info_list:
-  name=info.filename
+  name=info.orig_filename
   if not name or '\x00' in name or '\\' in name:raise ValueError('invalid ZIP member name')
   target=(base/name).resolve()
   if target!=base and base not in target.parents:raise ValueError('unsafe ZIP member path')

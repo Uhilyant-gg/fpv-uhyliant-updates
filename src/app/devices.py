@@ -1,4 +1,5 @@
 import json,os,sqlite3,uuid
+from contextlib import closing,contextmanager
 from pathlib import Path
 from PySide6.QtCore import QObject,Property,Signal,Slot
 from device_center import device_center_fields
@@ -20,7 +21,10 @@ class Devices(QObject):
  changed=Signal();streamsChanged=Signal();discoveryChanged=Signal();deviceAdded=Signal();deviceUpdated=Signal();deviceRemoved=Signal();deviceListRestored=Signal()
  def __init__(self):
   super().__init__();DATA.mkdir(parents=True,exist_ok=True);self._items=[];self._streams=[];self._active='';self._discovered=[];self._scanning=False;self._stage='';self._status='';self._pd=0;self._pt=0;self._found=0;self._worker=None;self._init();self._load()
- def _connect(self):return sqlite3.connect(DB)
+ @contextmanager
+ def _connect(self):
+  with closing(sqlite3.connect(DB)) as connection:
+   with connection:yield connection
  def _init(self):
   with self._connect() as d:
    d.execute('CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT NOT NULL,host TEXT NOT NULL,port INTEGER NOT NULL,connection TEXT NOT NULL,notes TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 0,identity_json TEXT NOT NULL DEFAULT "{}",last_observed_at INTEGER NOT NULL DEFAULT 0)')
