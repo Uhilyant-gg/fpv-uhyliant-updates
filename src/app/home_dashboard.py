@@ -34,9 +34,21 @@ def _human_summary(reason_code: str) -> str:
     }.get(reason_code, "Стан камери ще перевіряється.")
 
 
+def _controller_component(controller: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """A PC-connected RC controller is optional: only an observed controller that
+    needs setup contributes, and only its calibrate action."""
+    if not isinstance(controller, Mapping) or controller.get("health") != "attention":
+        return None
+    actions = controller.get("safeActions")
+    if not isinstance(actions, (list, tuple)) or "calibrate-controller" not in actions:
+        return None
+    return {"health": "attention", "safeActions": ["calibrate-controller"]}
+
+
 def home_dashboard(
     devices: Iterable[Mapping[str, Any]] | None,
     streams: Iterable[Mapping[str, Any]] | None,
+    controller: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     all_items = tuple(device for device in (devices or ()) if isinstance(device, Mapping))
     pending = tuple(
@@ -61,7 +73,11 @@ def home_dashboard(
         camera = device_health(camera_data)
 
     combined = station_health([camera])
-    next_action = present_next_action(select_next_best_action({"camera": camera.as_dict()}).as_dict())
+    components: dict[str, Any] = {"camera": camera.as_dict()}
+    controller_component = _controller_component(controller)
+    if controller_component is not None:
+        components["controller"] = controller_component
+    next_action = present_next_action(select_next_best_action(components).as_dict())
 
     verified = sum(
         1

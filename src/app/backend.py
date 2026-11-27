@@ -13,13 +13,21 @@ class HomeDashboard(QObject):
     def __init__(self, devices):
         super().__init__()
         self._devices = devices
+        self._controller = None
         self._model = home_dashboard(devices.items, devices.streams)
         devices.changed.connect(self.refresh)
         devices.streamsChanged.connect(self.refresh)
         devices.discoveryChanged.connect(self.refresh)
 
+    def setController(self, controller):
+        """Include an observed RC controller in the Home next action."""
+        self._controller = controller
+        controller.changed.connect(self.refresh)
+        self.refresh()
+
     def refresh(self):
-        self._model = home_dashboard(self._devices.items, self._devices.streams)
+        controller = self._controller.evidence() if self._controller is not None else None
+        self._model = home_dashboard(self._devices.items, self._devices.streams, controller)
         self.changed.emit()
 
     @Property(str, notify=changed)
