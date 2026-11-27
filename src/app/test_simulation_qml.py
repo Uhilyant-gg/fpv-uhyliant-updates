@@ -65,6 +65,7 @@ def single_shot(delay, callback):
             'hardwareE2EPopup': 'hardwareE2EContent',
             'updatePopup': 'updateContent',
             'devices': 'devicesContent',
+            'recordingPopup': 'recordingContent',
         }
         popups = {}
         for popup_name, loader_name in lazy_panels.items():
@@ -90,6 +91,14 @@ def single_shot(delay, callback):
         assert menu is not None and menu.property('visible')
         hardware_devices = window.findChild(QObject, 'flightMenuDevices')
         assert hardware_devices is not None and not hardware_devices.property('enabled')
+        flight_video = window.findChild(QObject, 'mainFlightVideoOutput')
+        assert attached_sinks and isinstance(attached_sinks[-1], dvr_runtime.QVideoSink)
+        assert attached_sinks[-1] == flight_video.property('videoSink'), 'recording follows the flight video'
+        dvr_button = window.findChild(QObject, 'dvrToggle')
+        assert dvr_button is not None and not dvr_button.property('visible'), 'no recording of the simulation'
+        dvr_menu = window.findChild(QObject, 'flightMenuDvrToggle')
+        assert dvr_menu is not None and not dvr_menu.property('enabled')
+        assert window.findChild(QObject, 'flightMenuRecordingSettings') is not None
         edit = window.findChild(QObject, 'flightMenuOsdSettings')
         assert edit is not None and edit.property('enabled')
         edit.clicked.emit()
@@ -118,6 +127,13 @@ def single_shot(delay, callback):
         (test_root / 'simulation-tested').write_text('ok')
     return original_single_shot(delay, verify)
 QTimer.singleShot = single_shot
+import dvr_runtime
+attached_sinks = []
+original_set_sink = dvr_runtime.DvrRuntime.setVideoSink
+def record_sink(self, sink):
+    attached_sinks.append(sink)
+    return original_set_sink(self, sink)
+dvr_runtime.DvrRuntime.setVideoSink = record_sink
 import main
 sys.argv = ['main.py', '--first-run-acceptance-smoke']
 assert main.main() == 0

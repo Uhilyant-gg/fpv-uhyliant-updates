@@ -29,6 +29,7 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
                 "PairingPanel.qml",
                 "PreflightPanel.qml",
                 "PresetsPanel.qml",
+                "RecordingPanel.qml",
                 "TimelinePanel.qml",
                 "UpdatePanel.qml",
             },

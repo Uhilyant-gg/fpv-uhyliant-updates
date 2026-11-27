@@ -15,6 +15,7 @@ Item {
  signal openSimulation()
  signal openController()
  signal openPresets()
+ signal openRecording()
  signal connectDevice(string deviceId)
  signal runNextAction(string action)
 
@@ -30,6 +31,7 @@ Item {
   {label: "Пульт", detail: "Підключити та налаштувати стіки", glyph: "✥", action: "controller"},
   {label: "Пресети", detail: "Налаштування під кожен дрон", glyph: "☰", action: "presets"},
   {label: "Підготовка", detail: "Перевірити стан системи", glyph: "✓", action: "preflight"},
+  {label: "Запис відео", detail: "Папка для записів польотів", glyph: "●", action: "recording"},
   {label: "Симуляція", detail: "Налаштувати екран без обладнання", glyph: "▣", action: "simulation"},
   {label: "Події", detail: "Історія важливих змін", glyph: "⌁", action: "timeline"},
   {label: "Прошивка", detail: "Оновлення камери", glyph: "↑", action: "firmware"},
@@ -58,6 +60,7 @@ Item {
   else if (action === "backup") openBackup()
   else if (action === "controller") openController()
   else if (action === "presets") openPresets()
+  else if (action === "recording") openRecording()
  }
 
  Rectangle {
