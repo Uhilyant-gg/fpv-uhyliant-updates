@@ -17,7 +17,7 @@ Never treat software CI as physical hardware evidence. Never allow a deferred ph
 - E0 real OpenIPC Hardware E2E remains physically incomplete.
 - E8 controller calibration/mapping/profile core exists, but controller discovery, live acquisition, durable persistence and onboarding remain incomplete.
 - The largest product risk is the absence of one evidenced integrated first-run journey that proves the user can launch, understand state, see devices and receive a useful next action without documentation or configuration editing.
-- A controlled offscreen full-app run now records all seven first-run stages and is accepted: health evidence appears in 1.67 seconds, with a useful `find-camera` action and no manual configuration or raw UI error. Simulated discovery transitions also appear in Timeline; updater and MAVLink side effects were stubbed. This is repository-software evidence, not packaged or physical acceptance. A normal desktop and hardware-backed journey remain unverified.
+- A controlled offscreen full-app run now records all seven first-run stages and is accepted: health evidence appears in 1.67 seconds, with a useful `find-camera` action and no manual configuration or raw UI error. Simulated discovery transitions also appear in Timeline; updater and MAVLink side effects were stubbed. A packaged Windows startup-diagnostics run passed on `8bf09d7`, reaching Qt/QML event-processing completion in 469 ms; this diagnostic does not exercise the visible first-run health, device or next-action journey. Neither run is full packaged-user or physical acceptance. A normal desktop and hardware-backed journey remain unverified.
 
 ## Canonical capability status
 These headings are retained as the machine-validated capability contract.
