@@ -1,8 +1,21 @@
 import tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
+from PySide6.QtCore import QObject,Signal
 import devices as devices_module
 import devices_routeaware as module
+
+class ErrorState(QObject):
+ discoveryChanged=Signal();manualChanged=Signal()
+ def __init__(self):
+  super().__init__();self._items=[];self._discovered=[];self._scanning=True;self._worker=object();self._stage="";self._status="";self._pd=0;self._pt=0;self._found=0;self._manual_busy=True;self._manual_result={};self._manual_error="";self._manual_status="checking";self._manual_message="";self._manual_worker=object();self._manual_requested_host="192.168.1.50"
+ def _remember_host(self,*args):pass
+ def _set_manual(self,*args):module.Devices._set_manual(self,*args)
+ @property
+ def manualError(self):return self._manual_error
+ @property
+ def scanStatus(self):return self._status
+
 class Tests(unittest.TestCase):
  def setUp(self):
   self.temp=tempfile.TemporaryDirectory();root=Path(self.temp.name);devices_module.DATA=root;devices_module.DB=root/'devices.sqlite3';self.orig=devices_module.interfaces;devices_module.interfaces=lambda:[]
@@ -16,6 +29,12 @@ class Tests(unittest.TestCase):
   d=module.Devices();d._manual_busy=True;d._manual_requested_host='192.168.1.50';d._on_manual_done({'host':'192.168.1.50','camera':True,'openipc':False,'identityVerified':False,'authRequired':True},'');self.assertFalse(d.manualBusy);self.assertEqual(d.manualStatus,'auth-required');self.assertIn('логін',d.manualMessage)
  def test_manual_no_camera_has_visible_error_state(self):
   d=module.Devices();d._manual_busy=True;d._manual_requested_host='192.168.1.50';d._on_manual_done({},'');self.assertFalse(d.manualBusy);self.assertEqual(d.manualStatus,'error');self.assertTrue(d.manualError)
+ def test_manual_probe_exception_shows_recovery_guidance_not_raw_error(self):
+  d=ErrorState();module.Devices._on_manual_done(d,{},'Connection refused: socket error')
+  self.assertIn('Перевірте',d.manualError);self.assertNotIn('Connection refused',d.manualError);self.assertNotIn('socket error',d.manualError)
+ def test_discovery_exception_shows_recovery_guidance_not_raw_error(self):
+  d=ErrorState();module.Devices._on_done(d,[],False,'Unknown exception: timeout')
+  self.assertIn('Перевірте мережу',d.scanStatus);self.assertNotIn('Unknown exception',d.scanStatus);self.assertNotIn('timeout',d.scanStatus)
  def test_manual_result_for_unrequested_host_fails_closed(self):
   d=module.Devices();d._manual_busy=True;d._manual_requested_host='192.168.1.40';d._on_manual_done(self.verified(),'');self.assertFalse(d.manualBusy);self.assertEqual(d.manualStatus,'error');self.assertEqual(d.manualResult,{});self.assertIn('поточній адресі',d.manualError)
  def test_verified_manual_candidate_adds_and_reports_success(self):
