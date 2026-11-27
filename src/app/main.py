@@ -132,6 +132,8 @@ def main():
     from controller_profile_store import JsonControllerProfileStore
     from controller_runtime import ControllerRuntime
     from flight_alerts_runtime import FlightAlertsRuntime
+    from presets_runtime import PresetsRuntime
+    from settings_presets import PresetStore
 
     harness.mark('application-imports-complete')
     DATA.mkdir(parents=True, exist_ok=True)
@@ -243,7 +245,8 @@ def main():
     app._runtime_refs = app._runtime_refs + (display_runtime, controller)
     home.setController(controller)
     flight_alerts = FlightAlertsRuntime(telemetry, s)
-    app._runtime_refs = app._runtime_refs + (flight_alerts,)
+    presets = PresetsRuntime(PresetStore(DATA / 'presets.json'), s)
+    app._runtime_refs = app._runtime_refs + (flight_alerts, presets)
     ctx = e.rootContext()
     for name, obj in [
         ('station', s),
@@ -275,6 +278,7 @@ def main():
         ('hardwareE2ERuntime', hardware_e2e),
         ('controllerRuntime', controller),
         ('flightAlerts', flight_alerts),
+        ('presetsRuntime', presets),
     ]:
         ctx.setContextProperty(name, obj)
     ctx.setContextProperty('appWindowTitle', WINDOW_TITLE)

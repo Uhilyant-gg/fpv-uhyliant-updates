@@ -28,6 +28,7 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
                 "OsdSettingsPanel.qml",
                 "PairingPanel.qml",
                 "PreflightPanel.qml",
+                "PresetsPanel.qml",
                 "TimelinePanel.qml",
                 "UpdatePanel.qml",
             },
