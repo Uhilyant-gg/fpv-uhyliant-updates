@@ -279,15 +279,15 @@ class DvrRuntime(QObject):
     def shutdown(self, timeout_ms=5000):
         """Stop and wait until the file is finalized, so closing the app keeps the video playable."""
         self._stop("")
-        if not self._finishing or QCoreApplication.instance() is None:
+        app = QCoreApplication.instance()
+        if not self._finishing or app is None:
             return
-        loop = QEventLoop()
-        self.changed.connect(loop.quit)
-        QTimer.singleShot(timeout_ms, loop.quit)
+        # Poll instead of a nested event loop: bounded by the real clock whatever
+        # the state of Qt timers and signals during application shutdown.
         deadline = time.monotonic() + timeout_ms / 1000
         while self._finishing and time.monotonic() < deadline:
-            loop.exec()
-        self.changed.disconnect(loop.quit)
+            app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 20)
+            time.sleep(0.01)
 
     def _stop(self, reason):
         if not self._recording:

@@ -314,3 +314,46 @@ def test_free_space_is_shown_for_a_missing_folder(make, monkeypatch):
     runtime = make()
     monkeypatch.setattr(dvr, "free_bytes", lambda path: 120 * 1024**3)
     assert runtime.freeSpaceText == "вільно 120 ГБ"
+
+
+def test_shutdown_wait_is_bounded_with_a_running_qt_app(make):
+    # With a Qt application present shutdown really waits for the encoder; it must
+    # still return on time when the encoder never reports that the file is finished.
+    import time
+
+    from PySide6.QtCore import QCoreApplication
+
+    app = QCoreApplication.instance() or QCoreApplication([])
+    assert app is not None
+    runtime = make()
+    sink = FakeSink()
+    runtime.setVideoSink(sink)
+    runtime.setVideoAvailable(True)
+    runtime.start()
+    sink.videoFrameChanged.emit(FakeFrame())
+    started = time.monotonic()
+    runtime.shutdown(timeout_ms=300)
+    assert time.monotonic() - started < 3
+    assert FakePipeline.instances[0].stopped
+    assert not runtime.recording
+
+
+def test_shutdown_returns_as_soon_as_the_file_is_finished(make):
+    import time
+
+    from PySide6.QtCore import QCoreApplication, QTimer
+
+    app = QCoreApplication.instance() or QCoreApplication([])
+    assert app is not None
+    runtime = make()
+    sink = FakeSink()
+    runtime.setVideoSink(sink)
+    runtime.setVideoAvailable(True)
+    runtime.start()
+    sink.videoFrameChanged.emit(FakeFrame())
+    pipeline = FakePipeline.instances[0]
+    QTimer.singleShot(50, pipeline.finish)
+    started = time.monotonic()
+    runtime.shutdown(timeout_ms=5000)
+    assert time.monotonic() - started < 2
+    assert runtime.status == "Запис збережено: " + pipeline.path.name
