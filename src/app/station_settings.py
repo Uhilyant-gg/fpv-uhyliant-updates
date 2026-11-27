@@ -26,12 +26,14 @@ ELEMENT_NAMES = (
     "reticle",
     "horizon",
 )
-POSITIONS = ("top-left", "top-right", "bottom-left", "bottom-right")
+# "corners" spreads the tiles over three corners, keeping bottom-right free for the flight buttons;
+# the other values stack every tile in one corner.
+POSITIONS = ("corners", "top-left", "top-right", "bottom-left", "bottom-right")
 DEFAULT_ELEMENT_VISIBILITY = {name: True for name in ELEMENT_NAMES}
 DEFAULT_ELEMENT_VISIBILITY.update({"homeDistance": False, "reticle": False, "horizon": False})
 DEFAULT_OPACITY = 0.58
 DEFAULT_SCALE = 1.0
-DEFAULT_POSITION = "top-left"
+DEFAULT_POSITION = "corners"
 
 
 def default_settings() -> dict[str, Any]:

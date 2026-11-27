@@ -92,3 +92,14 @@ def format_duration(seconds: float) -> str:
     hours, rest = divmod(total, 3600)
     minutes, secs = divmod(rest, 60)
     return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes:02d}:{secs:02d}"
+
+
+def format_free_space(free: int | None) -> str:
+    if free is None:
+        return ""
+    gb = free / (1024**3)
+    if gb >= 10:
+        return f"вільно {gb:.0f} ГБ"
+    if gb >= 1:
+        return f"вільно {gb:.1f} ГБ".replace(".", ",")
+    return f"вільно {free // (1024**2)} МБ"

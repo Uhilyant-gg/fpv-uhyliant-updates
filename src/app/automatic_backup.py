@@ -11,6 +11,7 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from pairing import SecretStoreUnavailable
+from station_settings import POSITIONS
 from snapshot_validation import validate_snapshot
 from station_backup import _b64, _json, _unb64
 
@@ -42,7 +43,7 @@ def valid_osd(value):
         v = value[key]
         if isinstance(v, bool) or not isinstance(v, (int, float)) or not low <= v <= high:
             return False
-    return value['position'] in ('top-left', 'top-right', 'bottom-left', 'bottom-right')
+    return value['position'] in POSITIONS
 
 
 class AutomaticBackup:

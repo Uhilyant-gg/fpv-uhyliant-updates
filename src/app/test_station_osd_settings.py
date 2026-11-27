@@ -90,11 +90,11 @@ class StationOsdSettingsTests(unittest.TestCase):
 
         self.assertEqual(station.osdOpacity, 1)
         self.assertEqual(station.osdScale, 0.85)
-        self.assertEqual(station.osdPosition, "top-left")
+        self.assertEqual(station.osdPosition, "corners")
         self.assertFalse(station.setOSDStyle(1.1, 1.0))
         self.assertFalse(station.setOSDPosition("center"))
         self.assertEqual(station.osdOpacity, 1)
-        self.assertEqual(station.osdPosition, "top-left")
+        self.assertEqual(station.osdPosition, "corners")
 
     def test_osd_style_can_be_reset_to_defaults(self):
         settings = Settings()

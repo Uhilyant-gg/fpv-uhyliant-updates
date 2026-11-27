@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 import unittest
 
@@ -19,10 +20,15 @@ class NavigationUiPolicyTests(unittest.TestCase):
         self.assertIn('action: "devices"', self.home)
 
     def test_home_keeps_secondary_app_entry_points_compact(self):
-        for label in ('Прошивка', 'Діагностика', 'Резервна копія', 'Підготовка', 'Симуляція'):
+        for label in ('Дрони і пресети', 'Налаштування станції', 'Обслуговування', 'Підготовка', 'Симуляція'):
+            self.assertIn(label, self.home)
+        for label in ('прошивка камери', 'резервна копія', 'Діагностика'):
             self.assertIn(label, self.home)
         self.assertIn('НАЗЕМНА СТАНЦІЯ', self.home)
         self.assertIn('Встановити ', self.home)
+        header = self.home.split('НАЗЕМНА СТАНЦІЯ', 1)[1].split('МОЇ КАМЕРИ', 1)[0]
+        self.assertIn('objectName: "homeUpdate"', header, 'update button sits next to the build version')
+        self.assertNotIn('key:"update"', self.main)
         self.assertIn('visible: updater.updateState === "available" || updater.updateState === "ready"', self.home)
         self.assertNotIn('Button{text:"Оновлення"', self.home)
         self.assertNotIn('Пристрої · Додати камеру', self.home)
@@ -34,8 +40,10 @@ class NavigationUiPolicyTests(unittest.TestCase):
 
     def test_home_exposes_encrypted_backup_and_restore(self):
         self.assertIn('signal openBackup()', self.home)
-        self.assertIn('Резервна копія', self.home)
-        self.assertIn('onOpenBackup:backupPopup.open()', self.main)
+        self.assertIn('резервна копія', self.home)
+        self.assertIn('onOpenBackup:openStationSettings("backup")', self.main)
+        self.assertIn('{key:"backup",label:"Резервна копія"', self.main)
+        self.assertIn('Component{id:backupPage;BackupPanel{}}', self.main)
 
     def test_saved_camera_rows_are_direct_fpv_entry(self):
         self.assertIn('model: devicesModel.homeItems', self.home)
@@ -96,8 +104,8 @@ class NavigationUiPolicyTests(unittest.TestCase):
         self.assertIn('objectName: "mainMenuToggle"', self.home)
         self.assertIn('objectName: "mainMenuDrawer"', self.home)
         self.assertIn('color: "#f20a1420"', self.home)
-        self.assertEqual(self.home.count('action: "preflight"'), 1)
-        self.assertNotIn('Button{text:"Підготовка"', self.home)
+        self.assertEqual(len(re.findall(r'action: "(devices|vehicles|station|service)"', self.home)), 4)
+        self.assertEqual(self.home.count('objectName: "homePreflight"'), 1)
 
     def test_compact_home_keeps_delayed_help_on_primary_action(self):
         self.assertIn('HoverHint { text: "Рекомендована дія для поточного стану." }', self.home)

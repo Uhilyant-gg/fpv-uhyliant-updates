@@ -71,3 +71,16 @@ def test_format_duration(seconds, text):
 
 def test_default_folder_is_absolute():
     assert Path(dvr.default_recordings_folder()).is_absolute()
+
+
+@pytest.mark.parametrize(
+    "free,text",
+    [
+        (None, ""),
+        (300 * 1024**2, "вільно 300 МБ"),
+        (int(2.5 * 1024**3), "вільно 2,5 ГБ"),
+        (120 * 1024**3, "вільно 120 ГБ"),
+    ],
+)
+def test_format_free_space(free, text):
+    assert dvr.format_free_space(free) == text

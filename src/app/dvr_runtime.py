@@ -157,6 +157,13 @@ class DvrRuntime(QObject):
         return dvr.format_duration(self._elapsed)
 
     @Property(str, notify=changed)
+    def freeSpaceText(self):
+        folder = Path(self.folder)
+        while not folder.exists() and folder.parent != folder:
+            folder = folder.parent
+        return dvr.format_free_space(dvr.free_bytes(folder))
+
+    @Property(str, notify=changed)
     def status(self):
         return self._status
 

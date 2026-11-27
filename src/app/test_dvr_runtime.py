@@ -308,3 +308,9 @@ def test_active_recording_blocks_app_update(tmp_path):
     assert not allowed and "активний запис" in reason
     station.setRecordingActive(False)
     assert station.canInstallUpdate()[0]
+
+
+def test_free_space_is_shown_for_a_missing_folder(make, monkeypatch):
+    runtime = make()
+    monkeypatch.setattr(dvr, "free_bytes", lambda path: 120 * 1024**3)
+    assert runtime.freeSpaceText == "вільно 120 ГБ"
