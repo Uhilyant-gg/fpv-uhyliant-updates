@@ -7,7 +7,7 @@ import unittest
 
 
 class SimulationQmlTests(unittest.TestCase):
-    def test_simulation_is_separate_from_real_telemetry(self):
+    def test_simulation_uses_flight_workspace_without_touching_real_telemetry(self):
         script = """
 import sys
 from pathlib import Path
@@ -49,15 +49,28 @@ def single_shot(delay, callback):
         button.clicked.emit()
         app.processEvents()
         assert window.property('simulation') is True
-        assert window.findChild(QObject, 'mainPages').property('currentIndex') == 3
+        assert window.findChild(QObject, 'mainPages').property('currentIndex') == 1
+        scene = window.findChild(QObject, 'simulationWorld')
+        video = window.findChild(QObject, 'mainFlightVideoOutput')
+        assert scene is not None and scene.property('visible')
+        assert video is not None and not video.property('visible')
         first = value_map(window.property('simulatedTelemetry'))
+        assert all(field in first for field in ('roll', 'pitch', 'yaw', 'homeDistance', 'batteryVoltage', 'gpsFix', 'groundSpeed'))
         window.setProperty('simulationTick', 10)
         app.processEvents()
         second = value_map(window.property('simulatedTelemetry'))
-        assert first['heading'] != second['heading']
+        assert first['heading'] != second['heading'] and first['roll'] != second['roll']
         assert value_map(window.property('t')) == before
-        edit = window.findChild(QObject, 'openSimulationOsd')
-        assert edit is not None
+        menu_toggle = window.findChild(QObject, 'flightMenuToggle')
+        assert menu_toggle is not None
+        menu_toggle.clicked.emit()
+        app.processEvents()
+        menu = window.findChild(QObject, 'flightMenu')
+        assert menu is not None and menu.property('visible')
+        hardware_devices = window.findChild(QObject, 'flightMenuDevices')
+        assert hardware_devices is not None and not hardware_devices.property('enabled')
+        edit = window.findChild(QObject, 'flightMenuOsdSettings')
+        assert edit is not None and edit.property('enabled')
         edit.clicked.emit()
         app.processEvents()
         popup = window.findChild(QObject, 'osdSettingsPopup')

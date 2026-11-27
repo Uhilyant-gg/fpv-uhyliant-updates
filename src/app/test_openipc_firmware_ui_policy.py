@@ -50,5 +50,5 @@ function bindDevice(){events.push("bind")}'''
   for gate in ('sessionResult.enabled','firmwareCenter.executionPlan.ready','automaticProfile!==""','!firmwareExecutor.busy'):self.assertIn(gate,body)
  def test_progress_and_post_reboot_verification_are_visible(self):
   for stage in ('Підготовка','Завантаження','Оновлення','Перезапуск','Перевірка'):self.assertIn(stage,self.qml)
-  self.has_call('firmwareUpdateSession.verifyAfterReboot',[]);self.assertIn('Камеру успішно оновлено до ',self.qml)
+  self.has_call('firmwareUpdateSession.verifyAfterReboot',[]);self.assertIn('Камеру оновлено до ',self.qml);self.assertIn('відеопотік не підтверджено',self.qml)
 if __name__=='__main__':unittest.main()

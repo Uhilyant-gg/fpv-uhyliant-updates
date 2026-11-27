@@ -15,7 +15,7 @@ class NavigationUiPolicyTests(unittest.TestCase):
  def test_home_exposes_encrypted_backup_and_restore(self):
   self.assertIn('signal openBackup()',self.home);self.assertIn('Резервна копія',self.home);self.assertIn('onOpenBackup:backupPopup.open()',self.main)
  def test_saved_camera_rows_are_direct_fpv_entry(self):
-  self.assertIn('model: devicesModel.items',self.home);self.assertIn('devicesModel.streams.length',self.home);self.assertIn('enabled === true',self.home);self.assertIn('root.connectDevice(modelData.id)',self.home)
+  self.assertIn('model: devicesModel.homeItems',self.home);self.assertIn('devicesModel.items.length',self.home);self.assertIn('item.onboardingState!=="ready"',self.main);self.assertIn('devicesModel.streams.length',self.home);self.assertIn('enabled === true',self.home);self.assertIn('root.connectDevice(modelData.id)',self.home)
  def test_devices_activation_uses_unified_fpv_handoff(self):
   self.assertIn('signal activateDevice(string deviceId)',self.devices);self.assertIn('root.activateDevice(selectedSaved.id)',self.devices);self.assertNotIn('onClicked:devicesModel.setActive(selectedSaved.id)',self.devices);self.assertIn('onActivateDevice:function(deviceId){devices.close();connectDevice(deviceId)}',self.main)
  def test_playback_rebuild_preserves_requested_pip(self):

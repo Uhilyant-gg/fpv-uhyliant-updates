@@ -40,12 +40,17 @@ class Devices(QObject):
   for r in rows:
    try:identity=json.loads(r[8]) if r[8] else {}
    except ValueError:identity={}
-   item={'id':r[0],'name':r[1],'type':r[2],'host':r[3],'port':r[4],'connection':r[5],'notes':r[6],'active':bool(r[7]),'openipcIdentity':identity,'lastObservedAt':r[9]};item.update(device_center_fields(item));self._items.append(item)
+   onboarding_state=str(identity.get('onboardingState') or 'ready')
+   item={'id':r[0],'name':r[1],'type':r[2],'host':r[3],'port':r[4],'connection':r[5],'notes':r[6],'active':bool(r[7]),'openipcIdentity':identity,'onboardingState':onboarding_state,'lastObservedAt':r[9]};item.update(device_center_fields(item));self._items.append(item)
    if item['active']:self._active=item['id']
   self._items.sort(key=lambda item:(item['deviceGroup'],item['name'].casefold()))
   self._streams=[{'id':r[0],'device_id':r[1],'name':r[2],'kind':r[3],'port':r[4],'path':r[5],'protocol':r[6],'enabled':bool(r[7])} for r in srows]
  @Property('QVariantList',notify=changed)
  def items(self):return self._items
+ @Property('QVariantList',notify=changed)
+ def homeItems(self):return [item for item in self._items if item.get('onboardingState')=='ready']
+ @Property(int,notify=changed)
+ def pendingCount(self):return sum(item.get('onboardingState')!='ready' for item in self._items)
  @Property('QVariantList',notify=streamsChanged)
  def streams(self):return self._streams
  @Property('QVariantList',notify=streamsChanged)
@@ -84,7 +89,7 @@ class Devices(QObject):
   if existed:self.deviceRemoved.emit()
  @Slot(str)
  def setActive(self,did):
-  if not any(x['id']==did for x in self._items):return
+  if not any(x['id']==did and x.get('onboardingState')=='ready' for x in self._items):return
   with self._connect() as d:d.execute('UPDATE devices SET active=0');d.execute('UPDATE devices SET active=1 WHERE id=?',(did,))
   self._load();self.changed.emit();self.streamsChanged.emit()
  @Slot()
@@ -93,6 +98,31 @@ class Devices(QObject):
   self._load();self.changed.emit();self.streamsChanged.emit()
  def _save_identity(self,did,identity):
   with self._connect() as d:d.execute('UPDATE devices SET identity_json=? WHERE id=?',(json.dumps(identity,ensure_ascii=False),did))
+ def saveDiscoveredCamera(self,name,host,identity,streams,onboarding_state,existing_id=''):
+  if onboarding_state not in ('ready','pending-firmware','pending-video') or not isinstance(identity,dict):return ''
+  did=''
+  identity=dict(identity);identity['onboardingState']=onboarding_state
+  with self._connect() as d:
+   row=d.execute('SELECT id FROM devices WHERE id=?',(existing_id,)).fetchone() if existing_id else None
+   if row:
+    did=row[0]
+    d.execute("UPDATE devices SET name=?,type=?,host=?,port=80,connection=?,active=CASE WHEN ?='ready' THEN active ELSE 0 END,identity_json=?,last_observed_at=strftime('%s','now') WHERE id=?",(name,'OpenIPC',host,'Network',onboarding_state,json.dumps(identity,ensure_ascii=False),did))
+   else:
+    did=uuid.uuid4().hex
+    d.execute("INSERT INTO devices(id,name,type,host,port,connection,notes,active,identity_json,last_observed_at) VALUES(?,?,?,?,?,?,?,?,?,strftime('%s','now'))",(did,name,'OpenIPC',host,80,'Network','',0,json.dumps(identity,ensure_ascii=False)))
+   for stream in (streams if isinstance(streams,(list,tuple)) else ()):
+    if not isinstance(stream,dict):continue
+    path=str(stream.get('path') or '')
+    protocol=str(stream.get('protocol') or '').lower()
+    port=stream.get('port')
+    if protocol!='rtsp' or not path.startswith('/') or not isinstance(port,int) or isinstance(port,bool) or not 1<=port<=65535:continue
+    exists=d.execute('SELECT 1 FROM streams WHERE device_id=? AND port=? AND path=? AND protocol=?',(did,port,path,protocol)).fetchone()
+    if not exists:
+     d.execute('INSERT INTO streams(id,device_id,name,kind,port,path,protocol,enabled) VALUES(?,?,?,?,?,?,?,1)',(uuid.uuid4().hex,did,str(stream.get('name') or 'Відео'),'main',port,path,protocol))
+  self._load();self.changed.emit();self.streamsChanged.emit()
+  if row:self.deviceUpdated.emit()
+  else:self.deviceAdded.emit()
+  return did
  @Slot(str,result=bool)
  def markObserved(self,host):
   address=str(host or '').strip()

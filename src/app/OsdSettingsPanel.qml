@@ -5,6 +5,20 @@ import QtQuick.Layouts
 Item {
  id: root
  signal closeRequested()
+ property var elementOptions: [
+  {name:"link", label:"Стан зв’язку"},
+  {name:"arm", label:"Стан ARM"},
+  {name:"mode", label:"Режим польоту"},
+  {name:"battery", label:"Акумулятор"},
+  {name:"gps", label:"GPS і супутники"},
+  {name:"altitude", label:"Висота"},
+  {name:"speed", label:"Швидкість"},
+  {name:"heading", label:"Напрямок"},
+  {name:"video", label:"Стан відео"},
+  {name:"homeDistance", label:"Відстань до точки повернення"},
+  {name:"reticle", label:"Приціл"},
+  {name:"horizon", label:"Штучний горизонт"}
+ ]
 
  Rectangle {
   anchors.fill: parent
@@ -39,48 +53,66 @@ Item {
    Layout.fillHeight: true
    spacing: 18
 
-   ColumnLayout {
-    Layout.preferredWidth: 250
+   ScrollView {
+    Layout.preferredWidth: 300
     Layout.fillHeight: true
-    spacing: 10
+    contentWidth: availableWidth
+    clip: true
+    ColumnLayout {
+     width: parent.width
+     spacing: 10
 
-    Switch { text: "Показувати OSD"; checked: station.osdEnabled; onToggled: station.setOSDEnabled(checked) }
-    Text { text: "Перетягніть показники на сітці праворуч."; color: "#dce6f2"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+     Switch { text: "Показувати OSD"; checked: station.osdEnabled; onToggled: station.setOSDEnabled(checked) }
+     Text { text: "Оберіть потрібні елементи. Перетягування прилипає до сітки з кроком 5%."; color: "#dce6f2"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
 
-    Text { text: "Прозорість фону"; color: "#dce6f2"; font.bold: true }
-    Slider {
-     id: opacitySlider
-     Layout.fillWidth: true
-     from: 0.25
-     to: 0.8
-     stepSize: 0.05
-     value: station.osdOpacity
-     onMoved: station.setOSDStyle(value, scaleSlider.value)
-    }
+     Text { text: "Прозорість підкладки: " + Math.round((1 - station.osdOpacity) * 100) + "%"; color: "#dce6f2"; font.bold: true }
+     Slider {
+      id: opacitySlider
+      objectName: "osdTransparencySlider"
+      Layout.fillWidth: true
+      from: 0
+      to: 1
+      stepSize: 0.05
+      value: 1 - station.osdOpacity
+      onMoved: station.setOSDStyle(1 - value, scaleSlider.value)
+     }
 
-    Text { text: "Розмір тексту"; color: "#dce6f2"; font.bold: true }
-    Slider {
-     id: scaleSlider
-     Layout.fillWidth: true
-     from: 0.85
-     to: 1.3
-     stepSize: 0.05
-     value: station.osdScale
-     onMoved: station.setOSDStyle(opacitySlider.value, value)
+     Text { text: "Розмір тексту: " + Math.round(station.osdScale * 100) + "%"; color: "#dce6f2"; font.bold: true }
+     Slider {
+      id: scaleSlider
+      Layout.fillWidth: true
+      from: 0.85
+      to: 1.3
+      stepSize: 0.05
+      value: station.osdScale
+      onMoved: station.setOSDStyle(1 - opacitySlider.value, value)
+     }
+
+     Text { text: "Елементи"; color: "#dce6f2"; font.bold: true; font.pixelSize: 15 }
+     Repeater {
+      model: root.elementOptions
+      CheckBox {
+       required property var modelData
+       objectName: "osd-toggle-" + modelData.name
+       Layout.fillWidth: true
+       text: modelData.label
+       checked: station.osdEnabledElements[modelData.name] === true
+       onToggled: station.setOSDElementEnabled(modelData.name, checked)
+      }
+     }
+     Button {
+      text: "Стандартні налаштування"
+      Layout.fillWidth: true
+      onClicked: station.resetOSDStyle()
+     }
     }
-    Button {
-     text: "Стандартні налаштування"
-     Layout.fillWidth: true
-     onClicked: station.resetOSDStyle()
-    }
-    Item { Layout.fillHeight: true }
    }
 
    ColumnLayout {
     Layout.fillWidth: true
     Layout.fillHeight: true
     spacing: 6
-    Text { text: "Симуляція · приклад відео і даних"; color: "#dce6f2"; font.bold: true }
+    Text { text: "Попередній перегляд · екран польоту"; color: "#dce6f2"; font.bold: true }
     Rectangle {
      id: preview
      Layout.fillWidth: true
@@ -106,8 +138,9 @@ Item {
       anchors.fill: parent
       editing: true
       positions: station.osdElements
+      enabledElements: station.osdEnabledElements
       corner: station.osdPosition
-      telemetry: ({connected:true, provider:"MAVLink", armed:false, flightMode:"STABILIZE", batteryVoltage:15.8, batteryRemaining:82, gpsFix:3, satellites:12, altitude:124, groundSpeed:12.4, heading:348})
+      telemetry: ({connected:true, provider:"MAVLink", armed:false, flightMode:"STABILIZE", batteryVoltage:15.8, batteryRemaining:82, gpsFix:3, satellites:12, altitude:124, groundSpeed:12.4, heading:348, roll:7, pitch:-3, yaw:348, homeDistance:86})
       video: ({streamId:"simulation", state:"playing"})
       opacityValue: station.osdOpacity
       scaleFactor: station.osdScale
@@ -126,7 +159,7 @@ Item {
   }
 
   Text {
-   text: "Це лише приклад, не реальна камера чи телеметрія. Зміни зберігаються автоматично."
+   text: "Попередній перегляд використовує штучні дані. Зміни зберігаються автоматично й не впливають на реальний політ."
    color: "#b7c8da"
    font.pixelSize: 13
    Layout.fillWidth: true

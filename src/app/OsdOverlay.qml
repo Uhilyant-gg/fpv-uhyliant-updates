@@ -5,6 +5,7 @@ Item {
  id: root
  property var telemetry: ({})
  property var video: ({})
+ property var enabledElements: ({})
  property color foreground: "white"
  property color muted: "#d5e0eb"
  property color good: "#35e0a1"
@@ -38,6 +39,26 @@ Item {
   }
   return " · " + telemetryText(field, value, suffix, digits)
  }
+ function elementEnabled(name) {
+  if (enabledElements[name] !== undefined) return enabledElements[name] === true
+  return name !== "homeDistance" && name !== "reticle" && name !== "horizon"
+ }
+ function attitudeAvailable() {
+  var freshness = telemetry.freshness || {}
+  return telemetry.connected === true && freshness.roll !== false && freshness.pitch !== false &&
+    isFinite(Number(telemetry.roll)) && isFinite(Number(telemetry.pitch))
+ }
+ function gridPixel(value, extent, minimum, maximum) {
+  if (extent <= 0) return 0
+  var step = extent / 20
+  var first = Math.ceil((minimum || 0) / step) * step
+  var last = Math.floor((maximum === undefined ? extent : maximum) / step) * step
+  return Math.max(first, Math.min(last, Math.round(value / step) * step))
+ }
+ function snapPercent(value, extent) {
+  if (extent <= 0) return 0
+  return Math.max(0, Math.min(100, Math.round(value * 20 / extent) * 5))
+ }
  function speedSuffix() {
   return telemetry.provider === "CRSF" ? " км/год" : " м/с"
  }
@@ -60,28 +81,40 @@ Item {
   if (telemetry.connected === false) return "Телеметрія: немає зв’язку"
   return "Телеметрія: не підтверджена"
  }
+ function centerPercent(name, axis, defaultValue) {
+  var saved = positions[name]
+  return saved && saved.length === 2 ? saved[axis] : defaultValue
+ }
+ function centeredLeft(name, itemWidth, defaultValue) {
+  return Math.max(0, Math.min(root.width - itemWidth, root.width * centerPercent(name, 0, defaultValue) / 100 - itemWidth / 2))
+ }
+ function centeredTop(name, itemHeight, defaultValue) {
+  return Math.max(0, Math.min(root.height - itemHeight, root.height * centerPercent(name, 1, defaultValue) / 100 - itemHeight / 2))
+ }
 
  property var tiles: [
-  {name:"link", text:root.linkLabel()},
-  {name:"arm", text:"ARM: " + (telemetry.connected !== true ? "—" : ((telemetry.freshness || {}).armed === false ? "застаріло" : (telemetry.armed === null || telemetry.armed === undefined ? "—" : (telemetry.armed ? "активний" : "вимкнений"))))},
-  {name:"mode", text:"Режим: " + root.telemetryText("flightMode", telemetry.flightMode)},
-  {name:"battery", text:"АКБ: " + root.telemetryText("batteryVoltage", telemetry.batteryVoltage, " В", 1) + root.optionalTelemetryText("batteryRemaining", telemetry.batteryRemaining, "%", 0)},
-  {name:"gps", text:"GPS: " + root.gpsFixDisplay() + root.optionalTelemetryText("satellites", telemetry.satellites, " супутн.", 0)},
-  {name:"altitude", text:"Висота: " + root.telemetryText("altitude", telemetry.altitude, " м", 0)},
-  {name:"speed", text:"Швидкість: " + root.telemetryText("groundSpeed", telemetry.groundSpeed, root.speedSuffix(), 1)},
-  {name:"heading", text:"Напрямок: " + root.telemetryText("heading", telemetry.heading, "°", 0)},
-  {name:"video", text:"Відео: " + (video.streamId ? (video.state === "playing" ? "активне" : "перевіряється") : "немає")}
+  {name:"link", defaultX:0, defaultY:0, text:root.linkLabel()},
+  {name:"arm", defaultX:0, defaultY:6, text:"ARM: " + (telemetry.connected !== true ? "—" : ((telemetry.freshness || {}).armed === false ? "застаріло" : (telemetry.armed === null || telemetry.armed === undefined ? "—" : (telemetry.armed ? "активний" : "вимкнений"))))},
+  {name:"mode", defaultX:0, defaultY:12, text:"Режим: " + root.telemetryText("flightMode", telemetry.flightMode)},
+  {name:"battery", defaultX:0, defaultY:18, text:"АКБ: " + root.telemetryText("batteryVoltage", telemetry.batteryVoltage, " В", 1) + root.optionalTelemetryText("batteryRemaining", telemetry.batteryRemaining, "%", 0)},
+  {name:"gps", defaultX:0, defaultY:24, text:"GPS: " + root.gpsFixDisplay() + root.optionalTelemetryText("satellites", telemetry.satellites, " супутн.", 0)},
+  {name:"altitude", defaultX:0, defaultY:30, text:"Висота: " + root.telemetryText("altitude", telemetry.altitude, " м", 0)},
+  {name:"speed", defaultX:0, defaultY:36, text:"Швидкість: " + root.telemetryText("groundSpeed", telemetry.groundSpeed, root.speedSuffix(), 1)},
+  {name:"heading", defaultX:0, defaultY:42, text:"Напрямок: " + root.telemetryText("heading", telemetry.heading, "°", 0)},
+  {name:"video", defaultX:0, defaultY:48, text:"Відео: " + (video.streamId ? (video.state === "playing" ? "активне" : "перевіряється") : "немає")},
+  {name:"homeDistance", defaultX:0, defaultY:54, text:"До точки повернення: " + root.telemetryText("homeDistance", telemetry.homeDistance, " м", 0)}
  ]
+ property var visibleTiles: root.tiles.filter(function(tileData) { return root.elementEnabled(tileData.name) })
  function tilePosition(tile, axis, index) {
   var saved = positions[tile.name]
   if (saved && saved.length === 2) return saved[axis]
-  var value = axis === 0 ? 0 : index * 6
+  var value = axis === 0 ? tile.defaultX : tile.defaultY
   if (axis === 0 && corner.endsWith("right")) return 100 - value
-  if (axis === 1 && corner.startsWith("bottom")) return Math.min(100, value + 52)
+  if (axis === 1 && corner.startsWith("bottom")) return 100 - value
   return value
  }
  Repeater {
-  model: root.tiles
+  model: root.visibleTiles
   delegate: Rectangle {
    id: tile
    required property var modelData
@@ -117,17 +150,110 @@ Item {
     onPositionChanged: function(event) {
      if (!pressed) return
      var point = mapToItem(root, event.x, event.y)
-     tile.movingX = Math.max(0, Math.min(root.width - tile.width, point.x - offsetX))
-     tile.movingY = Math.max(0, Math.min(root.height - tile.height, point.y - offsetY))
+     tile.movingX = root.gridPixel(point.x - offsetX, root.width, 0, root.width - tile.width)
+     tile.movingY = root.gridPixel(point.y - offsetY, root.height, 0, root.height - tile.height)
     }
     onReleased: {
-     var x = root.width > tile.width ? Math.round(tile.x * 20 / root.width) * 5 : 0
-     var y = root.height > tile.height ? Math.round(tile.y * 20 / root.height) * 5 : 0
-     root.positionChanged(tile.modelData.name, Math.max(0, Math.min(100, x)), Math.max(0, Math.min(100, y)))
+     var x = root.width > tile.width ? root.snapPercent(tile.x, root.width) : 0
+     var y = root.height > tile.height ? root.snapPercent(tile.y, root.height) : 0
+     root.positionChanged(tile.modelData.name, x, y)
      tile.moving = false
     }
     onCanceled: tile.moving = false
    }
+  }
+ }
+ Item {
+  id: horizon
+  objectName: "osd-horizon"
+  visible: root.elementEnabled("horizon")
+  z: 2
+  width: 176 * root.scaleFactor
+  height: 94 * root.scaleFactor
+  x: moving ? movingX - width / 2 : root.centeredLeft("horizon", width, 50)
+  y: moving ? movingY - height / 2 : root.centeredTop("horizon", height, 48)
+  property bool moving: false
+  property real movingX: 0
+  property real movingY: 0
+  Rectangle {
+   anchors.fill: parent
+   radius: height / 2
+   color: "#cc0b1522"
+   border.color: root.editing ? "#80c5ff" : "#8093a6"
+   clip: true
+   Item {
+    visible: root.attitudeAvailable()
+    width: parent.width * 1.7
+    height: parent.height * 2
+    x: (parent.width - width) / 2
+    y: (parent.height - height) / 2 + Number(root.telemetry.pitch) * root.scaleFactor * 1.4
+    rotation: -Number(root.telemetry.roll)
+    Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: parent.height / 2; color: "#4b8db8" }
+    Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: parent.height / 2; color: "#697d48" }
+    Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; height: 2 * root.scaleFactor; color: "#f6f1d8" }
+   }
+   Text {
+    objectName: "osd-horizon-unavailable"
+    anchors.centerIn: parent
+    visible: !root.attitudeAvailable()
+    text: "Нахил: немає даних"
+    color: root.foreground
+    font.pixelSize: 11 * root.scaleFactor
+   }
+   Rectangle { anchors.left: parent.left; anchors.leftMargin: parent.width * 0.18; anchors.verticalCenter: parent.verticalCenter; width: parent.width * 0.16; height: 2; color: root.foreground }
+   Rectangle { anchors.right: parent.right; anchors.rightMargin: parent.width * 0.18; anchors.verticalCenter: parent.verticalCenter; width: parent.width * 0.16; height: 2; color: root.foreground }
+  }
+  MouseArea {
+   anchors.fill: parent
+   enabled: root.editing
+   property real offsetX: 0
+   property real offsetY: 0
+   onPressed: function(event) { offsetX = horizon.width / 2 - event.x; offsetY = horizon.height / 2 - event.y; horizon.movingX = horizon.x + horizon.width / 2; horizon.movingY = horizon.y + horizon.height / 2; horizon.moving = true }
+   onPositionChanged: function(event) {
+    if (!pressed) return
+    var point = mapToItem(root, event.x, event.y)
+    horizon.movingX = root.gridPixel(point.x + offsetX, root.width, horizon.width / 2, root.width - horizon.width / 2)
+    horizon.movingY = root.gridPixel(point.y + offsetY, root.height, horizon.height / 2, root.height - horizon.height / 2)
+   }
+   onReleased: { root.positionChanged("horizon", root.snapPercent(horizon.x + horizon.width / 2, root.width), root.snapPercent(horizon.y + horizon.height / 2, root.height)); horizon.moving = false }
+   onCanceled: horizon.moving = false
+  }
+ }
+ Item {
+  id: reticle
+  objectName: "osd-reticle"
+  visible: root.elementEnabled("reticle")
+  z: 4
+  width: 44 * root.scaleFactor
+  height: 44 * root.scaleFactor
+  x: moving ? movingX - width / 2 : root.centeredLeft("reticle", width, 50)
+  y: moving ? movingY - height / 2 : root.centeredTop("reticle", height, 50)
+  property bool moving: false
+  property real movingX: 0
+  property real movingY: 0
+  Rectangle { anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; width: 2; height: 13 * root.scaleFactor; color: "#cc08111b" }
+  Rectangle { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; width: 2; height: 13 * root.scaleFactor; color: "#cc08111b" }
+  Rectangle { anchors.verticalCenter: parent.verticalCenter; anchors.left: parent.left; width: 13 * root.scaleFactor; height: 2; color: "#cc08111b" }
+  Rectangle { anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right; width: 13 * root.scaleFactor; height: 2; color: "#cc08111b" }
+  Rectangle { anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; width: 1; height: 12 * root.scaleFactor; color: "#72f4d5" }
+  Rectangle { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; width: 1; height: 12 * root.scaleFactor; color: "#72f4d5" }
+  Rectangle { anchors.verticalCenter: parent.verticalCenter; anchors.left: parent.left; width: 12 * root.scaleFactor; height: 1; color: "#72f4d5" }
+  Rectangle { anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right; width: 12 * root.scaleFactor; height: 1; color: "#72f4d5" }
+  Rectangle { anchors.centerIn: parent; width: 3 * root.scaleFactor; height: 3 * root.scaleFactor; radius: width / 2; color: "#72f4d5" }
+  MouseArea {
+   anchors.fill: parent
+   enabled: root.editing
+   property real offsetX: 0
+   property real offsetY: 0
+   onPressed: function(event) { offsetX = reticle.width / 2 - event.x; offsetY = reticle.height / 2 - event.y; reticle.movingX = reticle.x + reticle.width / 2; reticle.movingY = reticle.y + reticle.height / 2; reticle.moving = true }
+   onPositionChanged: function(event) {
+    if (!pressed) return
+    var point = mapToItem(root, event.x, event.y)
+    reticle.movingX = root.gridPixel(point.x + offsetX, root.width, reticle.width / 2, root.width - reticle.width / 2)
+    reticle.movingY = root.gridPixel(point.y + offsetY, root.height, reticle.height / 2, root.height - reticle.height / 2)
+   }
+   onReleased: { root.positionChanged("reticle", root.snapPercent(reticle.x + reticle.width / 2, root.width), root.snapPercent(reticle.y + reticle.height / 2, root.height)); reticle.moving = false }
+   onCanceled: reticle.moving = false
   }
  }
 }

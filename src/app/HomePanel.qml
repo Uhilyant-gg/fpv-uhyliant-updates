@@ -176,7 +176,8 @@ Item {
      Text { text: "Стан системи"; color: root.sub; font.pixelSize: 13 }
      Text { text: homeDashboard.summary; color: root.fg; font.pixelSize: 17; font.bold: true; wrapMode: Text.WordWrap; Layout.fillWidth: true }
      Text {
-      text: "Камер: " + devicesModel.count + "   ·   Перевірено: " + homeDashboard.verifiedCount +
+      text: "На головному екрані: " + homeDashboard.deviceCount +
+            "   ·   Очікують перевірки: " + homeDashboard.pendingCount +
             "   ·   Потребують уваги: " + homeDashboard.warningCount
       color: root.sub
       font.pixelSize: 13
@@ -213,7 +214,7 @@ Item {
     RowLayout {
      Layout.fillWidth: true
      Text { text: "МОЇ КАМЕРИ"; color: root.fg; font.bold: true; font.pixelSize: 15; font.letterSpacing: 1 }
-     Text { text: devicesModel.count ? devicesModel.count + " збережено" : "ще не додано"; color: root.sub; font.pixelSize: 13 }
+     Text { text: homeDashboard.deviceCount ? homeDashboard.deviceCount + " готово" : (homeDashboard.pendingCount ? homeDashboard.pendingCount + " на перевірці" : "ще не додано"); color: root.sub; font.pixelSize: 13 }
      Item { Layout.fillWidth: true }
      Button {
       visible: updater.updateState === "available" || updater.updateState === "ready"
@@ -229,7 +230,7 @@ Item {
      Layout.fillHeight: true
      clip: true
      spacing: 6
-     model: devicesModel.items
+     model: devicesModel.homeItems
      delegate: Rectangle {
       required property var modelData
       width: list.width
@@ -267,10 +268,10 @@ Item {
 
      Column {
       anchors.centerIn: parent
-      visible: devicesModel.count === 0
+      visible: devicesModel.homeItems.length === 0
       spacing: 6
-      Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Камер ще не додано"; color: root.fg; font.pixelSize: 19; font.bold: true }
-      Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Відкрийте меню та виберіть «Камери»"; color: root.sub; font.pixelSize: 15 }
+      Text { anchors.horizontalCenter: parent.horizontalCenter; text: devicesModel.pendingCount ? "Камера ще проходить перевірку" : "Камер ще не додано"; color: root.fg; font.pixelSize: 19; font.bold: true }
+      Text { anchors.horizontalCenter: parent.horizontalCenter; text: devicesModel.pendingCount ? "На головний екран камера потрапить після підтвердження прошивки та відео." : "Відкрийте меню та виберіть «Камери»"; color: root.sub; font.pixelSize: 15; wrapMode: Text.WordWrap; width: list.width * 0.8; horizontalAlignment: Text.AlignHCenter }
      }
     }
    }

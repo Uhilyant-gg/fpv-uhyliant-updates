@@ -1,5 +1,5 @@
 """Route-aware bounded discovery with fail-closed OpenIPC identity."""
-import base64,concurrent.futures,ipaddress,json,os,re,socket,subprocess,urllib.error,urllib.request
+import base64,concurrent.futures,ipaddress,json,os,re,socket,subprocess,time,urllib.error,urllib.request
 from html import unescape
 MAX_SWEEP_HOSTS=254;MAX_WORKERS=24;PROBE_TIMEOUT=0.65
 VIRTUAL_HINTS=("docker","wsl","hyper-v","vethernet","vmware","virtualbox","vpn","wireguard","tailscale","loopback")
@@ -50,6 +50,24 @@ def _tcp_open(host,port,cancel):
  try:
   with socket.create_connection((host,port),timeout=PROBE_TIMEOUT):return True
  except (TimeoutError,socket.timeout,OSError,ValueError):return False
+def _rtsp_describe(host,port,cancel):
+ if cancel.is_set():return False
+ deadline=time.monotonic()+PROBE_TIMEOUT
+ try:
+  with socket.create_connection((host,port),timeout=PROBE_TIMEOUT) as connection:
+   request=f"DESCRIBE rtsp://{host}:{port}/ RTSP/1.0\r\nCSeq: 1\r\nAccept: application/sdp\r\nConnection: close\r\n\r\n".encode("ascii")
+   connection.sendall(request);response=bytearray()
+   while len(response)<65536 and not cancel.is_set():
+    remaining=deadline-time.monotonic()
+    if remaining<=0:break
+    connection.settimeout(remaining)
+    chunk=connection.recv(min(4096,65536-len(response)))
+    if not chunk:break
+    response.extend(chunk)
+ except (TimeoutError,socket.timeout,OSError,ValueError):return False
+ headers,separator,body=bytes(response).partition(b"\r\n\r\n")
+ status=headers.split(b"\r\n",1)[0].split()
+ return bool(separator and len(status)>1 and status[1]==b"200" and b"m=video " in body.lower())
 def _fetch(url,accept,limit,cancel,username="",password=""):
  if cancel.is_set():return None,0
  headers={"Accept":accept,"User-Agent":"FPV-Uhyliant/route-discovery"}
@@ -106,7 +124,12 @@ def fingerprint(host,cancel,username="",password=""):
   if "openipc" in lower or "majestic" in lower:
    result["camera"]=result["openipc"]=True;result["services"].append("OpenIPC WebUI");result["evidence"].append("OpenIPC status.cgi");identity["platform"]=identity["platform"] or _status_value(text,("platform","board"));identity["soc"]=identity["soc"] or _status_value(text,("soc","chip"));identity["sensor"]=identity["sensor"] or _status_value(text,("sensor",));identity["firmware"]=identity["firmware"] or _status_value(text,("firmware","release"));identity["majestic"]=identity["majestic"] or _status_value(text,("majestic",))
   if "r2d2" in lower and result["openipc"]:result["r2d2"]=True;result["evidence"].append("R2D2 marker in status.cgi")
- if result["openipc"]:identity["verified"]=True;identity["evidence"]=list(result["evidence"]);result["identityVerified"]=any(identity[k] for k in ("platform","soc","sensor","firmware","majestic"));result["authRequired"]=False
+ if result["openipc"]:
+  identity["verified"]=True;identity["evidence"]=list(result["evidence"]);result["identityVerified"]=any(identity[k] for k in ("platform","soc","sensor","firmware","majestic"));result["authRequired"]=False
+  if 554 in open_ports and _rtsp_describe(host,554,cancel):
+   result["streams"].append({"name":"Основний","port":554,"path":"/","protocol":"rtsp"})
+   result["services"].append("RTSP відеопотік")
+   result["evidence"].append("RTSP DESCRIBE підтвердив відео")
  result["name"]=("OpenIPC " if result["openipc"] else "Камера ")+host;result["hostname"]=host;result["confidence"]="OpenIPC підтверджено" if result["openipc"] else ("Потрібна авторизація" if result["authRequired"] else "Кандидат камери")
  return result
 def discover_targets(targets,cancel,progress=None):

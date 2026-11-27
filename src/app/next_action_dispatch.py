@@ -11,6 +11,7 @@ from typing import Any, Mapping
 _TARGETS = {
     "diagnose": "diagnostics",
     "find-camera": "devices",
+    "review-firmware": "firmware",
     "identify-camera": "devices",
     "refresh-identity": "devices",
     "verify-camera": "devices",

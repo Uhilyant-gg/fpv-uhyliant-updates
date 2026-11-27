@@ -21,4 +21,5 @@ class FirmwareUpdateLifecycle:
   try:verification=verify_post_flash(before,result.get('identity') or {},profile,context.get('expectedFirmware',''))
   except Exception:return self.executor.failRediscovery(nonce)
   verification['rediscoveredHost']=host
+  verification['streams']=result.get('streams',[]) if isinstance(result.get('streams'),list) else []
   return self.executor.acceptRediscoveredVerification(result,verification,nonce)
