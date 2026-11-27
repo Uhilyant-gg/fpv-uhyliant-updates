@@ -58,31 +58,18 @@ class PresetStore:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             raise PresetError("preset-store-invalid") from None
-        if (
-            not isinstance(raw, dict)
-            or raw.get("schema") != STORE_SCHEMA
-            or raw.get("version") != VERSION
-            or not isinstance(raw.get("presets"), list)
-            or len(raw["presets"]) > MAX_PRESETS
-        ):
+        if not isinstance(raw, dict) or raw.get("schema") != STORE_SCHEMA or raw.get("version") != VERSION:
             raise PresetError("preset-store-invalid")
-        presets, ids = [], set()
-        for item in raw["presets"]:
-            if not isinstance(item, dict) or not isinstance(item.get("id"), str) or item["id"] in ids:
-                raise PresetError("preset-store-invalid")
-            try:
-                presets.append(
-                    {
-                        "id": item["id"],
-                        "name": clean_name(item.get("name")),
-                        "settings": validate_station_settings(item.get("settings")),
-                    }
-                )
-            except (PresetError, ValueError):
-                raise PresetError("preset-store-invalid") from None
-            ids.add(item["id"])
-        active = raw.get("active")
-        return {"active": active if active in ids else None, "presets": presets}
+        return validate_state(raw)
+
+    def replace_state(self, state: Any) -> dict[str, Any]:
+        """Replace every preset (backup restore); validated before anything is written."""
+        try:
+            valid = validate_state(state)
+        except PresetError:
+            raise PresetError("preset-settings-invalid") from None
+        self._write(valid)
+        return valid
 
     def _write(self, state: Mapping[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -192,3 +179,26 @@ class PresetStore:
             ) from None
         self._write(state)
         return preset
+
+
+def validate_state(raw: Any) -> dict[str, Any]:
+    """Validate {"active", "presets"} (store file or backup) or raise preset-store-invalid."""
+    if not isinstance(raw, Mapping) or not isinstance(raw.get("presets"), list) or len(raw["presets"]) > MAX_PRESETS:
+        raise PresetError("preset-store-invalid")
+    presets, ids = [], set()
+    for item in raw["presets"]:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str) or item["id"] in ids:
+            raise PresetError("preset-store-invalid")
+        try:
+            presets.append(
+                {
+                    "id": item["id"],
+                    "name": clean_name(item.get("name")),
+                    "settings": validate_station_settings(item.get("settings")),
+                }
+            )
+        except (PresetError, ValueError):
+            raise PresetError("preset-store-invalid") from None
+        ids.add(item["id"])
+    active = raw.get("active")
+    return {"active": active if active in ids else None, "presets": presets}

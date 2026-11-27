@@ -41,7 +41,7 @@ class Tests(unittest.TestCase):
             raw = p.read_text()
             envelope = json.loads(raw)
             self.assertNotIn('camera', raw)
-            self.assertEqual(envelope['version'], 3)
+            self.assertEqual(envelope['version'], 4)
             self.assertEqual(envelope['cipher'], 'aes-256-gcm')
             self.assertNotIn('mac', envelope)
 
