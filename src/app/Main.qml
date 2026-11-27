@@ -55,7 +55,7 @@ ApplicationWindow {
  }
  Shortcut{sequence:"F2";enabled:connected&&!serviceMode&&!simulation;onActivated:startSelected()} Shortcut{sequence:"F11";onActivated:w.visibility=w.visibility===Window.FullScreen?Window.Maximized:Window.FullScreen}
  StackLayout{id:pages;objectName:"mainPages";currentIndex:simulation?1:(!connected?0:(serviceMode?2:1));anchors.fill:parent
-  HomePanel{onOpenController:controllerPopup.open();onOpenSimulation:simulation=true;onOpenDevices:devices.open();onOpenFirmware:firmwarePopup.open();onOpenUpdate:updatePopup.open();onOpenDiagnostics:diagnostics.open();onOpenPreflight:preflightPopup.open();onOpenTimeline:timelinePopup.open();onOpenOsdSettings:openOsdSettings();onOpenBackup:backupPopup.open();onConnectDevice:function(deviceId){connectDevice(deviceId)};onRunNextAction:function(action){if(action==="calibrate-controller"){controllerPopup.open()}else if(action==="diagnose"){diagnostics.open()}else if(action==="review-firmware"){firmwarePopup.open()}else if(action==="find-camera"){devices.open()}else if(action==="show-video"||action==="connect-camera"){var activeId="";for(var i=0;i<devicesModel.items.length;i++){if(devicesModel.items[i].active&&devicesModel.items[i].onboardingState==="ready"){activeId=devicesModel.items[i].id;break}}if(activeId===""){activeId=devicesModel.homeItems.length>0?devicesModel.homeItems[0].id:""}if(activeId!=="")connectDevice(activeId);else devices.open()}else{devices.open()}}}
+  HomePanel{onOpenPresets:presetsPopup.open();onOpenController:controllerPopup.open();onOpenSimulation:simulation=true;onOpenDevices:devices.open();onOpenFirmware:firmwarePopup.open();onOpenUpdate:updatePopup.open();onOpenDiagnostics:diagnostics.open();onOpenPreflight:preflightPopup.open();onOpenTimeline:timelinePopup.open();onOpenOsdSettings:openOsdSettings();onOpenBackup:backupPopup.open();onConnectDevice:function(deviceId){connectDevice(deviceId)};onRunNextAction:function(action){if(action==="calibrate-controller"){controllerPopup.open()}else if(action==="diagnose"){diagnostics.open()}else if(action==="review-firmware"){firmwarePopup.open()}else if(action==="find-camera"){devices.open()}else if(action==="show-video"||action==="connect-camera"){var activeId="";for(var i=0;i<devicesModel.items.length;i++){if(devicesModel.items[i].active&&devicesModel.items[i].onboardingState==="ready"){activeId=devicesModel.items[i].id;break}}if(activeId===""){activeId=devicesModel.homeItems.length>0?devicesModel.homeItems[0].id:""}if(activeId!=="")connectDevice(activeId);else devices.open()}else{devices.open()}}}
   Item {
    Rectangle { anchors.fill: parent; visible: !w.simulation; color: "black" }
    VideoOutput { id:videoOut; objectName:"mainFlightVideoOutput"; anchors.fill:parent; visible:!w.simulation; fillMode:VideoOutput.PreserveAspectFit }
@@ -295,6 +295,12 @@ ApplicationWindow {
      background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
     }
     Button {
+     text: "Пресети"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
+     objectName: "flightMenuPresets"
+     onClicked: { flightMenu.close(); presetsPopup.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Button {
      text: "Діагностика"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
      enabled: !w.simulation
      onClicked: { flightMenu.close(); diagnostics.open() }
@@ -361,6 +367,7 @@ ApplicationWindow {
    }}
   }
  }
+ Popup{id:presetsPopup;objectName:"presetsPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(820,w.width-40);height:Math.min(620,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:presetsContent.active=true;contentItem:Loader{id:presetsContent;objectName:"presetsContent";anchors.fill:parent;active:false;sourceComponent:Component{PresetsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:presetsPopup.close()}}}}
  Popup{id:controllerPopup;objectName:"controllerPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(720,w.width-40);height:Math.min(560,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:controllerContent.active=true;onClosed:controllerContent.active=false;contentItem:Loader{id:controllerContent;objectName:"controllerContent";anchors.fill:parent;active:false;sourceComponent:Component{ControllerPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:controllerPopup.close()}}}}
  Popup{id:timelinePopup;objectName:"timelinePopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(760,w.width-40);height:Math.min(560,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:timelineContent.active=true;contentItem:Loader{id:timelineContent;objectName:"timelineContent";anchors.fill:parent;active:false;sourceComponent:Component{TimelinePanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:timelinePopup.close()}}}}
  Popup{id:backupPopup;objectName:"backupPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(700,w.width-40);height:Math.min(600,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:backupContent.active=true;onClosed:if(backupContent.item)backupContent.item.clearSensitiveFields();contentItem:Loader{id:backupContent;objectName:"backupContent";anchors.fill:parent;active:false;sourceComponent:Component{BackupPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:backupPopup.close()}}}}

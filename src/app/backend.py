@@ -3,6 +3,8 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Property, QSettings, Signal, Slot
 from flight_alerts import DEFAULT_THRESHOLDS, validate_threshold, validate_thresholds
 from home_dashboard import home_dashboard
+import station_settings
+from station_settings import validate_station_settings
 
 DATA = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'FPV-Uhyliant'
 DATA.mkdir(parents=True, exist_ok=True)
@@ -74,28 +76,12 @@ class Station(QObject):
     OSD_POSITION_KEY = "osd/station-position"
     OSD_ELEMENTS_KEY = "osd/station-elements"
     OSD_ELEMENT_VISIBILITY_KEY = "osd/station-element-visibility"
-    OSD_ELEMENT_NAMES = (
-        "link",
-        "arm",
-        "mode",
-        "battery",
-        "gps",
-        "altitude",
-        "speed",
-        "heading",
-        "video",
-        "homeDistance",
-        "reticle",
-        "horizon",
-    )
-    OSD_POSITIONS = ("top-left", "top-right", "bottom-left", "bottom-right")
-    OSD_DEFAULT_ELEMENT_VISIBILITY = {
-        name: True for name in ("link", "arm", "mode", "battery", "gps", "altitude", "speed", "heading", "video")
-    }
-    OSD_DEFAULT_ELEMENT_VISIBILITY.update({"homeDistance": False, "reticle": False, "horizon": False})
-    OSD_DEFAULT_OPACITY = 0.58
-    OSD_DEFAULT_SCALE = 1.0
-    OSD_DEFAULT_POSITION = "top-left"
+    OSD_ELEMENT_NAMES = station_settings.ELEMENT_NAMES
+    OSD_POSITIONS = station_settings.POSITIONS
+    OSD_DEFAULT_ELEMENT_VISIBILITY = station_settings.DEFAULT_ELEMENT_VISIBILITY
+    OSD_DEFAULT_OPACITY = station_settings.DEFAULT_OPACITY
+    OSD_DEFAULT_SCALE = station_settings.DEFAULT_SCALE
+    OSD_DEFAULT_POSITION = station_settings.DEFAULT_POSITION
     ALERT_THRESHOLDS_KEY = "alerts/thresholds"
 
     def __init__(self, settings=None):
@@ -123,6 +109,47 @@ class Station(QObject):
         except (TypeError, ValueError):
             stored = {}
         return validate_thresholds(stored)
+
+    def exportSettings(self):
+        """All station settings that belong in a vehicle preset."""
+        return {
+            "osd": {
+                "enabled": self._osd_enabled,
+                "opacity": self._opacity,
+                "scale": self._scale,
+                "position": self._position,
+                "elements": {name: list(value) for name, value in self._elements.items()},
+                "elementVisibility": dict(self._element_visibility),
+            },
+            "alerts": dict(self._alert_thresholds),
+        }
+
+    def applySettings(self, settings):
+        """Validate and apply a complete settings set (all or nothing), then persist it."""
+        try:
+            value = validate_station_settings(settings)
+        except ValueError:
+            return False
+        osd = value["osd"]
+        self._osd_enabled = osd["enabled"]
+        self._opacity = osd["opacity"]
+        self._scale = osd["scale"]
+        self._position = osd["position"]
+        self._elements = {name: list(pos) for name, pos in osd["elements"].items()}
+        self._element_visibility = dict(osd["elementVisibility"])
+        self._alert_thresholds = dict(value["alerts"])
+        self._settings.setValue(self.OSD_ENABLED_KEY, self._osd_enabled)
+        self._settings.setValue(self.OSD_OPACITY_KEY, self._opacity)
+        self._settings.setValue(self.OSD_SCALE_KEY, self._scale)
+        self._settings.setValue(self.OSD_POSITION_KEY, self._position)
+        self._settings.setValue(self.OSD_ELEMENTS_KEY, json.dumps(self._elements))
+        self._settings.setValue(self.OSD_ELEMENT_VISIBILITY_KEY, json.dumps(self._element_visibility))
+        self._settings.setValue(self.ALERT_THRESHOLDS_KEY, json.dumps(self._alert_thresholds, sort_keys=True))
+        saved = self._save_osd_settings()
+        if saved:
+            self.osdSettingsSaved.emit()
+        self.changed.emit()
+        return saved
 
     @Property("QVariantMap", notify=changed)
     def alertThresholds(self):
