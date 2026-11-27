@@ -105,6 +105,14 @@ class ControllerRuntimeTests(unittest.TestCase):
         self.runtime.startWizard()
         self.assertFalse(self.runtime.wizardActive)
 
+    def test_observe_takes_one_reading_without_polling(self):
+        self.runtime.observe()
+        self.assertEqual(self.runtime.health, "attention")
+        self.assertFalse(self.runtime.active)
+        self.radio.present = False
+        self.runtime.observe()
+        self.assertEqual(self.runtime.health, "unknown")
+
     def test_every_message_is_human(self):
         self.assertEqual(human_summary("something-new"), "Стан пульта невідомий.")
         self.assertNotIn("controller-", human_step_error("controller-unexpected"))

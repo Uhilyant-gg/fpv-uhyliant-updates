@@ -15,6 +15,8 @@ Item {
  property var navigation: ({})
  property var nextAction: ({})
  property bool osdEnabled: true
+ property string controllerHealth: "unknown"
+ property string controllerDetail: ""
  property color foreground: "#f4f7fb"
  property color secondary: "#b7c8da"
  property color line: "#273d55"
@@ -32,6 +34,7 @@ Item {
    "error": "Є проблема",
    "unavailable": "Немає даних",
    "not-integrated": "Не інтегровано",
+   "attention": "Потрібна дія",
    "disconnected": "Немає зв’язку"
   }
   return labels[state] || "Не перевірено"
@@ -77,6 +80,7 @@ Item {
   {label: "Мережа", state: network.state || "unavailable", detail: network.transport || "З’єднання не підтверджене"},
   {label: "Зовнішня навігація", state: navigation.state || "unavailable", detail: navigation.source || "Джерело не підтверджене"},
   {label: "OSD станції", state: osdEnabled ? "ready" : "unavailable", detail: osdEnabled ? "Додається поверх відео; зображення камери не змінюється" : "Не додається; OSD камери залишається частиною відео"},
+  {label: "Пульт", state: controllerHealth === "ready" ? "ready" : (controllerHealth === "problem" ? "error" : (controllerHealth === "attention" ? "attention" : "unavailable")), detail: controllerDetail || "Не перевірено"},
   {label: "Керування польотом", state: "not-integrated", detail: "Канал керування не інтегрований"}
  ]
 
