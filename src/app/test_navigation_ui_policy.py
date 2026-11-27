@@ -21,8 +21,13 @@ class NavigationUiPolicyTests(unittest.TestCase):
   for call in ('updater.check()','updater.download()','updater.install()'):self.assertIn(call,self.update)
  def test_service_mode_does_not_duplicate_navigation_grid(self):
   self.assertIn('СЕРВІСНИЙ РЕЖИМ',self.main);self.assertNotIn('GridLayout{Layout.fillWidth:true;columns:4',self.main)
+ def test_service_mode_hides_technical_provider_names_and_unknown_states(self):
+  service=self.main.split('СЕРВІСНИЙ РЕЖИМ',1)[1].split('Popup{id:flightMenu',1)[0]
+  for technical in ('telemetryRuntime.name','ext.source','net.transport'):self.assertNotIn(technical,service)
+  for label in ('Поточний стан системи','Дані польоту:','Зовнішня навігація:','Мережеве з’єднання:'):self.assertIn(label,service)
+  self.assertIn('states[value]||"потрібна перевірка"',self.main)
  def test_main_localizes_core_visible_surfaces(self):
-  for text in ('ВІДЕО','Основний','Додатковий','Поміняти місцями','Телеметрія:','Мережа:','недоступно'):self.assertIn(text,self.main)
+  for text in ('ВІДЕО','Основний','Додатковий','Поміняти місцями','Дані польоту:','Зовнішня навігація:','Мережеве з’єднання:','недоступно'):self.assertIn(text,self.main)
  def test_navigation_stop_clears_media_sources(self):self.assertIn('player.source=""',self.main);self.assertIn('secondaryPlayer.source=""',self.main)
  def test_hover_help_delay_is_five_seconds(self):self.assertIn('property int delay:5000',self.hint);self.assertIn('showTimer.restart()',self.hint)
  def test_compact_home_still_has_delayed_help(self):self.assertGreaterEqual(self.home.count('HoverHint{'),5)

@@ -49,7 +49,7 @@ class UiLanguagePolicyTests(unittest.TestCase):
 
     def test_main_surface_core_copy_is_ukrainian(self):
         visible = self.visible(self.sources["Main.qml"])
-        for expected in ("СЕРВІСНИЙ РЕЖИМ", "ВІДЕО", "Основний", "Додатковий", "Поміняти місцями", "Прошивка", "Телеметрія: ", "Мережа: "):
+        for expected in ("СЕРВІСНИЙ РЕЖИМ", "ВІДЕО", "Основний", "Додатковий", "Поміняти місцями", "Прошивка", "Дані польоту: ", "Мережеве з’єднання: "):
             self.assertIn(expected, visible)
         for obsolete in ("SERVICE MODE", "VIDEO WORKSPACE", "Primary", "Secondary", "Swap", "Firmware", "Telemetry: ", "Network: "):
             self.assertNotIn(obsolete, visible)
