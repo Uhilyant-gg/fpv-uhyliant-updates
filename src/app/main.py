@@ -127,6 +127,10 @@ def main():
     from serial_telemetry import MspSerialTransport, CrsfSerialTransport
     from telemetry_provider import CrsfProvider, MavlinkProvider, MspProvider, TelemetryRouter
     from vehicle import VehicleRuntime
+    from controller_discovery import default_source as default_controller_source
+    from controller_onboarding import ControllerOnboarding
+    from controller_profile_store import JsonControllerProfileStore
+    from controller_runtime import ControllerRuntime
 
     harness.mark('application-imports-complete')
     DATA.mkdir(parents=True, exist_ok=True)
@@ -232,7 +236,10 @@ def main():
     streams.autoSelect()
     pairing.reconcile()
     display_runtime = DisplayRuntime(app)
-    app._runtime_refs = app._runtime_refs + (display_runtime,)
+    controller = ControllerRuntime(
+        ControllerOnboarding(default_controller_source(), JsonControllerProfileStore(DATA / 'controller-profiles.json'))
+    )
+    app._runtime_refs = app._runtime_refs + (display_runtime, controller)
     ctx = e.rootContext()
     for name, obj in [
         ('station', s),
@@ -262,6 +269,7 @@ def main():
         ('updater', u),
         ('diagnosticsRuntime', diag),
         ('hardwareE2ERuntime', hardware_e2e),
+        ('controllerRuntime', controller),
     ]:
         ctx.setContextProperty(name, obj)
     ctx.setContextProperty('appWindowTitle', WINDOW_TITLE)

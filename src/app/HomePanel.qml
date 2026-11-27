@@ -13,6 +13,7 @@ Item {
  signal openOsdSettings()
  signal openBackup()
  signal openSimulation()
+ signal openController()
  signal connectDevice(string deviceId)
  signal runNextAction(string action)
 
@@ -25,6 +26,7 @@ Item {
  property bool menuOpen: false
  readonly property var menuItems: [
   {label: "Камери", detail: "Знайти або вибрати пристрій", glyph: "◉", action: "devices"},
+  {label: "Пульт", detail: "Підключити та налаштувати стіки", glyph: "✥", action: "controller"},
   {label: "Підготовка", detail: "Перевірити стан системи", glyph: "✓", action: "preflight"},
   {label: "Симуляція", detail: "Налаштувати екран без обладнання", glyph: "▣", action: "simulation"},
   {label: "Події", detail: "Історія важливих змін", glyph: "⌁", action: "timeline"},
@@ -52,6 +54,7 @@ Item {
   else if (action === "firmware") openFirmware()
   else if (action === "diagnostics") openDiagnostics()
   else if (action === "backup") openBackup()
+  else if (action === "controller") openController()
  }
 
  Rectangle {

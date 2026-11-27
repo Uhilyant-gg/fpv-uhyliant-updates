@@ -57,6 +57,7 @@ MODELS = {
     "updater": ("updater_engine", "Updater"),
     "diagnosticsRuntime": ("diagnostics_runtime", "DiagnosticsRuntime"),
     "hardwareE2ERuntime": ("hardware_e2e_runtime", "HardwareE2ERuntime"),
+    "controllerRuntime": ("controller_runtime", "ControllerRuntime"),
 }
 
 
