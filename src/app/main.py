@@ -240,6 +240,7 @@ def main():
         ControllerOnboarding(default_controller_source(), JsonControllerProfileStore(DATA / 'controller-profiles.json'))
     )
     app._runtime_refs = app._runtime_refs + (display_runtime, controller)
+    home.setController(controller)
     ctx = e.rootContext()
     for name, obj in [
         ('station', s),
@@ -286,6 +287,8 @@ def main():
         m.shutdown()
         msp_serial.stop()
         crsf_serial.stop()
+        controller.stopIdleObservation()
+        controller.deactivate()
         u.shutdown()
 
     if not e.rootObjects():
@@ -338,6 +341,7 @@ def main():
     QTimer.singleShot(0, show_home)
     if not x.first_run_acceptance_smoke:
         QTimer.singleShot(0, m.start)
+        QTimer.singleShot(1500, controller.startIdleObservation)
     QTimer.singleShot(1200, lambda: signal_ok(x.startup_token))
     QTimer.singleShot(1200, lambda: harness.mark('startup-ready'))
     harness.mark('event-loop-begin')

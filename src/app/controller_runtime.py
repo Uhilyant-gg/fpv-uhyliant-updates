@@ -15,6 +15,7 @@ from controller_mapping import MappingWizard
 from controller_onboarding import ControllerOnboarding
 
 POLL_INTERVAL_MS = 50
+IDLE_OBSERVE_INTERVAL_MS = 5000
 
 _SUMMARIES = {
     "controller-observed-inputs-and-restored": "Пульт підключено, налаштування відновлено.",
@@ -68,6 +69,11 @@ class ControllerRuntime(QObject):
         self._timer = QTimer(self)
         self._timer.setInterval(interval_ms)
         self._timer.timeout.connect(self._tick)
+        # Slow background observation so plugging a radio in is noticed without
+        # opening the panel; skipped while the fast panel polling runs.
+        self._idle = QTimer(self)
+        self._idle.setInterval(IDLE_OBSERVE_INTERVAL_MS)
+        self._idle.timeout.connect(self._idle_observe)
 
     # -- polling --------------------------------------------------------------
     def _tick(self):
@@ -99,6 +105,26 @@ class ControllerRuntime(QObject):
         self._active = True
         self._timer.start()
         self._tick()
+
+    def startIdleObservation(self):
+        self._idle.start()
+        self.observe()
+
+    def stopIdleObservation(self):
+        self._idle.stop()
+
+    def _idle_observe(self):
+        if not self._timer.isActive():
+            self.observe()
+
+    def evidence(self) -> dict[str, Any]:
+        """Health evidence for the Home next-action; empty while the wizard runs."""
+        if self._wizard is not None:
+            return {"health": "attention", "safeActions": []}
+        return {
+            "health": self._state.get("health", "unknown"),
+            "safeActions": list(self._state.get("safeActions") or []),
+        }
 
     @Slot()
     def observe(self):

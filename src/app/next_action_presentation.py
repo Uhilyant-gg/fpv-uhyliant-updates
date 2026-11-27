@@ -15,6 +15,7 @@ _LABELS = {
     "verify-camera": "Перевірити камеру",
     "review-firmware": "Перевірити прошивку",
     "show-video": "Показати відео",
+    "calibrate-controller": "Налаштувати пульт",
 }
 
 

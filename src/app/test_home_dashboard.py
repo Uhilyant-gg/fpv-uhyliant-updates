@@ -28,6 +28,41 @@ class HomeDashboardTests(unittest.TestCase):
         self.assertEqual(result["verifiedCount"], 1)
         self.assertEqual(result["nextAction"]["action"], "show-video")
 
+    def _ready_camera(self):
+        devices = [
+            {
+                "id": "cam-1",
+                "name": "Camera",
+                "active": True,
+                "openipcIdentity": {"verified": True, "platform": "ssc338q", "sensor": "imx335"},
+            }
+        ]
+        streams = [{"device_id": "cam-1", "enabled": True}]
+        return devices, streams
+
+    def test_unconfigured_controller_is_suggested_once_camera_is_ready(self):
+        devices, streams = self._ready_camera()
+        controller = {"health": "attention", "safeActions": ["calibrate-controller"]}
+        result = home_dashboard(devices, streams, controller)
+        self.assertEqual(result["nextAction"]["action"], "calibrate-controller")
+        self.assertEqual(result["nextAction"]["label"], "Налаштувати пульт")
+
+    def test_camera_actions_take_priority_over_controller_setup(self):
+        controller = {"health": "attention", "safeActions": ["calibrate-controller"]}
+        result = home_dashboard([], [], controller)
+        self.assertEqual(result["nextAction"]["action"], "find-camera")
+
+    def test_absent_or_ready_controller_never_adds_an_action(self):
+        devices, streams = self._ready_camera()
+        baseline = home_dashboard(devices, streams)["nextAction"]
+        for controller in (
+            None,
+            {"health": "unknown", "safeActions": ["connect-controller"]},
+            {"health": "ready", "safeActions": []},
+            {"health": "problem", "safeActions": ["diagnose"]},
+        ):
+            self.assertEqual(home_dashboard(devices, streams, controller)["nextAction"], baseline, controller)
+
     def test_unverified_camera_gets_attention_instead_of_ready(self):
         result = home_dashboard(
             [

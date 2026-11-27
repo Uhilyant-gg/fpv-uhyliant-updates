@@ -2,8 +2,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtCore import QCoreApplication, QObject, Signal
 
+from backend import HomeDashboard
 from controller_onboarding import ControllerOnboarding
 from controller_profile_store import JsonControllerProfileStore
 from controller_runtime import ControllerRuntime, human_step_error, human_summary
@@ -112,6 +113,46 @@ class ControllerRuntimeTests(unittest.TestCase):
         self.radio.present = False
         self.runtime.observe()
         self.assertEqual(self.runtime.health, "unknown")
+
+    def test_evidence_for_home_action(self):
+        self.assertEqual(self.runtime.evidence()["health"], "unknown")
+        self.runtime.observe()
+        self.assertEqual(self.runtime.evidence(), {"health": "attention", "safeActions": ["calibrate-controller"]})
+        self.runtime.startWizard()
+        self.assertEqual(self.runtime.evidence()["safeActions"], [])
+
+    def test_idle_observation_notices_plugged_radio(self):
+        self.radio.present = False
+        self.runtime.startIdleObservation()
+        self.assertEqual(self.runtime.health, "unknown")
+        self.radio.present = True
+        self.runtime._idle_observe()
+        self.assertEqual(self.runtime.health, "attention")
+        self.runtime.stopIdleObservation()
+
+    def test_home_suggests_controller_setup_when_radio_appears(self):
+        class Devices(QObject):
+            changed = Signal()
+            streamsChanged = Signal()
+            discoveryChanged = Signal()
+            items = [
+                {
+                    "id": "cam-1",
+                    "name": "Camera",
+                    "active": True,
+                    "openipcIdentity": {"verified": True, "platform": "ssc338q", "sensor": "imx335"},
+                }
+            ]
+            streams = [{"device_id": "cam-1", "enabled": True}]
+
+        home = HomeDashboard(Devices())
+        home.setController(self.runtime)
+        self.assertEqual(home.nextAction["action"], "show-video")
+        self.runtime.observe()
+        self.assertEqual(home.nextAction["action"], "calibrate-controller")
+        self.radio.present = False
+        self.runtime.observe()
+        self.assertEqual(home.nextAction["action"], "show-video")
 
     def test_every_message_is_human(self):
         self.assertEqual(human_summary("something-new"), "Стан пульта невідомий.")
