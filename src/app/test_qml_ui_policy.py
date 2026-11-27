@@ -80,7 +80,10 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
     def test_osd_layout_editing_locks_when_telemetry_reports_armed(self):
         main = self.qml["Main.qml"]
         panel = self.qml["OsdSettingsPanel.qml"]
-        self.assertIn("editingAllowed:w.simulation||t.armed!==true", re.sub(r"\s+", "", main))
+        main = re.sub(r"\s+", "", main)
+        self.assertIn("functionopenOsdSettings(){osdSettingsPanel.editingAllowed=w.simulation||t.armed!==true;osdSettingsPopup.open()}", main)
+        self.assertIn("if(osdSettingsPopup.visible&&!w.simulation)osdSettingsPanel.editingAllowed=t.armed!==true", main)
+        self.assertNotIn("editingAllowed:w.simulation||t.armed!==true", main)
         self.assertIn("enabled: root.editingAllowed", panel)
         self.assertIn("editing: root.editingAllowed", panel)
         self.assertIn("Телеметрія показує ARM", panel)
