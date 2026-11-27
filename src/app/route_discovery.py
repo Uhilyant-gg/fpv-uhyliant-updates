@@ -4,12 +4,12 @@ from html import unescape
 MAX_SWEEP_HOSTS=254;MAX_WORKERS=24;PROBE_TIMEOUT=0.65
 VIRTUAL_HINTS=("docker","wsl","hyper-v","vethernet","vmware","virtualbox","vpn","wireguard","tailscale","loopback")
 def _private_ipv4(value):
- try:ip=ipaddress.ip_address(value);return ip.version==4 and ip.is_private and not(ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_unspecified)
+ try:ip=ipaddress.ip_address(value);return ip.version==4 and ip.is_private and not(ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_unspecified or ip.is_reserved)
  except ValueError:return False
 def route_is_sweepable(network,interface=""):
  try:net=ipaddress.ip_network(network,strict=False)
  except ValueError:return False
- return net.version==4 and net.prefixlen>=24 and net.num_addresses<=MAX_SWEEP_HOSTS+2 and _private_ipv4(net.network_address+1) and not any(h in interface.lower() for h in VIRTUAL_HINTS)
+ return net.version==4 and net.prefixlen>=24 and net.num_addresses<=MAX_SWEEP_HOSTS+2 and _private_ipv4(net.network_address) and not any(h in interface.lower() for h in VIRTUAL_HINTS)
 def plan_targets(interfaces,routes,known_hosts=()):
  direct={str(ipaddress.ip_address(h)) for h in known_hosts if _private_ipv4(h)};networks={}
  for item in list(interfaces)+list(routes):

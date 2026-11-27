@@ -88,6 +88,33 @@ Prefer the smallest safe change that produces the largest measurable reduction i
 ### Operational home
 When a verified usable camera exists, video is the operational home and receives the largest useful area. Health and next action remain glanceable without displacing video.
 
+The FPV workspace may show video and a live map side by side or let the operator switch between them. The map shows the drone's observed position, direction of travel and travelled track. It may also show the Starlink terminal's location when supplied by the connected terminal/API. Drone and terminal positions are distinct observations and must include their source and freshness. Never infer either position from an IP address or stale cached coordinates.
+
+The map must identify stale or unavailable position data rather than presenting it as live. Track history is drawn only from fresh observed drone coordinates. Provide cached/offline map availability where the chosen map source permits it, and make any retained location history visible and controllable by the operator.
+
+Support multiple displays as part of the FPV workspace. Operators can move a video stream to another monitor by dragging it or using an explicit “Move to display” action, detach it into a window, and return it to the main workspace without restarting the stream. Offer clear presets such as video + map, two vehicle workspaces, and one stream per display; keep labels and device status visible in every detached window. Restore a saved layout only when its display arrangement is unambiguous. If a monitor disconnects, move its stream back to the main workspace and explain what happened.
+
+Controllers are assigned to vehicle/flight-controller operation sessions, not directly to cameras. A vehicle session may reference one or more cameras; each controller-to-vehicle assignment must remain visible and unambiguous. Multiple independent vehicle sessions can be presented in one station, with explicit focus and separate video, map, telemetry, controller and health state.
+
+The operator can preserve the OSD already present in the incoming aircraft video. Station-generated OSD is an independent overlay with separate controls: keep the original video OSD, show the station OSD, or show both with a non-overlapping layout. The safe default never modifies or attempts to remove the source OSD. If source OSD is burned into the video pixels, disabling the station overlay must not imply that the source OSD was removed.
+
+Station OSD settings are available from Home and Service mode, persist automatically, and allow corner placement, text scaling, background opacity and reset to defaults. Provide a preview that is clearly identified as layout-only, with no fabricated live telemetry; make settings easy to reach before video operation and keep editing out of the active flight view.
+
+### Connectivity and Starlink
+Show separate evidence for Starlink terminal state, mobile 4G/5G availability, the station's active network route, video, telemetry and control. A connected terminal or available Internet route does not by itself prove that the aircraft, video, telemetry or control channel is usable. Show the active and available backup route only when observed; do not claim automatic failover unless it is implemented and verified for the supported network equipment.
+
+Starlink management belongs in a dedicated Connectivity/Starlink surface, with a compact persistent status on the FPV workspace. Supported status and controls depend on the verified terminal/router model and its available interface. Do not invent capabilities when a model does not expose them.
+
+During a Starlink update or reboot, keep a visible status through the full transition: update in progress, reboot required, rebooting, waiting for reconnection, online again, or failed. Warn before an action that can interrupt the network. After reconnection, independently revalidate the network route, video, telemetry and control evidence before showing the station as ready.
+
+### Preflight readiness
+Provide a concise readiness check for each vehicle session. Summarize observed controller assignment/input freshness, camera/video, telemetry, network route, position freshness and OSD source. Show what is ready, what needs attention and what remains unknown, with one useful next action. Do not infer readiness from one component's connected state, and do not invent hardware-specific thresholds.
+
+### Alerts and session history
+Prioritize alerts by their observed impact. Critical alerts remain visible without covering the central video; non-critical updates are quiet and deduplicated until the state changes. Use text and iconography as well as color, and never hide an unresolved critical state behind an acknowledgement.
+
+Keep a human-readable session timeline for meaningful connection changes, stale/lost/restored video or telemetry, Starlink update/reboot states, device discovery and operator-confirmed configuration changes. Provide a sanitized export and clear retention controls for location and session history.
+
 ### Health Dashboard
 First-run, disconnected and recovery states show a compact health surface that answers within 10 seconds:
 - Is the system ready?
@@ -148,6 +175,9 @@ Plugins may contribute normalized evidence and safe actions. They may not bypass
 Create an automatic backup before every critical reversible configuration change. Recovery must be available as one clear action when safe.
 
 Backups must be identity-bound, versioned and validated before restore. Failed or ambiguous restore remains blocked and explained in human language.
+
+## Offline operation
+Basic local operation must not require an account or cloud service. Keep local device/controller profiles and workspace layouts available offline. Use cached maps when supported by the selected provider, and make it clear when map tiles or remote device capabilities are unavailable.
 
 ## Smart search and in-app assistance
 Search accepts natural task language and routes the user to the relevant action or surface. It should answer task questions, not expose internal file or component names.

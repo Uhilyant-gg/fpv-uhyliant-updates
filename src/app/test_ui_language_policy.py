@@ -9,6 +9,7 @@ class UiLanguagePolicyTests(unittest.TestCase):
         self.sources = {
             name: (here / name).read_text(encoding="utf-8")
             for name in (
+                "BackupPanel.qml",
                 "FirmwareCenter.qml", "UpdatePanel.qml", "DevicesPanel.qml",
                 "DiagnosticsPanel.qml", "PairingPanel.qml", "Main.qml",
                 "MavlinkDiagnostics.qml",
@@ -47,9 +48,25 @@ class UiLanguagePolicyTests(unittest.TestCase):
         for obsolete in ("PAIRING TRUST", "Protected secret store", "Trust metadata store", "Recovery required", "Fingerprint:", "trusted"):
             self.assertNotIn(obsolete, visible)
 
+    def test_backup_surface_explains_encryption_and_requires_confirmed_restore(self):
+        source = self.sources["BackupPanel.qml"]
+        visible = self.visible(source)
+        for expected in (
+            "РЕЗЕРВНА КОПІЯ",
+            "у зашифрованому файлі.",
+            "Пароль не зберігається.",
+            "Зберегти резервну копію",
+            "Перевірити копію",
+            "Відновити",
+        ):
+            self.assertIn(expected, visible)
+        self.assertIn("Поточний список пристроїв і відеопотоків буде замінено.", source)
+        self.assertNotIn("stationBackup.result.reason", source)
+        self.assertIn("stationBackup.restoreInspected(true)", source)
+
     def test_main_surface_core_copy_is_ukrainian(self):
         visible = self.visible(self.sources["Main.qml"])
-        for expected in ("СЕРВІСНИЙ РЕЖИМ", "ВІДЕО", "Основний", "Додатковий", "Поміняти місцями", "Прошивка", "Телеметрія: ", "Мережа: "):
+        for expected in ("СЕРВІСНИЙ РЕЖИМ", "ВІДЕО", "Основний", "Додатковий", "Поміняти місцями", "Прошивка", "Дані польоту: ", "Мережеве з’єднання: "):
             self.assertIn(expected, visible)
         for obsolete in ("SERVICE MODE", "VIDEO WORKSPACE", "Primary", "Secondary", "Swap", "Firmware", "Telemetry: ", "Network: "):
             self.assertNotIn(obsolete, visible)

@@ -3,6 +3,10 @@ import hashlib,json,os,secrets,sys,time,uuid
 from copy import deepcopy
 from pathlib import Path
 from PySide6.QtCore import QObject,Property,Signal,Slot
+SECRET_STORE_UNAVAILABLE="Захищене сховище секретів недоступне. Перевірте налаштування безпеки системи."
+SECRET_STORE_OPERATION_ERROR="Не вдалося скористатися захищеним сховищем. Перевірте доступ і повторіть спробу."
+METADATA_LOAD_ERROR="Не вдалося прочитати налаштування довіри. Перевірте доступ до файлів і повторіть спробу."
+METADATA_SAVE_ERROR="Не вдалося зберегти налаштування довіри. Перевірте доступність диска і повторіть спробу."
 class SecretStoreUnavailable(RuntimeError):pass
 class MetadataStoreUnavailable(RuntimeError):pass
 class SecretStore:
@@ -40,23 +44,25 @@ class PairingRegistry(QObject):
    if not all(self._valid_record(r) for r in records):raise MetadataStoreUnavailable('Некоректний запис довіри')
    if len({r['id'] for r in records})!=len(records):raise MetadataStoreUnavailable('Дубльований запис довіри')
    self._records={r['id']:dict(r) for r in records};self._metadata_error=''
-  except Exception as e:self._records={};self._metadata_error=str(e)
+  except MetadataStoreUnavailable as e:self._records={};self._metadata_error=str(e)
+  except Exception:self._records={};self._metadata_error=METADATA_LOAD_ERROR
  def _valid_record(self,r):
   required={'id','label','endpoint','fingerprint','createdAt','trustedAt','state','secretRef'}
   return isinstance(r,dict) and set(r)==required and all(isinstance(r.get(k),str) and r.get(k) for k in ('id','label','endpoint','fingerprint','state','secretRef')) and r.get('state')=='trusted' and isinstance(r.get('createdAt'),int) and not isinstance(r.get('createdAt'),bool) and isinstance(r.get('trustedAt'),int) and not isinstance(r.get('trustedAt'),bool) and len(r.get('fingerprint',''))==64 and all(c in '0123456789abcdef' for c in r['fingerprint']) and r['secretRef']=='pairing/'+r['id']
  def _persist(self,records):
   if not getattr(self.metadata,'available',False):return False
   try:self.metadata.save([deepcopy(v) for v in records.values()]);self._metadata_error='';return True
-  except Exception as e:self._metadata_error=str(e);return False
+  except MetadataStoreUnavailable as e:self._metadata_error=str(e);return False
+  except Exception:self._metadata_error=METADATA_SAVE_ERROR;return False
  def _secret_call(self,operation,*args):
   try:result=getattr(self.store,operation)(*args);self._secret_error='';return True,result
-  except Exception as e:self._secret_error=str(e);return False,None
+  except Exception:self._secret_error=SECRET_STORE_OPERATION_ERROR;return False,None
  @Property(bool,notify=changed)
  def secretStoreAvailable(self):return bool(getattr(self.store,'available',False))
  @Property(bool,notify=changed)
  def metadataStoreAvailable(self):return bool(getattr(self.metadata,'available',False))
  @Property(str,notify=changed)
- def secretStoreError(self):return self._secret_error or str(getattr(self.store,'error',''))
+ def secretStoreError(self):return self._secret_error or (SECRET_STORE_UNAVAILABLE if not self.secretStoreAvailable else '')
  @Property(str,notify=changed)
  def metadataError(self):return self._metadata_error
  @Property(str,notify=changed)

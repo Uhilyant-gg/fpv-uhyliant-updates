@@ -16,7 +16,7 @@ def interfaces():
  except OSError:pass
  return out
 class Devices(QObject):
- changed=Signal();streamsChanged=Signal();discoveryChanged=Signal()
+ changed=Signal();streamsChanged=Signal();discoveryChanged=Signal();deviceAdded=Signal();deviceUpdated=Signal();deviceRemoved=Signal();deviceListRestored=Signal()
  def __init__(self):
   super().__init__();DATA.mkdir(parents=True,exist_ok=True);self._items=[];self._streams=[];self._active='';self._discovered=[];self._scanning=False;self._stage='';self._status='';self._pd=0;self._pt=0;self._found=0;self._worker=None;self._init();self._load()
  def _connect(self):return sqlite3.connect(DB)
@@ -68,11 +68,13 @@ class Devices(QObject):
   if not name.strip() or not valid_host(host.strip()):return ''
   did=uuid.uuid4().hex
   with self._connect() as d:d.execute('INSERT INTO devices(id,name,type,host,port,connection,notes,active,identity_json) VALUES(?,?,?,?,?,?,?,?,?)',(did,name.strip(),typ,host.strip(),max(1,min(int(port),65535)),connection,notes.strip(),0,'{}'))
-  self._load();self.changed.emit();return did
+  self._load();self.changed.emit();self.deviceAdded.emit();return did
  @Slot(str)
  def removeDevice(self,did):
+  existed=any(x.get('id')==did for x in self._items)
   with self._connect() as d:d.execute('DELETE FROM streams WHERE device_id=?',(did,));d.execute('DELETE FROM devices WHERE id=?',(did,))
   self._load();self.changed.emit();self.streamsChanged.emit()
+  if existed:self.deviceRemoved.emit()
  @Slot(str)
  def setActive(self,did):
   if not any(x['id']==did for x in self._items):return
@@ -129,5 +131,5 @@ class Devices(QObject):
      d.execute('INSERT INTO devices(id,name,type,host,port,connection,notes,active,identity_json) VALUES(?,?,?,?,?,?,?,?,?)',(item['id'],item['name'],item['type'],item['host'],int(item['port']),item['connection'],item['notes'],active,json.dumps({k:v for k,v in identity.items() if k!='device_id'},ensure_ascii=False)))
     for s in value['streams']:d.execute('INSERT INTO streams(id,device_id,name,kind,port,path,protocol,enabled) VALUES(?,?,?,?,?,?,?,?)',(s['id'],s['device_id'],s['name'],s['kind'],int(s['port']),s['path'],s['protocol'],int(bool(s.get('enabled')))))
   except (sqlite3.Error,KeyError,TypeError,ValueError):return False
-  self._load();self.changed.emit();self.streamsChanged.emit();return True
+  self._load();self.changed.emit();self.streamsChanged.emit();self.deviceListRestored.emit();return True
  def snapshot(self):return {'devices':self._items,'streams':self._streams}

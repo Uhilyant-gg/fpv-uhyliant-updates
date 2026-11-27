@@ -10,7 +10,7 @@ def _manifest_url():scheme=''.join(map(chr,[104,116,116,112,115,58,47,47]));host
 DEFAULT=_manifest_url()
 def canon(o):d=dict(o);d.pop('signature',None);return json.dumps(d,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()
 def vt(v):
- if not isinstance(v,str) or not VERSION_RE.fullmatch(v):raise RuntimeError(f'Некоректний номер версії: {v!r}')
+ if not isinstance(v,str) or not VERSION_RE.fullmatch(v):raise RuntimeError('Версія оновлення має некоректний формат')
  return tuple(int(x) for x in v.split('-',1)[0].split('.'))
 def https_url(v,label):
  u=urllib.parse.urlparse(v)
@@ -48,6 +48,35 @@ def validate_install_root(root):
  if root is None:return None
  r=Path(root).resolve();helper=r/'FPV-Uhyliant-Update.exe';launcher=r/'FPV-Uhyliant-Launcher.exe';current=r/'app'/'current'/'FPV-Uhyliant.exe'
  return r if helper.is_file() and launcher.is_file() and current.is_file() else None
+UPDATE_VALIDATION_MESSAGES={
+ 'Версія оновлення має некоректний формат':'Оновлення містить некоректну версію. Його перевірку зупинено.',
+ 'Некоректний HTTPS URL для маніфесту':'Не вдалося перевірити захищене посилання на оновлення.',
+ 'Некоректний HTTPS URL для пакета':'Не вдалося перевірити захищене посилання на оновлення.',
+ 'Маніфест має некоректний формат':'Не вдалося прочитати інформацію про оновлення. Спробуйте ще раз пізніше.',
+ 'Недовірений підпис маніфесту':'Не вдалося підтвердити джерело оновлення. Завантаження зупинено.',
+ 'Маніфест не містить опис пакета':'В інформації про оновлення бракує потрібних даних. Спробуйте пізніше.',
+ 'Некоректне ім’я файла пакета':'Назва файла оновлення не пройшла перевірку. Завантаження зупинено.',
+ 'Некоректний SHA-256 пакета':'Файл оновлення не пройшов перевірку цілісності. Завантаження зупинено.',
+ 'Підпис маніфесту не пройшов перевірку':'Не вдалося підтвердити джерело оновлення. Завантаження зупинено.',
+ 'Некоректний стан завантаженого оновлення':'Дані завантаженого оновлення пошкоджені. Завантажте його ще раз.',
+ 'Пакет оновлення знаходиться поза каталогом оновлень':'Файл оновлення знаходиться у непідтримуваній папці. Встановлення зупинено.',
+ 'Пакет оновлення має бути безпосередньо в каталозі оновлень':'Файл оновлення знаходиться у непідтримуваній папці. Встановлення зупинено.',
+ 'Некоректний SHA-256 у стані готовності':'Файл оновлення не пройшов перевірку цілісності. Встановлення зупинено.',
+ 'Завантажений пакет змінився після перевірки':'Файл оновлення змінився після перевірки. Завантажте його ще раз.',
+ 'Завантажений пакет не відповідає перевіреному маніфесту':'Файл не відповідає перевіреній версії оновлення. Завантажте його ще раз.',
+ 'SHA-256 пакета не збігається':'Файл оновлення не пройшов перевірку цілісності. Завантажте його ще раз.',
+ 'Некоректний стан пакета для staging':'Не вдалося підготувати оновлення до встановлення. Спробуйте ще раз.',
+ 'Пакет не пройшов перевірку перед staging':'Файл оновлення не пройшов перевірку цілісності. Встановлення зупинено.',
+ 'Пакет змінився під час staging':'Файл оновлення змінився під час підготовки. Завантажте його ще раз.',
+ 'Некоректний стан пакета для запуску updater':'Не вдалося підготувати оновлення до встановлення. Спробуйте ще раз.',
+ 'Некоректний PID для запуску updater':'Не вдалося підготувати оновлення до встановлення. Спробуйте ще раз.',
+}
+def human_update_error(action,error):
+ if isinstance(error,RuntimeError):return UPDATE_VALIDATION_MESSAGES.get(str(error),'Не вдалося безпечно перевірити оновлення. Операцію зупинено.')
+ if isinstance(error,(urllib.error.URLError,TimeoutError,ConnectionError)):
+  return 'Не вдалося перевірити оновлення. Перевірте мережу і спробуйте ще раз.' if action=='check' else 'Не вдалося завантажити оновлення. Перевірте мережу і спробуйте ще раз.'
+ if isinstance(error,OSError):return 'Не вдалося зберегти оновлення. Перевірте доступ до диска і вільне місце.'
+ return 'Не вдалося завершити операцію оновлення. Перевірте мережу і спробуйте ще раз.'
 class W(QThread):
  done=Signal(bool,object);progress=Signal(int,str)
  def __init__(self,a,p):super().__init__();self.a=a;self.p=p
@@ -70,7 +99,7 @@ class W(QThread):
     os.replace(part,t)
    except Exception:part.unlink(missing_ok=True);raise
    ready={'version':o['version'],'package':str(t),'sha256':digest};tmp=UP/'ready.tmp';tmp.write_text(json.dumps(ready),encoding='utf-8');os.replace(tmp,UP/'ready.json');self.done.emit(True,ready)
-  except Exception as e:self.done.emit(False,str(e))
+  except Exception as e:self.done.emit(False,human_update_error(self.a,e))
 class Updater(QObject):
  changed=Signal();progressChanged=Signal()
  def __init__(self,root=None,guard=None):super().__init__();self.root=validate_install_root(root);self.guard=guard or (lambda:(True,''));self.url=DEFAULT;self.state='idle';self.status='Готово';self.available='';self.notes=[];self.p=0;self.m={};self.w=None
@@ -104,7 +133,9 @@ class Updater(QObject):
   if decision=='blocked':self.state='blocked';self.status=why;self.changed.emit();return
   if decision=='unavailable':self.state='error';self.status='Компонент оновлення недоступний: запустіть встановлену програму через FPV-Uhyliant-Launcher.exe';self.changed.emit();return
   try:r=stage_ready_package(self.root,load_ready(self.m));args=helper_args(self.root/'FPV-Uhyliant-Update.exe',self.root,r,os.getpid());subprocess.Popen(args,cwd=self.root,creationflags=getattr(subprocess,'DETACHED_PROCESS',0))
-  except (RuntimeError,OSError,ValueError) as e:self.state='error';self.status=str(e);self.changed.emit();return
+  except RuntimeError as e:self.state='error';self.status=human_update_error('install',e);self.changed.emit();return
+  except (OSError,ValueError) as e:self.state='error';self.status=human_update_error('install',e);self.changed.emit();return
+  self.state='installing';self.status='Встановлення оновлення розпочато';self.changed.emit()
   QTimer.singleShot(300,QCoreApplication.quit)
  def _start(self,a,p,s):
   if self.busy:self.status='Операція оновлення вже виконується';self.changed.emit();return
