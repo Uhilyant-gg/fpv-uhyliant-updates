@@ -67,6 +67,16 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
         self.assertIn("Перетягніть позначені елементи по сітці", source)
         self.assertIn("Розташування не змінюється автоматично", source)
 
+    def test_osd_controls_explain_camera_pixels_cannot_be_removed(self):
+        copy = "\n".join(
+            self.visible_literals(self.qml[name])
+            for name in ("Main.qml", "OsdSettingsPanel.qml", "PreflightPanel.qml")
+        )
+        self.assertIn("вбудоване в зображення", copy)
+        self.assertIn("прибрати його тут неможливо", copy)
+        self.assertIn("Додавати OSD станції поверх відео", copy)
+        self.assertNotIn("Вимкнути OSD камери", copy)
+
     def test_shared_hover_hint_contract_is_five_seconds(self):
         hint = self.qml["HoverHint.qml"]
         self.assertIn("property int delay:5000", hint)

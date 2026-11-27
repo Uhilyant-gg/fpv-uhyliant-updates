@@ -76,7 +76,7 @@ Item {
   {label: "GPS-дані польотника", state: gpsState(), detail: gpsDetail()},
   {label: "Мережа", state: network.state || "unavailable", detail: network.transport || "З’єднання не підтверджене"},
   {label: "Зовнішня навігація", state: navigation.state || "unavailable", detail: navigation.source || "Джерело не підтверджене"},
-  {label: "OSD станції", state: osdEnabled ? "ready" : "unavailable", detail: osdEnabled ? "Увімкнено; вхідне відео не змінюється" : "Вимкнено"},
+  {label: "OSD станції", state: osdEnabled ? "ready" : "unavailable", detail: osdEnabled ? "Додається поверх відео; зображення камери не змінюється" : "Не додається; OSD камери залишається частиною відео"},
   {label: "Керування польотом", state: "not-integrated", detail: "Канал керування не інтегрований"}
  ]
 

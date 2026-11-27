@@ -75,7 +75,13 @@ Item {
      width: parent.width
      spacing: 10
 
-     Switch { text: "Показувати OSD"; checked: station.osdEnabled; onToggled: station.setOSDEnabled(checked) }
+     Switch { text: "Додавати OSD станції поверх відео"; checked: station.osdEnabled; onToggled: station.setOSDEnabled(checked) }
+     Text {
+      text: "Відео з камери не змінюється. Якщо її OSD вбудоване в зображення, приховати його тут неможливо."
+      color: "#b7c8da"
+      wrapMode: Text.WordWrap
+      Layout.fillWidth: true
+     }
      Text { text: "Оберіть потрібні елементи. Перетягування прилипає до сітки з кроком 5%."; color: "#dce6f2"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
 
      Text { text: "Прозорість підкладки: " + Math.round((1 - station.osdOpacity) * 100) + "%"; color: "#dce6f2"; font.bold: true }

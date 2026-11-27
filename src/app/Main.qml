@@ -169,7 +169,7 @@ ApplicationWindow {
      background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
     }
     Switch {
-     text: "Показувати OSD станції"
+     text: "Додавати OSD станції поверх відео"
      font.pixelSize: 15
      Layout.fillWidth: true
      Layout.leftMargin: 8
@@ -177,7 +177,7 @@ ApplicationWindow {
      onToggled: station.setOSDEnabled(checked)
     }
     Text {
-     text: "OSD камери не змінюється."
+     text: "Відео камери залишається без змін. Якщо її OSD вбудоване в зображення, прибрати його тут неможливо."
      color: sub
      wrapMode: Text.WordWrap
      Layout.fillWidth: true
