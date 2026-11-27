@@ -1,4 +1,5 @@
 """Deterministic post-merge completion and next-Story handoff."""
+
 from __future__ import annotations
 
 import json
@@ -75,7 +76,18 @@ def build_handoff(state: PersistedState, evidence: MergeEvidence, next_story_id:
         raise ValueError("merged HEAD does not match persisted binding")
     if not next_story_id:
         raise ValueError("next Story is required")
-    handoff = StoryHandoff(HANDOFF_SCHEMA_VERSION,state.story_id,state.pr,state.expected_head_sha,evidence.merge_commit_sha,State.COMPLETE.value,next_story_id,evidence.merge_commit_sha,State.READY.value,"post-merge-handoff-ready")
+    handoff = StoryHandoff(
+        HANDOFF_SCHEMA_VERSION,
+        state.story_id,
+        state.pr,
+        state.expected_head_sha,
+        evidence.merge_commit_sha,
+        State.COMPLETE.value,
+        next_story_id,
+        evidence.merge_commit_sha,
+        State.READY.value,
+        "post-merge-handoff-ready",
+    )
     handoff.validate()
     return handoff
 

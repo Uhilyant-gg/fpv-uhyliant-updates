@@ -32,14 +32,20 @@ class HardwareSimulatorTests(unittest.TestCase):
 
     def test_identity_faults_invalidate_old_evidence(self):
         initial = VirtualDeviceState("camera-1", identity_verified=True, evidence_fresh=True)
-        for fault, status in (("identity-unavailable", "unknown"), ("identity-stale", "unknown"), ("identity-mismatch", "problem")):
+        for fault, status in (
+            ("identity-unavailable", "unknown"),
+            ("identity-stale", "unknown"),
+            ("identity-mismatch", "problem"),
+        ):
             result = simulate(initial, {"type": fault})
             self.assertEqual(result["status"], status)
             self.assertFalse(result["state"]["evidence_fresh"])
             self.assertFalse(result["physicalEvidenceComplete"])
 
     def test_identity_fault_only_recovers_after_revalidation(self):
-        faulted = simulate(VirtualDeviceState("camera-1", identity_verified=True, evidence_fresh=True), {"type": "identity-mismatch"})
+        faulted = simulate(
+            VirtualDeviceState("camera-1", identity_verified=True, evidence_fresh=True), {"type": "identity-mismatch"}
+        )
         observed = simulate(VirtualDeviceState(**faulted["state"]), {"type": "observe"})
         self.assertFalse(observed["state"]["evidence_fresh"])
         refreshed = simulate(VirtualDeviceState(**observed["state"]), {"type": "verify-identity", "verified": True})

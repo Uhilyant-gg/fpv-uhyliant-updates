@@ -9,7 +9,12 @@ class ZeroConfigStartupTests(unittest.TestCase):
         self.assertEqual(result["health"], "unknown")
 
     def test_saved_metadata_cannot_become_operational_from_unrelated_ready_fields(self):
-        result = zero_config_startup({"verified": True, "host": "192.168.1.10"}, None, {"health": "ready", "safeActions": []}, {"primaryId": "main", "freshPlayback": True, "health": "ready"})
+        result = zero_config_startup(
+            {"verified": True, "host": "192.168.1.10"},
+            None,
+            {"health": "ready", "safeActions": []},
+            {"primaryId": "main", "freshPlayback": True, "health": "ready"},
+        )
         self.assertEqual(result["stage"], "restore")
         self.assertEqual(result["action"], "revalidate-camera")
         self.assertNotEqual(result["health"], "ready")
@@ -25,7 +30,12 @@ class ZeroConfigStartupTests(unittest.TestCase):
         self.assertEqual(result["health"], "unknown")
 
     def test_operate_requires_fresh_ready_playback(self):
-        result = zero_config_startup(None, None, {"health": "ready", "safeActions": []}, {"primaryId": "main", "freshPlayback": True, "health": "ready"})
+        result = zero_config_startup(
+            None,
+            None,
+            {"health": "ready", "safeActions": []},
+            {"primaryId": "main", "freshPlayback": True, "health": "ready"},
+        )
         self.assertEqual(result["health"], "ready")
         self.assertEqual(result["stage"], "operate")
 

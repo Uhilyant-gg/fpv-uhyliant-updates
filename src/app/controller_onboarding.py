@@ -5,6 +5,7 @@ identity-bound restore. Every decision uses a fresh local observation; a saved
 profile alone never makes the controller ready. Output uses the unified health
 vocabulary with at most the normal-workflow safe actions the NBA engine accepts.
 """
+
 from __future__ import annotations
 
 import time
@@ -23,7 +24,11 @@ def _actions_for(health: str, reason: str) -> list[str]:
         return []
     if reason in {"controller-not-observed", "controller-input-unavailable"}:
         return ["connect-controller"]
-    if reason in {"controller-profile-unavailable", "controller-input-outside-calibration", "controller-profile-invalid"}:
+    if reason in {
+        "controller-profile-unavailable",
+        "controller-input-outside-calibration",
+        "controller-profile-invalid",
+    }:
         return ["calibrate-controller"]
     return ["diagnose"]
 
@@ -35,8 +40,13 @@ def _public(controller: Mapping[str, Any] | None) -> dict[str, Any] | None:
 
 
 class ControllerOnboarding:
-    def __init__(self, source: Any, store: Any, clock: Callable[[], float] | None = None,
-                 max_age: float = DEFAULT_MAX_AGE_SECONDS):
+    def __init__(
+        self,
+        source: Any,
+        store: Any,
+        clock: Callable[[], float] | None = None,
+        max_age: float = DEFAULT_MAX_AGE_SECONDS,
+    ):
         self.source = source
         self.store = store
         self.clock = clock or time.monotonic
@@ -90,8 +100,11 @@ class ControllerOnboarding:
     def calibration_status(self) -> dict[str, Any]:
         if self._calibration is None:
             return {"active": False, "samples": 0, "controllerId": None}
-        return {"active": True, "samples": len(self._calibration["samples"]),
-                "controllerId": self._calibration["controllerId"]}
+        return {
+            "active": True,
+            "samples": len(self._calibration["samples"]),
+            "controllerId": self._calibration["controllerId"],
+        }
 
     def begin_calibration(self) -> dict[str, Any]:
         saved, _ = self._saved()
@@ -121,8 +134,11 @@ class ControllerOnboarding:
             self._calibration = None
             return self._result("unknown", "controller-calibration-interrupted")
         channels = controller.get("channels")
-        if (not controller.get("connected") or not is_fresh(controller, self.clock(), self.max_age)
-                or len(channels) != self._calibration["channelCount"]):
+        if (
+            not controller.get("connected")
+            or not is_fresh(controller, self.clock(), self.max_age)
+            or len(channels) != self._calibration["channelCount"]
+        ):
             self._calibration = None
             return self._result("unknown", "controller-calibration-interrupted", controller)
         if len(self._calibration["samples"]) < MAX_CALIBRATION_SAMPLES:
@@ -141,14 +157,17 @@ class ControllerOnboarding:
         try:
             profile = calibrate_controller(session["controllerId"], session["samples"], mapping)
         except ValueError as exc:
-            return self._result("attention", str(exc), {"id": session["controllerId"], "name": session["name"],
-                                                         "transport": "usb-hid"})
+            return self._result(
+                "attention", str(exc), {"id": session["controllerId"], "name": session["name"], "transport": "usb-hid"}
+            )
         if self.store is None:
             return self._result("problem", "controller-profile-store-unavailable")
         try:
             self.store.save_profile(session["controllerId"], session["name"], profile)
         except (ControllerProfileStoreInvalid, OSError) as exc:
-            reason = str(exc) if isinstance(exc, ControllerProfileStoreInvalid) else "controller-profile-store-write-failed"
+            reason = (
+                str(exc) if isinstance(exc, ControllerProfileStoreInvalid) else "controller-profile-store-write-failed"
+            )
             return self._result("problem", reason)
         self._calibration = None
         return self.refresh()

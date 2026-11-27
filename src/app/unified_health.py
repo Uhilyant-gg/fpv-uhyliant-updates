@@ -3,6 +3,7 @@
 This module is intentionally pure and conservative: unknown evidence remains unknown,
 and safe actions must be supplied explicitly by the subsystem producing the evidence.
 """
+
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping
 
@@ -11,15 +12,17 @@ HEALTH_ATTENTION = "attention"
 HEALTH_PROBLEM = "problem"
 HEALTH_UNKNOWN = "unknown"
 HEALTH_VALUES = frozenset({HEALTH_READY, HEALTH_ATTENTION, HEALTH_PROBLEM, HEALTH_UNKNOWN})
-SAFE_ACTION_VALUES = frozenset({
-    "connect-camera",
-    "diagnose",
-    "find-camera",
-    "identify-camera",
-    "refresh-identity",
-    "show-video",
-    "verify-camera",
-})
+SAFE_ACTION_VALUES = frozenset(
+    {
+        "connect-camera",
+        "diagnose",
+        "find-camera",
+        "identify-camera",
+        "refresh-identity",
+        "show-video",
+        "verify-camera",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -42,7 +45,9 @@ class HealthEvidence:
             raise ValueError("reason-code-required")
         if not isinstance(self.evidence, Mapping):
             raise ValueError("evidence-must-be-mapping")
-        if not isinstance(self.safeActions, tuple) or any(not isinstance(action, str) or not action.strip() for action in self.safeActions):
+        if not isinstance(self.safeActions, tuple) or any(
+            not isinstance(action, str) or not action.strip() for action in self.safeActions
+        ):
             raise ValueError("safe-actions-invalid")
         if len(self.safeActions) != len(set(self.safeActions)):
             raise ValueError("safe-actions-duplicate")
@@ -61,9 +66,15 @@ class HealthEvidence:
         }
 
 
-def health_evidence(*, state: str, health: str, summary: str, reason_code: str,
-                    evidence: Mapping[str, Any] | None = None,
-                    safe_actions: Iterable[str] = ()) -> HealthEvidence:
+def health_evidence(
+    *,
+    state: str,
+    health: str,
+    summary: str,
+    reason_code: str,
+    evidence: Mapping[str, Any] | None = None,
+    safe_actions: Iterable[str] = (),
+) -> HealthEvidence:
     return HealthEvidence(
         state=state,
         health=health,
@@ -74,10 +85,14 @@ def health_evidence(*, state: str, health: str, summary: str, reason_code: str,
     )
 
 
-def unknown_health(*, state: str = "unknown", summary: str = "Evidence is insufficient.",
-                   reason_code: str = "insufficient-evidence",
-                   evidence: Mapping[str, Any] | None = None,
-                   safe_actions: Iterable[str] = ()) -> HealthEvidence:
+def unknown_health(
+    *,
+    state: str = "unknown",
+    summary: str = "Evidence is insufficient.",
+    reason_code: str = "insufficient-evidence",
+    evidence: Mapping[str, Any] | None = None,
+    safe_actions: Iterable[str] = (),
+) -> HealthEvidence:
     return health_evidence(
         state=state,
         health=HEALTH_UNKNOWN,
@@ -88,8 +103,9 @@ def unknown_health(*, state: str = "unknown", summary: str = "Evidence is insuff
     )
 
 
-def aggregate_health(items: Iterable[HealthEvidence], *, state: str = "aggregate",
-                     summary: str = "Combined health.") -> HealthEvidence:
+def aggregate_health(
+    items: Iterable[HealthEvidence], *, state: str = "aggregate", summary: str = "Combined health."
+) -> HealthEvidence:
     items = tuple(items)
     if not items:
         return unknown_health(state=state, summary="No health evidence is available.")

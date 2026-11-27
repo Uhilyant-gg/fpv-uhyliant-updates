@@ -15,21 +15,40 @@ class QueueV3LoopVerificationTests(unittest.TestCase):
         self.green_checks = [{"name": "verify", "status": "completed", "conclusion": "success", "head_sha": "new-head"}]
 
     def evidence(self, **kwargs):
-        values = dict(pr=65, head_sha="new-head", base_sha="base", pr_story_id="S1", required_ci_green=True,
-                      security_green=True, review_approved=False, reviewed_sha="", tested_sha="new-head", blocker=None)
+        values = dict(
+            pr=65,
+            head_sha="new-head",
+            base_sha="base",
+            pr_story_id="S1",
+            required_ci_green=True,
+            security_green=True,
+            review_approved=False,
+            reviewed_sha="",
+            tested_sha="new-head",
+            blocker=None,
+        )
         values.update(kwargs)
         return GitHubEvidence(**values)
 
     def test_green_repaired_head_reaches_existing_merge_gate(self):
         result = verify_repaired_head(
-            plan=self.plan, persisted=self.persisted, evidence=self.evidence(), ci_status="green",
-            pr=self.pr, checks=self.green_checks, reviews=[], required_checks={"verify"}, security_checks=set(),
+            plan=self.plan,
+            persisted=self.persisted,
+            evidence=self.evidence(),
+            ci_status="green",
+            pr=self.pr,
+            checks=self.green_checks,
+            reviews=[],
+            required_checks={"verify"},
+            security_checks=set(),
         )
         self.assertEqual(result.decision.action, AutopilotAction.MERGE_AUTHORIZED)
         self.assertEqual(result.verified_head_sha, "new-head")
 
     def test_running_repaired_head_waits(self):
-        result = verify_repaired_head(plan=self.plan, persisted=self.persisted, evidence=self.evidence(), ci_status="running")
+        result = verify_repaired_head(
+            plan=self.plan, persisted=self.persisted, evidence=self.evidence(), ci_status="running"
+        )
         self.assertEqual(result.decision.action, AutopilotAction.WAIT)
 
     def test_failed_repaired_head_returns_to_bounded_repair(self):
@@ -39,7 +58,9 @@ class QueueV3LoopVerificationTests(unittest.TestCase):
 
     def test_stale_evidence_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "loop-verify-stale-evidence"):
-            verify_repaired_head(plan=self.plan, persisted=self.persisted, evidence=self.evidence(head_sha="old-head"), ci_status="green")
+            verify_repaired_head(
+                plan=self.plan, persisted=self.persisted, evidence=self.evidence(head_sha="old-head"), ci_status="green"
+            )
 
     def test_requires_ci_running_state(self):
         stale = PersistedState(SCHEMA_VERSION, State.REPAIRING, "S1", "base", 65, "new-head", 1, 3)

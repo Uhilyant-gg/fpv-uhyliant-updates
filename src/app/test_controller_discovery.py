@@ -1,7 +1,12 @@
 import unittest
 
-from controller_discovery import (ControllerSourceUnavailable, WinMMJoystickSource, discover_controllers,
-                                  is_fresh, select_controller)
+from controller_discovery import (
+    ControllerSourceUnavailable,
+    WinMMJoystickSource,
+    discover_controllers,
+    is_fresh,
+    select_controller,
+)
 
 
 class FakeSource:

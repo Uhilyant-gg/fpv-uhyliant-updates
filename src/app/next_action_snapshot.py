@@ -1,4 +1,5 @@
 """Validation boundary for serialized Next Best Action snapshots."""
+
 from __future__ import annotations
 
 from typing import Any, Mapping

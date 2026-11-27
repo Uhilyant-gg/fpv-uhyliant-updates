@@ -76,9 +76,7 @@ class ProjectStateTests(unittest.TestCase):
             self.assertEqual(state["capabilities"][capability], "complete")
             heading_prefix = f"### {epic} - "
             matching_headings = [
-                line.strip()
-                for line in roadmap.splitlines()
-                if line.strip().startswith(heading_prefix)
+                line.strip() for line in roadmap.splitlines() if line.strip().startswith(heading_prefix)
             ]
             self.assertEqual(len(matching_headings), 1)
             self.assertTrue(
@@ -103,9 +101,7 @@ class ProjectStateTests(unittest.TestCase):
             errors = canonical_drift_errors(state, root)
             pending_headings = [
                 line.strip()
-                for line in (root / "DELIVERY_ROADMAP.md").read_text(
-                    encoding="utf-8"
-                ).splitlines()
+                for line in (root / "DELIVERY_ROADMAP.md").read_text(encoding="utf-8").splitlines()
                 if line.strip().startswith("### E4 - ")
             ]
             self.assertEqual(
