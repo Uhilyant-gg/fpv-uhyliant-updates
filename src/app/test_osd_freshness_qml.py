@@ -48,7 +48,9 @@ assert any(issue.get('kind') == 'safe-area' and issue.get('name') == 'link' for 
 """
         env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
         path = str(Path(__file__).with_name("OsdOverlay.qml").resolve())
-        result = subprocess.run([sys.executable, "-c", script, path], capture_output=True, text=True, env=env, timeout=30)
+        result = subprocess.run(
+            [sys.executable, "-c", script, path], capture_output=True, text=True, env=env, timeout=30
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_dragging_snaps_and_restores_position_after_resize(self):
@@ -98,7 +100,9 @@ assert tile.x() > old_x, (tile.x(), old_x)
 """
         env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
         path = str(Path(__file__).with_name("OsdOverlay.qml").resolve())
-        result = subprocess.run([sys.executable, "-c", script, path], capture_output=True, text=True, env=env, timeout=30)
+        result = subprocess.run(
+            [sys.executable, "-c", script, path], capture_output=True, text=True, env=env, timeout=30
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_real_qml_hides_expired_values_and_distinguishes_unknown(self):
@@ -124,7 +128,9 @@ assert overlay.telemetryText('altitude', 123, ' м', 0) == '—'
 """
         env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
         path = str(Path(__file__).with_name("OsdOverlay.qml").resolve())
-        result = subprocess.run([sys.executable, "-c", script, path], capture_output=True, text=True, env=env, timeout=30)
+        result = subprocess.run(
+            [sys.executable, "-c", script, path], capture_output=True, text=True, env=env, timeout=30
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_optional_osd_widgets_follow_individual_visibility_and_attitude_freshness(self):
@@ -171,7 +177,9 @@ assert unavailable is not None and unavailable.property('visible')
 """
         env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
         path = str(Path(__file__).with_name("OsdOverlay.qml").resolve())
-        result = subprocess.run([sys.executable, "-c", script, path], capture_output=True, text=True, env=env, timeout=30)
+        result = subprocess.run(
+            [sys.executable, "-c", script, path], capture_output=True, text=True, env=env, timeout=30
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
 
 

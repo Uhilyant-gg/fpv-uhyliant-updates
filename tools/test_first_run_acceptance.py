@@ -10,10 +10,18 @@ class FirstRunAcceptanceCliTests(unittest.TestCase):
     def test_cli_returns_zero_for_accepted_snapshot(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "snapshot.json"
-            path.write_text(json.dumps({
-                "stage": "operation", "health": "ready", "devices": [],
-                "primaryActions": [], "messages": ["Готово"],
-            }), encoding="utf-8")
+            path.write_text(
+                json.dumps(
+                    {
+                        "stage": "operation",
+                        "health": "ready",
+                        "devices": [],
+                        "primaryActions": [],
+                        "messages": ["Готово"],
+                    }
+                ),
+                encoding="utf-8",
+            )
             with patch("builtins.print") as output:
                 code = first_run_acceptance.main([str(path), "--elapsed-ms", "500"])
             self.assertEqual(0, code)
@@ -23,9 +31,16 @@ class FirstRunAcceptanceCliTests(unittest.TestCase):
     def test_cli_returns_one_and_exact_failed_stage(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "snapshot.json"
-            path.write_text(json.dumps({
-                "stage": "health", "health": "problem", "primaryActions": ["diagnose"],
-            }), encoding="utf-8")
+            path.write_text(
+                json.dumps(
+                    {
+                        "stage": "health",
+                        "health": "problem",
+                        "primaryActions": ["diagnose"],
+                    }
+                ),
+                encoding="utf-8",
+            )
             with patch("builtins.print") as output:
                 code = first_run_acceptance.main([str(path), "--elapsed-ms", "11000"])
             self.assertEqual(1, code)

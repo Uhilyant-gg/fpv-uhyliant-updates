@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """One-command local preflight and setup for the FPV Uhyliant workspace."""
+
 from __future__ import annotations
 
 import argparse
@@ -53,7 +54,11 @@ def preflight(root: Path) -> dict:
     compatible_python, python_detail = find_compatible_python()
     checks = [
         {"name": "python", "ok": compatible_python is not None, "detail": python_detail},
-        {"name": "canonical-files", "ok": not missing, "detail": "present" if not missing else "missing: " + ", ".join(missing)},
+        {
+            "name": "canonical-files",
+            "ok": not missing,
+            "detail": "present" if not missing else "missing: " + ", ".join(missing),
+        },
         {"name": "requirements", "ok": requirements.is_file(), "detail": str(requirements)},
         {"name": "launcher", "ok": launcher.is_file(), "detail": str(launcher)},
         {"name": "git-worktree", "ok": (root / ".git").exists() or (root / ".git").is_file(), "detail": str(root)},
@@ -72,7 +77,7 @@ def run_command(name: str, command: Iterable[str], cwd: Path, timeout: int = 300
             text=True,
             timeout=timeout,
         )
-    except subprocess.TimeoutExpired as exc:
+    except subprocess.TimeoutExpired:
         return {"name": name, "ok": False, "detail": "Перевищено час очікування.", "exitCode": None}
     except Exception:
         return {"name": name, "ok": False, "detail": "Не вдалося запустити перевірку.", "exitCode": None}
@@ -80,14 +85,23 @@ def run_command(name: str, command: Iterable[str], cwd: Path, timeout: int = 300
     return {
         "name": name,
         "ok": result.returncode == 0,
-        "detail": lines[-3000:] if lines else ("Готово." if result.returncode == 0 else "Перевірка завершилася з помилкою."),
+        "detail": lines[-3000:]
+        if lines
+        else ("Готово." if result.returncode == 0 else "Перевірка завершилася з помилкою."),
         "exitCode": result.returncode,
     }
 
 
 def bootstrap(root: Path, *, install: bool = True, smoke: bool = True) -> dict:
     root = root.resolve()
-    result = {"schemaVersion": 1, "status": "BLOCKED", "stage": "preflight", "reasonCode": "project-bootstrap-blocked", "summary": "", "checks": []}
+    result = {
+        "schemaVersion": 1,
+        "status": "BLOCKED",
+        "stage": "preflight",
+        "reasonCode": "project-bootstrap-blocked",
+        "summary": "",
+        "checks": [],
+    }
     pre = preflight(root)
     result["checks"].append({"name": "preflight", "ok": pre["ok"], "detail": pre["checks"]})
     if not pre["ok"]:
@@ -152,14 +166,18 @@ def bootstrap(root: Path, *, install: bool = True, smoke: bool = True) -> dict:
         if not marker.is_file():
             result["summary"] = "Перевірка запуску не дала підтвердження."
             result["reasonCode"] = "launch-smoke-evidence-missing"
-            result["checks"].append({"name": "smoke-evidence", "ok": False, "detail": "Файл підтвердження запуску не створено."})
+            result["checks"].append(
+                {"name": "smoke-evidence", "ok": False, "detail": "Файл підтвердження запуску не створено."}
+            )
             return result
         try:
             payload = json.loads(marker.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             payload = {}
         evidence_ok = payload.get("status") == "ok"
-        result["checks"].append({"name": "smoke-evidence", "ok": evidence_ok, "detail": "present" if evidence_ok else "invalid"})
+        result["checks"].append(
+            {"name": "smoke-evidence", "ok": evidence_ok, "detail": "present" if evidence_ok else "invalid"}
+        )
         if not evidence_ok:
             result["summary"] = "Підтвердження запуску містить невірний стан."
             result["reasonCode"] = "launch-smoke-evidence-invalid"

@@ -5,15 +5,10 @@ import unittest
 
 class QmlUiPolicyAuditTests(unittest.TestCase):
     def setUp(self):
-        self.qml = {
-            path.name: path.read_text(encoding="utf-8")
-            for path in Path(__file__).parent.glob("*.qml")
-        }
+        self.qml = {path.name: path.read_text(encoding="utf-8") for path in Path(__file__).parent.glob("*.qml")}
 
     def visible_literals(self, source):
-        return "\n".join(
-            re.findall(r'(?:text|placeholderText|title)\s*:\s*"([^"]*)"', source)
-        )
+        return "\n".join(re.findall(r'(?:text|placeholderText|title)\s*:\s*"([^"]*)"', source))
 
     def test_all_expected_qml_surfaces_are_audited(self):
         self.assertEqual(
@@ -39,12 +34,32 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
 
     def test_visible_ui_does_not_restore_known_english_copy(self):
         obsolete = (
-            "SERVICE MODE", "VIDEO WORKSPACE", "Primary", "Secondary", "Swap",
-            "Firmware", "Telemetry:", "Network:", "IDENTITY", "System / Component",
-            "Vehicle", "System state", "LINK DIAGNOSTICS", "Health", "Message rate",
-            "Last packet", "Estimated lost", "Bad data", "Comm errors",
-            "Controller load", "not broadcast", "Manifest", "Expected SHA-256",
-            "Camera preset", "video profile", "hardware apply",
+            "SERVICE MODE",
+            "VIDEO WORKSPACE",
+            "Primary",
+            "Secondary",
+            "Swap",
+            "Firmware",
+            "Telemetry:",
+            "Network:",
+            "IDENTITY",
+            "System / Component",
+            "Vehicle",
+            "System state",
+            "LINK DIAGNOSTICS",
+            "Health",
+            "Message rate",
+            "Last packet",
+            "Estimated lost",
+            "Bad data",
+            "Comm errors",
+            "Controller load",
+            "not broadcast",
+            "Manifest",
+            "Expected SHA-256",
+            "Camera preset",
+            "video profile",
+            "hardware apply",
         )
         for name, source in self.qml.items():
             visible = self.visible_literals(source)
@@ -69,8 +84,7 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
 
     def test_osd_controls_explain_camera_pixels_cannot_be_removed(self):
         copy = "\n".join(
-            self.visible_literals(self.qml[name])
-            for name in ("Main.qml", "OsdSettingsPanel.qml", "PreflightPanel.qml")
+            self.visible_literals(self.qml[name]) for name in ("Main.qml", "OsdSettingsPanel.qml", "PreflightPanel.qml")
         )
         self.assertIn("вбудоване в зображення", copy)
         self.assertIn("прибрати його тут неможливо", copy)
@@ -81,8 +95,14 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
         main = self.qml["Main.qml"]
         panel = self.qml["OsdSettingsPanel.qml"]
         main = re.sub(r"\s+", "", main)
-        self.assertIn("functionopenOsdSettings(){if(!osdSettingsLoader.active){osdSettingsLoader.active=true;Qt.callLater(openOsdSettings);return}osdSettingsLoader.item.editingAllowed=w.simulation||t.armed!==true;osdSettingsPopup.open()}", main)
-        self.assertIn("if(osdSettingsPopup.visible&&!w.simulation&&osdSettingsLoader.item)osdSettingsLoader.item.editingAllowed=t.armed!==true", main)
+        self.assertIn(
+            "functionopenOsdSettings(){if(!osdSettingsLoader.active){osdSettingsLoader.active=true;Qt.callLater(openOsdSettings);return}osdSettingsLoader.item.editingAllowed=w.simulation||t.armed!==true;osdSettingsPopup.open()}",
+            main,
+        )
+        self.assertIn(
+            "if(osdSettingsPopup.visible&&!w.simulation&&osdSettingsLoader.item)osdSettingsLoader.item.editingAllowed=t.armed!==true",
+            main,
+        )
         self.assertNotIn("editingAllowed:w.simulation||t.armed!==true", main)
         self.assertIn("enabled: root.editingAllowed", panel)
         self.assertIn("editing: root.editingAllowed", panel)

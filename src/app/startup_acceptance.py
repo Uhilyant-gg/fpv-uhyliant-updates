@@ -1,4 +1,5 @@
 """Deterministic repository-software contract for the first-run journey."""
+
 from __future__ import annotations
 
 import json
@@ -42,12 +43,14 @@ def startup_acceptance_report(
     for stage in UI_STAGES:
         event = by_stage.get(stage)
         elapsed = event.get("elapsedMs") if event else None
-        stages.append({
-            "stage": stage,
-            "present": event is not None,
-            "status": event.get("status") if event else "missing",
-            "elapsedMs": elapsed if isinstance(elapsed, int) else None,
-        })
+        stages.append(
+            {
+                "stage": stage,
+                "present": event is not None,
+                "status": event.get("status") if event else "missing",
+                "elapsedMs": elapsed if isinstance(elapsed, int) else None,
+            }
+        )
 
     missing = [stage["stage"] for stage in stages if not stage["present"]]
     failed_stage = missing[0] if missing else None
@@ -66,11 +69,7 @@ def startup_acceptance_report(
         failed_stage = "health"
         reason = "understandable-state-timeout"
 
-    elapsed_values = [
-        int(event["elapsedMs"])
-        for event in rows
-        if isinstance(event.get("elapsedMs"), int)
-    ]
+    elapsed_values = [int(event["elapsedMs"]) for event in rows if isinstance(event.get("elapsedMs"), int)]
     elapsed_ms = max(elapsed_values, default=0)
     devices_event = by_stage.get("devices")
     device_details = devices_event.get("detail", {}) if devices_event else {}

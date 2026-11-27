@@ -1,4 +1,5 @@
 """Fail-closed readiness policy for adding OpenIPC cameras to the home screen."""
+
 from typing import Any, Mapping
 
 from firmware_center import SUPPORTED_PROFILES
@@ -27,7 +28,6 @@ def camera_onboarding(candidate: Mapping[str, Any] | None) -> dict[str, Any]:
         if profile.get("platform") == platform and profile.get("sensor") == sensor
     ]
     profile = profiles[0] if len(profiles) == 1 else ""
-    stageable = verified and bool(profile)
 
     if not verified:
         return {
@@ -57,15 +57,20 @@ def camera_onboarding(candidate: Mapping[str, Any] | None) -> dict[str, Any]:
         }
 
     streams = candidate.get("streams")
-    verified_streams = [
-        stream
-        for stream in streams if isinstance(stream, Mapping)
-        and str(stream.get("protocol", "")).lower() == "rtsp"
-        and str(stream.get("path", "")).startswith("/")
-        and isinstance(stream.get("port"), int)
-        and not isinstance(stream.get("port"), bool)
-        and 1 <= stream["port"] <= 65535
-    ] if isinstance(streams, (list, tuple)) else []
+    verified_streams = (
+        [
+            stream
+            for stream in streams
+            if isinstance(stream, Mapping)
+            and str(stream.get("protocol", "")).lower() == "rtsp"
+            and str(stream.get("path", "")).startswith("/")
+            and isinstance(stream.get("port"), int)
+            and not isinstance(stream.get("port"), bool)
+            and 1 <= stream["port"] <= 65535
+        ]
+        if isinstance(streams, (list, tuple))
+        else []
+    )
     if not verified_streams:
         return {
             "ready": False,

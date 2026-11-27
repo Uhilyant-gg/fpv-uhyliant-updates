@@ -21,10 +21,12 @@ class DeviceCenterTests(unittest.TestCase):
         self.assertEqual(fields["lastObservedAt"], 0)
 
     def test_firmware_is_shown_only_for_verified_identity(self):
-        fields = device_center_fields({
-            "type": "OpenIPC",
-            "openipcIdentity": {"verified": True, "firmware": "release-1"},
-        })
+        fields = device_center_fields(
+            {
+                "type": "OpenIPC",
+                "openipcIdentity": {"verified": True, "firmware": "release-1"},
+            }
+        )
 
         self.assertEqual(fields["versionLabel"], "release-1")
 

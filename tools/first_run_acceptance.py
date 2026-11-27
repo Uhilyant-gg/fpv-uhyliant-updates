@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run the deterministic first-run acceptance contract and emit JSON."""
+
 from __future__ import annotations
 
 import argparse
@@ -36,9 +37,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
     contract = _load_contract()
-    result = contract.evaluate_first_run(
-        snapshot, elapsed_ms=args.elapsed_ms, deadline_ms=args.deadline_ms
-    ).as_dict()
+    result = contract.evaluate_first_run(snapshot, elapsed_ms=args.elapsed_ms, deadline_ms=args.deadline_ms).as_dict()
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0 if result["status"] == "accepted" else 1
 

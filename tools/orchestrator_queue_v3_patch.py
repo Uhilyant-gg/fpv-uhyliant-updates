@@ -4,6 +4,7 @@ This validates what may be handed to a repository mutation transport. It does no
 write files itself. Every requested file must remain on the bound repair branch,
 and protected control-plane paths are rejected from autonomous repair.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

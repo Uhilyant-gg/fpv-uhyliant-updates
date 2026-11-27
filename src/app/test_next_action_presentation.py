@@ -8,7 +8,9 @@ class NextActionPresentationTests(unittest.TestCase):
         self.assertFalse(present_next_action(None)["available"])
 
     def test_known_action_gets_practical_label(self):
-        result = present_next_action({"action": "find-camera", "source": "camera", "reasonCode": "safe-action-selected"})
+        result = present_next_action(
+            {"action": "find-camera", "source": "camera", "reasonCode": "safe-action-selected"}
+        )
         self.assertTrue(result["available"])
         self.assertEqual(result["label"], "Знайти камеру")
         self.assertEqual(result["source"], "camera")

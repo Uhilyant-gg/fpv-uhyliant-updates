@@ -15,9 +15,18 @@ class QueueV3AutopilotTests(unittest.TestCase):
         self.green_checks = [{"name": "verify", "status": "completed", "conclusion": "success", "head_sha": "head"}]
 
     def evidence(self, **kwargs):
-        values = dict(pr=58, head_sha="head", base_sha="base", pr_story_id="S1", required_ci_green=False,
-                      security_green=True, review_approved=False, reviewed_sha="", tested_sha="head",
-                      blocker="required-check-failed")
+        values = dict(
+            pr=58,
+            head_sha="head",
+            base_sha="base",
+            pr_story_id="S1",
+            required_ci_green=False,
+            security_green=True,
+            review_approved=False,
+            reviewed_sha="",
+            tested_sha="head",
+            blocker="required-check-failed",
+        )
         values.update(kwargs)
         return GitHubEvidence(**values)
 

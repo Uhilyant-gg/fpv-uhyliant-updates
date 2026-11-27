@@ -5,11 +5,14 @@ from next_action_snapshot import is_canonical_next_action_shape, validated_next_
 
 class NextActionSnapshotTests(unittest.TestCase):
     def test_missing_snapshot_preserves_unknown_state(self):
-        self.assertEqual(validated_next_action_snapshot(None), {
-            "action": None,
-            "reasonCode": "next-action-unavailable",
-            "source": None,
-        })
+        self.assertEqual(
+            validated_next_action_snapshot(None),
+            {
+                "action": None,
+                "reasonCode": "next-action-unavailable",
+                "source": None,
+            },
+        )
 
     def test_exact_public_shape_is_canonical(self):
         value = {"action": "diagnose", "reasonCode": "safe-action-selected", "source": "camera"}

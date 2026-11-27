@@ -45,7 +45,19 @@ class TimelineRuntimeTests(unittest.TestCase):
 
     def test_device_discovery_lifecycle_is_human_readable_and_deduplicated(self):
         timeline = TimelineRuntime(Settings(), clock=lambda: 180)
-        for state in ("unknown", "scanning", "scanning", "completed", "completed", "scanning", "failed", "failed", "scanning", "cancelled", "cancelled"):
+        for state in (
+            "unknown",
+            "scanning",
+            "scanning",
+            "completed",
+            "completed",
+            "scanning",
+            "failed",
+            "failed",
+            "scanning",
+            "cancelled",
+            "cancelled",
+        ):
             timeline.observe("discovery", state)
 
         self.assertEqual(
@@ -79,7 +91,15 @@ class TimelineRuntimeTests(unittest.TestCase):
 
     def test_camera_firmware_lifecycle_records_verified_failure_and_blocked_outcomes(self):
         timeline = TimelineRuntime(Settings(), clock=lambda: 240)
-        for state in ("hardware-validation-pending", "ready", "reboot-pending", "reboot-pending", "verified", "blocked", "error"):
+        for state in (
+            "hardware-validation-pending",
+            "ready",
+            "reboot-pending",
+            "reboot-pending",
+            "verified",
+            "blocked",
+            "error",
+        ):
             timeline.observe("camera-firmware", state)
 
         self.assertEqual(

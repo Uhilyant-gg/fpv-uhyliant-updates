@@ -114,7 +114,7 @@ class TimelineRuntime(QObject):
             if timestamp < cutoff or timestamp > now + 300:
                 continue
             history.append({"timestamp": timestamp, "message": message})
-        return history[-self.MAX_HISTORY:]
+        return history[-self.MAX_HISTORY :]
 
     def _save_history(self):
         self._settings.setValue(self.SETTINGS_KEY, self._history)
@@ -133,11 +133,13 @@ class TimelineRuntime(QObject):
             if presentation is None:
                 continue
             title, level = presentation
-            visible.append({
-                "time": datetime.fromtimestamp(event["timestamp"]).strftime("%H:%M"),
-                "title": title,
-                "level": level,
-            })
+            visible.append(
+                {
+                    "time": datetime.fromtimestamp(event["timestamp"]).strftime("%H:%M"),
+                    "title": title,
+                    "level": level,
+                }
+            )
         return visible
 
     @Property(str, notify=changed)
@@ -149,7 +151,7 @@ class TimelineRuntime(QObject):
         if event_type not in EVENTS:
             return False
         self._history.append({"timestamp": int(self._clock()), "message": event_type})
-        self._history = self._history[-self.MAX_HISTORY:]
+        self._history = self._history[-self.MAX_HISTORY :]
         self._save_history()
         return True
 
@@ -161,7 +163,26 @@ class TimelineRuntime(QObject):
     @Slot(str, str)
     def observe(self, source, state):
         state_events = STATE_EVENTS.get(source)
-        if state_events is None or state not in {"connected", "ready", "degraded", "lost", "playing", "stopped", "scanning", "completed", "cancelled", "failed", "available", "installing", "reboot-pending", "verified", "error", "blocked", "current", "unknown"}:
+        if state_events is None or state not in {
+            "connected",
+            "ready",
+            "degraded",
+            "lost",
+            "playing",
+            "stopped",
+            "scanning",
+            "completed",
+            "cancelled",
+            "failed",
+            "available",
+            "installing",
+            "reboot-pending",
+            "verified",
+            "error",
+            "blocked",
+            "current",
+            "unknown",
+        }:
             return
         previous = self._last_states.get(source)
         self._last_states[source] = state

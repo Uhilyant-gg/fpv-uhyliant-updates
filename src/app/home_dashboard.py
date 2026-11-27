@@ -1,4 +1,5 @@
 """Presentation model for the operational home dashboard."""
+
 from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
@@ -39,12 +40,10 @@ def home_dashboard(
 ) -> dict[str, Any]:
     all_items = tuple(device for device in (devices or ()) if isinstance(device, Mapping))
     pending = tuple(
-        device for device in all_items
-        if device.get("onboardingState") in ("pending-firmware", "pending-video")
+        device for device in all_items if device.get("onboardingState") in ("pending-firmware", "pending-video")
     )
     items = tuple(
-        device for device in all_items
-        if device.get("onboardingState") not in ("pending-firmware", "pending-video")
+        device for device in all_items if device.get("onboardingState") not in ("pending-firmware", "pending-video")
     )
     available_streams = tuple(stream for stream in (streams or ()) if isinstance(stream, Mapping))
 
@@ -62,15 +61,12 @@ def home_dashboard(
         camera = device_health(camera_data)
 
     combined = station_health([camera])
-    next_action = present_next_action(
-        select_next_best_action({"camera": camera.as_dict()}).as_dict()
-    )
+    next_action = present_next_action(select_next_best_action({"camera": camera.as_dict()}).as_dict())
 
     verified = sum(
         1
         for device in items
-        if isinstance(device.get("openipcIdentity"), Mapping)
-        and device["openipcIdentity"].get("verified") is True
+        if isinstance(device.get("openipcIdentity"), Mapping) and device["openipcIdentity"].get("verified") is True
     )
     warning_count = len(pending) + sum(
         1

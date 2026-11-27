@@ -79,11 +79,13 @@ class StationOsdSettingsTests(unittest.TestCase):
         self.assertEqual(changes, [True, True, True, True])
 
     def test_osd_style_rejects_out_of_range_values_and_clamps_saved_values(self):
-        settings = Settings({
-            Station.OSD_OPACITY_KEY: 2,
-            Station.OSD_SCALE_KEY: 0.1,
-            Station.OSD_POSITION_KEY: "center",
-        })
+        settings = Settings(
+            {
+                Station.OSD_OPACITY_KEY: 2,
+                Station.OSD_SCALE_KEY: 0.1,
+                Station.OSD_POSITION_KEY: "center",
+            }
+        )
         station = Station(settings)
 
         self.assertEqual(station.osdOpacity, 1)
@@ -154,16 +156,18 @@ class StationOsdSettingsTests(unittest.TestCase):
         self.assertTrue(defaults["battery"])
 
     def test_corrupt_element_visibility_keeps_safe_defaults(self):
-        settings = Settings({
-            Station.OSD_ELEMENT_VISIBILITY_KEY: '{"battery":false,"reticle":true,"horizon":"yes","unknown":true}'
-        })
+        settings = Settings(
+            {Station.OSD_ELEMENT_VISIBILITY_KEY: '{"battery":false,"reticle":true,"horizon":"yes","unknown":true}'}
+        )
         station = Station(settings)
         self.assertFalse(station.osdEnabledElements["battery"])
         self.assertTrue(station.osdEnabledElements["reticle"])
         self.assertFalse(station.osdEnabledElements["horizon"])
 
     def test_corrupt_element_positions_are_ignored(self):
-        settings = Settings({Station.OSD_ELEMENTS_KEY: '{"battery":[3, 5], "speed":[200, 0], "gps":[true, 0], "other":[1, 1]}'})
+        settings = Settings(
+            {Station.OSD_ELEMENTS_KEY: '{"battery":[3, 5], "speed":[200, 0], "gps":[true, 0], "other":[1, 1]}'}
+        )
         self.assertEqual(Station(settings).osdElements, {"battery": [3, 5]})
         settings.values[Station.OSD_ELEMENTS_KEY] = "not json"
         self.assertEqual(Station(settings).osdElements, {})

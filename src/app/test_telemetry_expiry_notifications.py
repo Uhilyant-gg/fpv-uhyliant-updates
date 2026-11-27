@@ -14,7 +14,12 @@ _app = QCoreApplication.instance() or QCoreApplication([])
 class TelemetryExpiryNotificationTests(unittest.TestCase):
     def test_expiry_notifies_provider_without_new_frames(self):
         examples = (
-            (CrsfRuntime, CrsfProvider, frame(CRSF_FRAMETYPE_BATTERY_SENSOR, b'\x00\x98\x00\x0c\x00\x00\x01\x4b'), 'batteryVoltage'),
+            (
+                CrsfRuntime,
+                CrsfProvider,
+                frame(CRSF_FRAMETYPE_BATTERY_SENSOR, b'\x00\x98\x00\x0c\x00\x00\x01\x4b'),
+                'batteryVoltage',
+            ),
             (MspRuntime, MspProvider, response_v1(MSP_ALTITUDE, b'\x64\x00\x00\x00'), 'altitude'),
         )
         for runtime_type, provider_type, packet, field in examples:
@@ -38,8 +43,20 @@ class TelemetryExpiryNotificationTests(unittest.TestCase):
 
     def test_expired_field_notifies_while_another_frame_keeps_connection_alive(self):
         examples = (
-            (CrsfRuntime, CrsfProvider, frame(CRSF_FRAMETYPE_BATTERY_SENSOR, b'\x00\x98\x00\x0c\x00\x00\x01\x4b'), frame(0x14, b'\x01\x02\x03'), 'batteryVoltage'),
-            (MspRuntime, MspProvider, response_v1(MSP_ALTITUDE, b'\x64\x00\x00\x00'), response_v1(1, b'\x00\x01\x02'), 'altitude'),
+            (
+                CrsfRuntime,
+                CrsfProvider,
+                frame(CRSF_FRAMETYPE_BATTERY_SENSOR, b'\x00\x98\x00\x0c\x00\x00\x01\x4b'),
+                frame(0x14, b'\x01\x02\x03'),
+                'batteryVoltage',
+            ),
+            (
+                MspRuntime,
+                MspProvider,
+                response_v1(MSP_ALTITUDE, b'\x64\x00\x00\x00'),
+                response_v1(1, b'\x00\x01\x02'),
+                'altitude',
+            ),
         )
         for runtime_type, provider_type, initial, later, field in examples:
             with self.subTest(provider=provider_type.__name__):

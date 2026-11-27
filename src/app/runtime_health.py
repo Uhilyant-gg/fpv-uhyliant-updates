@@ -1,4 +1,5 @@
 """Compose canonical runtime health, zero-config readiness and Next Best Action."""
+
 from __future__ import annotations
 
 from typing import Any, Mapping
@@ -26,10 +27,12 @@ def runtime_health_snapshot(
         "vehicle": vehicle.as_dict(),
         "station": station.as_dict(),
     }
-    next_action = select_next_best_action({
-        "camera": components["camera"],
-        "vehicle": components["vehicle"],
-    })
+    next_action = select_next_best_action(
+        {
+            "camera": components["camera"],
+            "vehicle": components["vehicle"],
+        }
+    )
     startup = zero_config_readiness(components["camera"], workspace)
     return {
         **components,

@@ -12,12 +12,13 @@ Evidence rules:
   guessed;
 - every observation carries ``observedAt`` so consumers can reject stale input.
 """
+
 from __future__ import annotations
 
 import math
 import sys
 import time
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping
 
 TRANSPORT_USB_HID = "usb-hid"
 DEFAULT_MAX_AGE_SECONDS = 1.0
@@ -171,22 +172,46 @@ class WinMMJoystickSource:
 
         class JOYCAPSW(ctypes.Structure):
             _fields_ = [
-                ("wMid", wintypes.WORD), ("wPid", wintypes.WORD), ("szPname", wintypes.WCHAR * 32),
-                ("wXmin", wintypes.UINT), ("wXmax", wintypes.UINT), ("wYmin", wintypes.UINT), ("wYmax", wintypes.UINT),
-                ("wZmin", wintypes.UINT), ("wZmax", wintypes.UINT), ("wNumButtons", wintypes.UINT),
-                ("wPeriodMin", wintypes.UINT), ("wPeriodMax", wintypes.UINT), ("wRmin", wintypes.UINT),
-                ("wRmax", wintypes.UINT), ("wUmin", wintypes.UINT), ("wUmax", wintypes.UINT), ("wVmin", wintypes.UINT),
-                ("wVmax", wintypes.UINT), ("wCaps", wintypes.UINT), ("wMaxAxes", wintypes.UINT),
-                ("wNumAxes", wintypes.UINT), ("wMaxButtons", wintypes.UINT), ("szRegKey", wintypes.WCHAR * 32),
+                ("wMid", wintypes.WORD),
+                ("wPid", wintypes.WORD),
+                ("szPname", wintypes.WCHAR * 32),
+                ("wXmin", wintypes.UINT),
+                ("wXmax", wintypes.UINT),
+                ("wYmin", wintypes.UINT),
+                ("wYmax", wintypes.UINT),
+                ("wZmin", wintypes.UINT),
+                ("wZmax", wintypes.UINT),
+                ("wNumButtons", wintypes.UINT),
+                ("wPeriodMin", wintypes.UINT),
+                ("wPeriodMax", wintypes.UINT),
+                ("wRmin", wintypes.UINT),
+                ("wRmax", wintypes.UINT),
+                ("wUmin", wintypes.UINT),
+                ("wUmax", wintypes.UINT),
+                ("wVmin", wintypes.UINT),
+                ("wVmax", wintypes.UINT),
+                ("wCaps", wintypes.UINT),
+                ("wMaxAxes", wintypes.UINT),
+                ("wNumAxes", wintypes.UINT),
+                ("wMaxButtons", wintypes.UINT),
+                ("szRegKey", wintypes.WCHAR * 32),
                 ("szOEMVxD", wintypes.WCHAR * 260),
             ]
 
         class JOYINFOEX(ctypes.Structure):
             _fields_ = [
-                ("dwSize", wintypes.DWORD), ("dwFlags", wintypes.DWORD), ("dwXpos", wintypes.DWORD),
-                ("dwYpos", wintypes.DWORD), ("dwZpos", wintypes.DWORD), ("dwRpos", wintypes.DWORD),
-                ("dwUpos", wintypes.DWORD), ("dwVpos", wintypes.DWORD), ("dwButtons", wintypes.DWORD),
-                ("dwButtonNumber", wintypes.DWORD), ("dwPOV", wintypes.DWORD), ("dwReserved1", wintypes.DWORD),
+                ("dwSize", wintypes.DWORD),
+                ("dwFlags", wintypes.DWORD),
+                ("dwXpos", wintypes.DWORD),
+                ("dwYpos", wintypes.DWORD),
+                ("dwZpos", wintypes.DWORD),
+                ("dwRpos", wintypes.DWORD),
+                ("dwUpos", wintypes.DWORD),
+                ("dwVpos", wintypes.DWORD),
+                ("dwButtons", wintypes.DWORD),
+                ("dwButtonNumber", wintypes.DWORD),
+                ("dwPOV", wintypes.DWORD),
+                ("dwReserved1", wintypes.DWORD),
                 ("dwReserved2", wintypes.DWORD),
             ]
 
@@ -208,12 +233,14 @@ class WinMMJoystickSource:
                 continue
             axes = [info.dwXpos, info.dwYpos, info.dwZpos, info.dwRpos, info.dwUpos, info.dwVpos]
             count = max(0, min(int(caps.wNumAxes), len(axes)))
-            devices.append({
-                "vendorId": int(caps.wMid),
-                "productId": int(caps.wPid),
-                "name": caps.szPname,
-                "channels": [int(v) for v in axes[:count]],
-            })
+            devices.append(
+                {
+                    "vendorId": int(caps.wMid),
+                    "productId": int(caps.wPid),
+                    "name": caps.szPname,
+                    "channels": [int(v) for v in axes[:count]],
+                }
+            )
         return devices
 
 
