@@ -20,6 +20,7 @@ Item {
  signal openVehicleSettings()
  signal openService()
  signal connectDevice(string deviceId)
+ signal openPreflightFor(string deviceId)
  signal runNextAction(string action)
 
  property color fg: "#f5f8fc"
@@ -28,6 +29,8 @@ Item {
  property color elevated: "#e6162638"
  property color line: "#64788d"
  property color green: "#35e0a1"
+ property color amber: "#ffbd59"
+ property color red: "#ff6678"
  property bool menuOpen: false
  readonly property var menuItems: [
   {label: "Камери", detail: "Знайти, вибрати або додати камеру", glyph: "◉", action: "devices", section: "main"},
@@ -45,6 +48,20 @@ Item {
    return false
   }
   return false
+ }
+ function countersText() {
+  var parts = []
+  if (homeDashboard.pendingCount > 0) parts.push("на перевірці: " + homeDashboard.pendingCount)
+  if (homeDashboard.warningCount > 0) parts.push("потребують уваги: " + homeDashboard.warningCount)
+  return parts.join("  ·  ")
+ }
+ function lastSeenText(seconds) {
+  if (!seconds) return "Ще не виходила на зв’язок"
+  var age = Math.max(0, Date.now() / 1000 - seconds)
+  if (age < 120) return "На зв’язку щойно"
+  if (age < 3600) return "Остання активність " + Math.round(age / 60) + " хв тому"
+  if (age < 86400) return "Остання активність " + Math.round(age / 3600) + " год тому"
+  return "Остання активність " + Math.round(age / 86400) + " дн тому"
  }
  function activateMenuItem(action) {
   menuOpen = false
@@ -77,12 +94,15 @@ Item {
   anchors.margins: 20
   spacing: 16
 
+  // One header: station identity and version, system state with its next action, menu.
   Rectangle {
+   objectName: "homeHeader"
    Layout.fillWidth: true
-   Layout.preferredHeight: 76
+   Layout.preferredHeight: 84
    radius: 12
    color: root.surface
-   border.color: root.line
+   border.color: homeDashboard.health === "problem" ? root.red :
+                 (homeDashboard.health === "attention" ? root.amber : root.line)
 
    RowLayout {
     anchors.fill: parent
@@ -118,30 +138,42 @@ Item {
      HoverHint { text: "Вийшла нова версія програми." }
     }
 
-    Item { Layout.fillWidth: true }
+    Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 44; Layout.leftMargin: 6; color: "#33485e" }
 
-    Rectangle {
-     Layout.preferredWidth: statusLabel.implicitWidth + 26
-     Layout.preferredHeight: 38
-     radius: 8
-     color: "#99101925"
-     border.color: root.line
-     RowLayout {
-      anchors.centerIn: parent
-      spacing: 8
-      Rectangle {
-       width: 9; height: 9; radius: 5
-       color: homeDashboard.health === "ready" ? root.green :
-              (homeDashboard.health === "problem" ? "#ff6678" : "#ffbd59")
-      }
+    RowLayout {
+     objectName: "homeStatus"
+     Layout.fillWidth: true
+     Layout.leftMargin: 6
+     spacing: 10
+     Rectangle {
+      Layout.preferredWidth: 12; Layout.preferredHeight: 12; radius: 6
+      color: homeDashboard.health === "ready" ? root.green : (homeDashboard.health === "problem" ? root.red : root.amber)
+     }
+     ColumnLayout {
+      Layout.fillWidth: true
+      spacing: 2
+      Text { text: homeDashboard.summary; color: root.fg; font.pixelSize: 15; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
       Text {
-       id: statusLabel
-       text: homeDashboard.title
-       color: root.fg
-       font.pixelSize: 14
-       font.bold: true
+       objectName: "homeCounters"
+       visible: text !== ""
+       text: root.countersText()
+       color: root.sub
+       font.pixelSize: 12
+       elide: Text.ElideRight
+       Layout.fillWidth: true
       }
      }
+    }
+
+    Button {
+     objectName: "homeNextAction"
+     visible: homeDashboard.nextAction.available && !(homeDashboard.nextAction.action === "find-camera" && devicesModel.homeItems.length === 0)
+     text: homeDashboard.nextAction.label
+     font.pixelSize: 15
+     font.bold: true
+     Layout.preferredHeight: 44
+     onClicked: root.runNextAction(homeDashboard.nextAction.action)
+     HoverHint { text: "Рекомендована дія для поточного стану." }
     }
 
     Button {
@@ -164,138 +196,156 @@ Item {
    }
   }
 
-  Rectangle {
+  RowLayout {
    Layout.fillWidth: true
-   Layout.preferredHeight: 118
-   radius: 12
-   color: root.surface
-   border.color: homeDashboard.health === "problem" ? "#ff6678" :
-                 (homeDashboard.health === "attention" ? "#ffbd59" :
-                  (homeDashboard.health === "ready" ? root.green : root.line))
+   Text { text: "МОЇ КАМЕРИ"; color: root.fg; font.bold: true; font.pixelSize: 15; font.letterSpacing: 1 }
+   Text { visible: devicesModel.homeItems.length > 0; text: devicesModel.homeItems.length; color: root.sub; font.pixelSize: 15; font.bold: true }
+   Item { Layout.fillWidth: true }
+   Button { objectName: "homeAddCamera"; visible: devicesModel.homeItems.length > 0; text: "+ Додати камеру"; font.pixelSize: 14; onClicked: root.openDevices() }
+   Button { objectName: "homeSimulation"; visible: devicesModel.homeItems.length > 0; text: "▣ Симуляція"; font.pixelSize: 14; onClicked: root.openSimulation() }
+  }
 
-   RowLayout {
-    anchors.fill: parent
-    anchors.margins: 16
-    spacing: 14
-
+  Item {
+   visible: devicesModel.homeItems.length > 0
+   Layout.fillWidth: true
+   Layout.fillHeight: true
+  GridView {
+   id: list
+   objectName: "homeCameraGrid"
+   anchors.fill: parent
+   // Each cell carries a 14 px gap on its right; the view extends past the edge by that gap.
+   anchors.rightMargin: -14
+   clip: true
+   model: devicesModel.homeItems
+   readonly property int columns: Math.max(1, Math.floor(width / 380))
+   cellWidth: Math.floor(width / columns)
+   cellHeight: 190
+   delegate: Item {
+    required property var modelData
+    width: list.cellWidth
+    height: list.cellHeight
     Rectangle {
-     Layout.preferredWidth: 56; Layout.preferredHeight: 56; radius: 28
-     color: homeDashboard.health === "ready" ? "#15392f" :
-            (homeDashboard.health === "problem" ? "#3a1d27" : "#3a301b")
-     Text {
-      anchors.centerIn: parent
-      text: homeDashboard.health === "ready" ? "✓" : (homeDashboard.health === "problem" ? "!" : "?")
-      color: homeDashboard.health === "ready" ? root.green :
-             (homeDashboard.health === "problem" ? "#ff6678" : "#ffbd59")
-      font.pixelSize: 25
-      font.bold: true
+     objectName: "cameraCard"
+     anchors.fill: parent
+     anchors.rightMargin: 14
+     anchors.bottomMargin: 14
+     radius: 12
+     color: cardHover.hovered ? root.elevated : root.surface
+     border.color: modelData.active ? root.green : root.line
+     border.width: modelData.active ? 2 : 1
+     HoverHandler { id: cardHover }
+     ColumnLayout {
+      anchors.fill: parent
+      anchors.margins: 14
+      spacing: 6
+      RowLayout {
+       Layout.fillWidth: true
+       spacing: 10
+       Rectangle {
+        Layout.preferredWidth: 40; Layout.preferredHeight: 40; radius: 9
+        color: modelData.openipcIdentity.verified ? "#15392f" : "#253449"
+        border.color: modelData.openipcIdentity.verified ? root.green : root.line
+        Text { anchors.centerIn: parent; text: "◉"; color: modelData.openipcIdentity.verified ? root.green : root.sub; font.pixelSize: 19 }
+       }
+       ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 1
+        Text { text: modelData.name; color: root.fg; font.bold: true; font.pixelSize: 17; elide: Text.ElideRight; Layout.fillWidth: true }
+        Text { text: modelData.host + (modelData.openipcIdentity.verified ? "  ·  OpenIPC " + modelData.versionLabel : ""); color: root.sub; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
+       }
+       Text { visible: modelData.active; text: "АКТИВНА"; color: root.green; font.bold: true; font.pixelSize: 11 }
+      }
+      RowLayout {
+       spacing: 7
+       Rectangle {
+        Layout.preferredWidth: 9; Layout.preferredHeight: 9; radius: 5
+        color: modelData.health === "ready" ? root.green : (modelData.health === "problem" ? root.red : root.amber)
+       }
+       Text { text: modelData.healthLabel; color: root.fg; font.pixelSize: 13 }
+      }
+      Text { text: root.lastSeenText(modelData.lastObservedAt); color: root.sub; font.pixelSize: 12 }
+      Item { Layout.fillHeight: true }
+      RowLayout {
+       Layout.fillWidth: true
+       spacing: 8
+       Button {
+        objectName: "homePreflight"
+        text: "✓ Підготовка"
+        font.pixelSize: 14
+        Layout.preferredHeight: 42
+        onClicked: root.openPreflightFor(modelData.id)
+       }
+       Button {
+        objectName: "cameraFly"
+        text: "▶  Летіти"
+        enabled: root.canEnterFpv(modelData.id)
+        font.pixelSize: 16
+        font.bold: true
+        Layout.fillWidth: true
+        Layout.preferredHeight: 42
+        onClicked: root.connectDevice(modelData.id)
+        contentItem: Text { text: parent.text; font: parent.font; color: parent.enabled ? "#06130d" : root.sub; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+        background: Rectangle { radius: 8; color: !parent.enabled ? "#1d2c3c" : (parent.hovered ? "#5cf0bd" : root.green) }
+        HoverHint { text: parent.enabled ? "Відкрити відео й перейти до польоту." : "Для камери ще не налаштовано відеопотік." }
+       }
+      }
      }
-    }
-
-    ColumnLayout {
-     Layout.fillWidth: true
-     spacing: 4
-     Text { text: "Стан системи"; color: root.sub; font.pixelSize: 13 }
-     Text { text: homeDashboard.summary; color: root.fg; font.pixelSize: 17; font.bold: true; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-     Text {
-      text: "На головному екрані: " + homeDashboard.deviceCount +
-            "   ·   Очікують перевірки: " + homeDashboard.pendingCount +
-            "   ·   Потребують уваги: " + homeDashboard.warningCount
-      color: root.sub
-      font.pixelSize: 13
-      elide: Text.ElideRight
-      Layout.fillWidth: true
-     }
-    }
-
-    Button {
-     objectName: "homeNextAction"
-     visible: homeDashboard.nextAction.available
-     text: homeDashboard.nextAction.label
-     font.pixelSize: 15
-     font.bold: true
-     Layout.minimumWidth: 154
-     Layout.preferredHeight: 48
-     onClicked: root.runNextAction(homeDashboard.nextAction.action)
-     HoverHint { text: "Рекомендована дія для поточного стану." }
     }
    }
   }
 
-  Rectangle {
+  }
+
+  // Empty state: what is needed, and two equal ways forward.
+  Item {
+   visible: devicesModel.homeItems.length === 0
    Layout.fillWidth: true
    Layout.fillHeight: true
-   radius: 12
-   color: root.surface
-   border.color: root.line
-
-   ColumnLayout {
-    anchors.fill: parent
-    anchors.margins: 14
-    spacing: 10
-    RowLayout {
-     Layout.fillWidth: true
-     Text { text: "МОЇ КАМЕРИ"; color: root.fg; font.bold: true; font.pixelSize: 15; font.letterSpacing: 1 }
-     Text { text: homeDashboard.deviceCount ? homeDashboard.deviceCount + " готово" : (homeDashboard.pendingCount ? homeDashboard.pendingCount + " на перевірці" : "ще не додано"); color: root.sub; font.pixelSize: 13 }
-     Item { Layout.fillWidth: true }
-     Button { objectName: "homePreflight"; text: "✓ Підготовка"; font.pixelSize: 14; onClicked: root.openPreflight() }
-     Button { objectName: "homeSimulation"; text: "▣ Симуляція"; font.pixelSize: 14; visible: devicesModel.homeItems.length > 0; onClicked: root.openSimulation() }
-    }
-
-    ListView {
-     id: list
-     Layout.fillWidth: true
-     Layout.fillHeight: true
-     clip: true
-     spacing: 6
-     model: devicesModel.homeItems
-     delegate: Rectangle {
-      required property var modelData
-      width: list.width
-      height: 68
-      radius: 9
-      color: rowHover.hovered ? root.elevated : "#58132130"
-      border.color: modelData.active ? root.green : "#454f6070"
-      HoverHandler { id: rowHover }
-      RowLayout {
-       anchors.fill: parent
-       anchors.leftMargin: 12
-       anchors.rightMargin: 12
-       spacing: 11
-       Rectangle {
-        Layout.preferredWidth: 38; Layout.preferredHeight: 38; radius: 8
-        color: modelData.openipcIdentity.verified ? "#15392f" : "#253449"
-        border.color: modelData.openipcIdentity.verified ? root.green : root.line
-        Text { anchors.centerIn: parent; text: "◉"; color: modelData.openipcIdentity.verified ? root.green : root.sub; font.pixelSize: 18 }
-       }
-       ColumnLayout {
-        Layout.fillWidth: true
-        spacing: 2
-        Text { text: modelData.name; color: root.fg; font.bold: true; font.pixelSize: 16 }
-        Text { text: modelData.host + (modelData.openipcIdentity.verified ? "  ·  OpenIPC" : ""); color: root.sub; font.pixelSize: 13 }
-       }
-       Text { visible: modelData.active; text: "АКТИВНА"; color: root.green; font.bold: true; font.pixelSize: 12 }
-       Button {
-        text: "Відкрити FPV"
-        enabled: root.canEnterFpv(modelData.id)
-        font.pixelSize: 14
-        onClicked: root.connectDevice(modelData.id)
-       }
-      }
+   Rectangle {
+    objectName: "homeEmptyCard"
+    anchors.centerIn: parent
+    width: Math.min(parent.width, 640)
+    height: emptyColumn.implicitHeight + 56
+    radius: 14
+    color: root.surface
+    border.color: root.line
+    ColumnLayout {
+     id: emptyColumn
+     anchors.fill: parent
+     anchors.margins: 28
+     spacing: 10
+     Text { Layout.alignment: Qt.AlignHCenter; text: "◉"; color: root.sub; font.pixelSize: 40 }
+     Text {
+      Layout.alignment: Qt.AlignHCenter
+      text: devicesModel.pendingCount ? "Камера проходить перевірку" : "Камер ще не додано"
+      color: root.fg; font.pixelSize: 21; font.bold: true
      }
-
-     Column {
-      anchors.centerIn: parent
-      visible: devicesModel.homeItems.length === 0
-      spacing: 6
-      Text { anchors.horizontalCenter: parent.horizontalCenter; text: devicesModel.pendingCount ? "Камера ще проходить перевірку" : "Камер ще не додано"; color: root.fg; font.pixelSize: 19; font.bold: true }
-      Text { anchors.horizontalCenter: parent.horizontalCenter; text: devicesModel.pendingCount ? "На головний екран камера потрапить після підтвердження прошивки та відео." : "Підключіть камеру до мережі цього комп’ютера і запустіть пошук. Без обладнання можна спробувати симуляцію."; color: root.sub; font.pixelSize: 15; wrapMode: Text.WordWrap; width: list.width * 0.8; horizontalAlignment: Text.AlignHCenter }
-      Row {
-       anchors.horizontalCenter: parent.horizontalCenter
-       topPadding: 10
-       spacing: 10
-       Button { objectName: "emptyFindCamera"; text: "Знайти камеру"; font.pixelSize: 15; font.bold: true; visible: !(homeDashboard.nextAction.available && homeDashboard.nextAction.action === "find-camera"); onClicked: root.openDevices() }
-       Button { objectName: "emptyOpenSimulation"; text: "Спробувати симуляцію"; font.pixelSize: 15; visible: devicesModel.pendingCount === 0; onClicked: root.openSimulation() }
+     Text {
+      Layout.fillWidth: true
+      text: devicesModel.pendingCount
+       ? "На головний екран камера потрапить після підтвердження прошивки та відео."
+       : "Підключіть камеру OpenIPC до тієї ж мережі, що й цей комп’ютер, і запустіть пошук. Без обладнання можна спробувати симуляцію."
+      color: root.sub; font.pixelSize: 15; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter
+     }
+     RowLayout {
+      Layout.alignment: Qt.AlignHCenter
+      Layout.topMargin: 10
+      spacing: 12
+      Button {
+       objectName: "emptyFindCamera"
+       text: devicesModel.pendingCount ? "Відкрити камери" : "Знайти камеру в мережі"
+       font.pixelSize: 15; font.bold: true
+       Layout.preferredWidth: 240; Layout.preferredHeight: 48
+       onClicked: root.openDevices()
+       contentItem: Text { text: parent.text; font: parent.font; color: "#06130d"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+       background: Rectangle { radius: 8; color: parent.hovered ? "#5cf0bd" : root.green }
+      }
+      Button {
+       objectName: "emptyOpenSimulation"
+       text: "Спробувати симуляцію"
+       font.pixelSize: 15
+       Layout.preferredWidth: 240; Layout.preferredHeight: 48
+       onClicked: root.openSimulation()
       }
      }
     }
@@ -318,10 +368,10 @@ Item {
   visible: root.menuOpen
   anchors.top: parent.top
   anchors.right: parent.right
-  anchors.topMargin: 96
+  anchors.topMargin: 108
   anchors.rightMargin: 20
   width: Math.min(350, root.width - 40)
-  height: Math.min(drawerContent.implicitHeight + 24, root.height - 116)
+  height: Math.min(drawerContent.implicitHeight + 24, root.height - 128)
   radius: 12
   color: "#f20a1420"
   border.color: "#71879c"
