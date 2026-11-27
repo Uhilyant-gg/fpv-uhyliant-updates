@@ -49,15 +49,28 @@ print("ok", len(data))
 """
 
 
-def test_frames_from_a_video_sink_are_saved_as_mp4():
-    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
-    result = subprocess.run(
-        [sys.executable, "-c", SCRIPT],
-        cwd=Path(__file__).resolve().parent,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=90,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert "ok" in result.stdout
+def test_frames_from_a_video_sink_are_saved_as_mp4(tmp_path):
+    # Qt Multimedia may start an audio daemon (PulseAudio autospawn) that outlives the
+    # child and keeps inherited pipes open, so output goes to files and autospawn is off.
+    client_conf = tmp_path / "pulse-client.conf"
+    client_conf.write_text("autospawn = no\n")
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", PULSE_CLIENTCONFIG=str(client_conf))
+    out_path, err_path = tmp_path / "out.txt", tmp_path / "err.txt"
+    with out_path.open("w") as out, err_path.open("w") as err:
+        process = subprocess.Popen(
+            [sys.executable, "-c", SCRIPT],
+            cwd=Path(__file__).resolve().parent,
+            env=env,
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+        )
+        try:
+            code = process.wait(timeout=90)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+            code = "timeout"
+    output = out_path.read_text() + err_path.read_text()
+    assert code == 0, output
+    assert "ok" in output
