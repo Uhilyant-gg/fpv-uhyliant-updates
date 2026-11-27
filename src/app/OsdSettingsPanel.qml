@@ -126,6 +126,52 @@ Item {
       Layout.fillWidth: true
       onClicked: station.resetOSDStyle()
      }
+
+     Text { text: "Попередження в польоті"; color: "#dce6f2"; font.bold: true; font.pixelSize: 15; Layout.topMargin: 8 }
+     Text {
+      text: "Значення 0 вимикає попередження. Спрацьовують лише свіжі дані телеметрії."
+      color: "#9fb2c6"; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 11
+     }
+     GridLayout {
+      columns: 2
+      Layout.fillWidth: true
+      columnSpacing: 10
+      Text { text: "Якість лінку (LQ) нижче, %"; color: "#dce6f2"; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+      SpinBox {
+       objectName: "alertLinkQualityMin"
+       from: 0; to: 100; stepSize: 5; editable: true
+       value: station.alertThresholds.linkQualityMin
+       onValueModified: station.setAlertThreshold("linkQualityMin", value)
+      }
+      Text { text: "Заряд батареї нижче, %"; color: "#dce6f2"; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+      SpinBox {
+       objectName: "alertBatteryRemainingMin"
+       from: 0; to: 100; stepSize: 5; editable: true
+       value: station.alertThresholds.batteryRemainingMin
+       onValueModified: station.setAlertThreshold("batteryRemainingMin", value)
+      }
+      Text { text: "Кількість банок акумулятора (0 — не задано)"; color: "#dce6f2"; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+      SpinBox {
+       objectName: "alertCellCount"
+       from: 0; to: 12; editable: true
+       value: station.alertThresholds.cellCount
+       onValueModified: station.setAlertThreshold("cellCount", value)
+      }
+      Text { text: "Напруга на банку нижче, В"; color: "#dce6f2"; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+      SpinBox {
+       objectName: "alertCellVoltageMin"
+       from: 0; to: 420; stepSize: 5; editable: true
+       value: Math.round(station.alertThresholds.cellVoltageMin * 100)
+       textFromValue: function(v) { return (v / 100).toFixed(2) }
+       valueFromText: function(text) { return Math.round(Number(String(text).replace(",", ".")) * 100) }
+       onValueModified: station.setAlertThreshold("cellVoltageMin", value / 100)
+      }
+     }
+     Button {
+      text: "Стандартні пороги попереджень"
+      Layout.fillWidth: true
+      onClicked: station.resetAlertThresholds()
+     }
     }
    }
 

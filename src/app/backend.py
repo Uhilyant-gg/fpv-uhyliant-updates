@@ -1,6 +1,7 @@
 import json, math, os
 from pathlib import Path
 from PySide6.QtCore import QObject, Property, QSettings, Signal, Slot
+from flight_alerts import DEFAULT_THRESHOLDS, validate_threshold, validate_thresholds
 from home_dashboard import home_dashboard
 
 DATA = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'FPV-Uhyliant'
@@ -95,6 +96,7 @@ class Station(QObject):
     OSD_DEFAULT_OPACITY = 0.58
     OSD_DEFAULT_SCALE = 1.0
     OSD_DEFAULT_POSITION = "top-left"
+    ALERT_THRESHOLDS_KEY = "alerts/thresholds"
 
     def __init__(self, settings=None):
         super().__init__()
@@ -110,9 +112,42 @@ class Station(QObject):
         self._elements = self._read_osd_elements()
         self._element_visibility = self._read_osd_element_visibility()
         self._osd_settings_error = ""
+        self._alert_thresholds = self._read_alert_thresholds()
         self._armed = False
         self._recording = False
         self._streaming = False
+
+    def _read_alert_thresholds(self):
+        try:
+            stored = json.loads(str(self._settings.value(self.ALERT_THRESHOLDS_KEY, "{}")))
+        except (TypeError, ValueError):
+            stored = {}
+        return validate_thresholds(stored)
+
+    @Property("QVariantMap", notify=changed)
+    def alertThresholds(self):
+        return dict(self._alert_thresholds)
+
+    @Slot(str, float, result=bool)
+    def setAlertThreshold(self, name, value):
+        """Validate, apply and persist one alert threshold with the other station settings."""
+        try:
+            normalized = validate_threshold(name, value)
+        except ValueError:
+            return False
+        self._alert_thresholds[name] = normalized
+        self._settings.setValue(self.ALERT_THRESHOLDS_KEY, json.dumps(self._alert_thresholds, sort_keys=True))
+        saved = self._save_osd_settings()
+        self.changed.emit()
+        return saved
+
+    @Slot(result=bool)
+    def resetAlertThresholds(self):
+        self._alert_thresholds = dict(DEFAULT_THRESHOLDS)
+        self._settings.setValue(self.ALERT_THRESHOLDS_KEY, "{}")
+        saved = self._save_osd_settings()
+        self.changed.emit()
+        return saved
 
     def _read_osd_enabled(self):
         value = self._settings.value(self.OSD_ENABLED_KEY, True)

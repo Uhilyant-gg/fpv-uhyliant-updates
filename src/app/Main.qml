@@ -89,6 +89,20 @@ ApplicationWindow {
      }
     }
    }
+   Rectangle {
+    objectName: "flightAlertBanner"
+    visible: flightAlerts.active && !w.simulation
+    z: 25
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.topMargin: 16
+    width: Math.min(parent.width - 32, flightAlertText.implicitWidth + 40)
+    height: 48
+    radius: 10
+    color: flightAlerts.level === "critical" ? "#e6b3263a" : "#e6a8730f"
+    border.color: flightAlerts.level === "critical" ? red : amber
+    Text { id: flightAlertText; anchors.centerIn: parent; text: flightAlerts.text; color: "white"; font.pixelSize: 18; font.bold: true }
+   }
    Rectangle { visible:w.displayFallbackNotice!==""&&!w.simulation; z:20; anchors.top:parent.top; anchors.horizontalCenter:parent.horizontalCenter; anchors.topMargin:16; width:Math.min(parent.width-32,620); height:48; radius:10; color:"#e60b1522"; border.color:amber; Text{anchors.fill:parent;anchors.margins:10;text:w.displayFallbackNotice;color:fg;horizontalAlignment:Text.AlignHCenter;verticalAlignment:Text.AlignVCenter;wrapMode:Text.WordWrap} }
    Column { visible:!w.simulation&&player.playbackState!==MediaPlayer.PlayingState&&!primaryDetached; anchors.centerIn:parent; spacing:8; Text{text:stateUa(videoRuntime.state);color:fg;font.pixelSize:20;font.bold:true} Text{text:videoRuntime.error;color:red;visible:text!==""} Button{text:"Запустити відео";enabled:selectedStreamId!=="";onClicked:startSelected()} }
    Column { visible:!w.simulation&&primaryDetached; anchors.centerIn:parent; spacing:8; Text{text:"Основний потік відкрито в окремому вікні";color:fg;font.pixelSize:18} Button{text:"Повернути до основного екрана";onClicked:primaryDetached=false} }
