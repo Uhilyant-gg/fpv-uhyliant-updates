@@ -134,6 +134,8 @@ def main():
     from flight_alerts_runtime import FlightAlertsRuntime
     from presets_runtime import PresetsRuntime
     from dvr_runtime import DvrRuntime
+    from connection_profiles import ConnectionStore
+    from connections_runtime import ConnectionsRuntime
     from settings_presets import PresetStore
 
     harness.mark('application-imports-complete')
@@ -250,8 +252,11 @@ def main():
     presets = PresetsRuntime(preset_store, s)
     backup.restored.connect(presets.reload)
     dvr_runtime = DvrRuntime()
+    connections = ConnectionsRuntime(d, ConnectionStore(DATA / 'connections.json'))
+    v.host_resolver = connections.host_for
+    secondary.host_resolver = connections.host_for
     dvr_runtime.recordingChanged.connect(lambda: s.setRecordingActive(dvr_runtime.recording))
-    app._runtime_refs = app._runtime_refs + (flight_alerts, presets, dvr_runtime)
+    app._runtime_refs = app._runtime_refs + (flight_alerts, presets, dvr_runtime, connections)
     ctx = e.rootContext()
     for name, obj in [
         ('station', s),
@@ -285,6 +290,7 @@ def main():
         ('flightAlerts', flight_alerts),
         ('presetsRuntime', presets),
         ('dvrRuntime', dvr_runtime),
+        ('connectionsRuntime', connections),
     ]:
         ctx.setContextProperty(name, obj)
     ctx.setContextProperty('appWindowTitle', WINDOW_TITLE)
@@ -296,6 +302,7 @@ def main():
         hardware_e2e.reset()
         credentials.clear()
         dvr_runtime.shutdown()
+        connections.stop()
         video.stopAll()
         links.clear()
         pairing.clearPending()
@@ -324,6 +331,7 @@ def main():
                 },
             )
             return
+        connections.start()
         try:
             d.discoverOpenIPC()
             harness.mark('discovery', detail={'started': True, 'savedDevices': d.count})

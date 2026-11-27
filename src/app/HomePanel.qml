@@ -49,6 +49,28 @@ Item {
   }
   return false
  }
+ function connectionColor(state) {
+  return state === "available" ? root.green : (state === "unavailable" ? root.red : (state === "checking" ? root.amber : "#5b6b7c"))
+ }
+ function connectionReady(deviceId) {
+  var kind = connectionsRuntime.selected[deviceId] || ""
+  var statuses = connectionsRuntime.statuses[deviceId] || {}
+  return kind !== "" && statuses[kind] !== undefined && statuses[kind].state === "available"
+ }
+ function flyHint(deviceId) {
+  if (!canEnterFpv(deviceId)) return "Для камери ще не налаштовано відеопотік."
+  if (!(connectionsRuntime.selected[deviceId] || "")) return "Спершу виберіть тип підключення."
+  if (!connectionReady(deviceId)) return "Вибране підключення зараз недоступне."
+  return "Відкрити відео й перейти до польоту."
+ }
+ function editAddress(deviceId, kind) {
+  addressPopup.deviceId = deviceId
+  addressPopup.kind = kind
+  addressField.text = connectionsRuntime.addressFor(deviceId, kind)
+  addressPopup.error = ""
+  addressPopup.open()
+  addressField.forceActiveFocus()
+ }
  function countersText() {
   var parts = []
   if (homeDashboard.pendingCount > 0) parts.push("на перевірці: " + homeDashboard.pendingCount)
@@ -219,9 +241,12 @@ Item {
    model: devicesModel.homeItems
    readonly property int columns: Math.max(1, Math.floor(width / 380))
    cellWidth: Math.floor(width / columns)
-   cellHeight: 190
+   cellHeight: 300
    delegate: Item {
+    id: cameraCell
     required property var modelData
+    readonly property string cameraId: modelData.id
+    readonly property string selectedKind: connectionsRuntime.selected[cameraId] || ""
     width: list.cellWidth
     height: list.cellHeight
     Rectangle {
@@ -264,6 +289,67 @@ Item {
        Text { text: modelData.healthLabel; color: root.fg; font.pixelSize: 13 }
       }
       Text { text: root.lastSeenText(modelData.lastObservedAt); color: root.sub; font.pixelSize: 12 }
+      RowLayout {
+       Layout.fillWidth: true
+       Layout.topMargin: 4
+       Text { text: "Підключення"; color: root.sub; font.pixelSize: 12; font.bold: true; Layout.fillWidth: true }
+       Button {
+        objectName: "editConnectionAddress"
+        visible: cameraCell.selectedKind === "static" || cameraCell.selectedKind === "starlink"
+        text: "✎ адреса"
+        flat: true
+        font.pixelSize: 12
+        padding: 0
+        topPadding: 0
+        bottomPadding: 0
+        Layout.preferredHeight: 16
+        Layout.maximumHeight: 16
+        onClicked: root.editAddress(cameraCell.cameraId, cameraCell.selectedKind)
+       }
+      }
+      GridLayout {
+       columns: 2
+       columnSpacing: 6
+       rowSpacing: 6
+       Layout.fillWidth: true
+       Repeater {
+        model: connectionsRuntime.types
+        delegate: Button {
+         id: chip
+         required property var modelData
+         readonly property var status: (connectionsRuntime.statuses[cameraCell.cameraId] || {})[modelData.key] || ({})
+         readonly property bool chosen: cameraCell.selectedKind === modelData.key
+         objectName: "connection-" + modelData.key
+         Layout.fillWidth: true
+         Layout.preferredWidth: 1
+         Layout.preferredHeight: 40
+         enabled: status.state !== "unsupported"
+         onClicked: {
+          if (modelData.needsAddress && status.state === "unconfigured") root.editAddress(cameraCell.cameraId, modelData.key)
+          else connectionsRuntime.select(cameraCell.cameraId, modelData.key)
+         }
+         background: Rectangle {
+          radius: 7
+          color: chip.chosen ? "#1f4d72" : (chip.hovered ? "#22364b" : "#132235")
+          border.color: chip.chosen ? "#5aa4ff" : "#2f4860"
+          border.width: chip.chosen ? 2 : 1
+         }
+         contentItem: RowLayout {
+          spacing: 7
+          Rectangle {
+           Layout.preferredWidth: 9; Layout.preferredHeight: 9; radius: 5
+           color: root.connectionColor(chip.status.state)
+          }
+          ColumnLayout {
+           spacing: 0
+           Layout.fillWidth: true
+           Text { text: chip.modelData.label; color: chip.enabled ? root.fg : root.sub; font.pixelSize: 13; font.bold: chip.chosen; elide: Text.ElideRight; Layout.fillWidth: true }
+           Text { text: chip.status.label || ""; color: root.sub; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+          }
+         }
+        }
+       }
+      }
       Item { Layout.fillHeight: true }
       RowLayout {
        Layout.fillWidth: true
@@ -278,7 +364,7 @@ Item {
        Button {
         objectName: "cameraFly"
         text: "▶  Летіти"
-        enabled: root.canEnterFpv(modelData.id)
+        enabled: root.canEnterFpv(modelData.id) && root.connectionReady(cameraCell.cameraId)
         font.pixelSize: 16
         font.bold: true
         Layout.fillWidth: true
@@ -286,7 +372,7 @@ Item {
         onClicked: root.connectDevice(modelData.id)
         contentItem: Text { text: parent.text; font: parent.font; color: parent.enabled ? "#06130d" : root.sub; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
         background: Rectangle { radius: 8; color: !parent.enabled ? "#1d2c3c" : (parent.hovered ? "#5cf0bd" : root.green) }
-        HoverHint { text: parent.enabled ? "Відкрити відео й перейти до польоту." : "Для камери ще не налаштовано відеопотік." }
+        HoverHint { text: root.flyHint(cameraCell.cameraId) }
        }
       }
      }
@@ -430,6 +516,45 @@ Item {
       }
      }
     }
+   }
+  }
+ }
+
+ Popup {
+  id: addressPopup
+  objectName: "connectionAddressPopup"
+  property string deviceId: ""
+  property string kind: ""
+  property string error: ""
+  modal: true
+  anchors.centerIn: parent
+  width: Math.min(460, root.width - 40)
+  padding: 18
+  background: Rectangle { color: "#0d1725"; border.color: "#2387ff"; radius: 12 }
+  function save() {
+   if (connectionsRuntime.setAddress(deviceId, kind, addressField.text)) {
+    connectionsRuntime.select(deviceId, kind)
+    close()
+   } else {
+    error = "Адреса має неправильний формат."
+   }
+  }
+  contentItem: ColumnLayout {
+   spacing: 10
+   Text { text: addressPopup.kind === "starlink" ? "Адреса камери через Starlink (IPv6)" : "Статична адреса камери"; color: root.fg; font.pixelSize: 17; font.bold: true }
+   Text {
+    Layout.fillWidth: true
+    wrapMode: Text.WordWrap
+    color: root.sub
+    text: addressPopup.kind === "starlink" ? "Публічна IPv6-адреса камери в мережі Starlink, наприклад 2001:db8::10." : "IP-адреса або доменне ім’я (DDNS), наприклад 93.170.12.5 або drone.example.net."
+   }
+   TextField { id: addressField; objectName: "connectionAddressField"; Layout.fillWidth: true; placeholderText: addressPopup.kind === "starlink" ? "2001:db8::10" : "93.170.12.5"; onAccepted: addressPopup.save() }
+   Text { objectName: "connectionAddressError"; visible: text !== ""; text: addressPopup.error; color: root.red }
+   RowLayout {
+    Layout.fillWidth: true
+    Item { Layout.fillWidth: true }
+    Button { text: "Скасувати"; onClicked: addressPopup.close() }
+    Button { objectName: "connectionAddressSave"; text: "Зберегти"; font.bold: true; onClicked: addressPopup.save() }
    }
   }
  }

@@ -1,4 +1,6 @@
 import socket, time
+
+from connection_profiles import url_host
 from datetime import datetime, timezone
 from PySide6.QtCore import QObject, Property, Signal, Slot
 
@@ -22,6 +24,8 @@ class VideoRuntime(QObject):
         self._profile = {}
         self._device = {}
         self._check_ms = None
+        # Optional: picks the address by the connection type the pilot selected.
+        self.host_resolver = None
 
     @Property(str, notify=changed)
     def state(self):
@@ -169,7 +173,7 @@ class VideoRuntime(QObject):
             port = int(stream.get('port'))
         except (TypeError, ValueError):
             port = 0
-        host = str(device.get('host', '')).strip()
+        host = str(self.host_resolver(device) if self.host_resolver else device.get('host', '')).strip()
         canonical = self._canonical_stream(stream)
         path = canonical.get('path', '')
         if not host or port < 1 or port > 65535 or not path:
@@ -184,7 +188,7 @@ class VideoRuntime(QObject):
         self._host = host
         self._port = port
         self._stream_id = stream_id
-        self._url = f'rtsp://{self._host}:{self._port}{path}'
+        self._url = f'rtsp://{url_host(self._host)}:{self._port}{path}'
         self._attempts = 1
         self._set('checking')
         if not self._check_endpoint():
