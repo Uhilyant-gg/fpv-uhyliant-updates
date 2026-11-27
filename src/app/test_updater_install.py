@@ -24,7 +24,7 @@ class Tests(unittest.TestCase):
     def test_helper_args_bind_verified_ready_identity(self):
         ready = {'version':'2.0.12','package':'C:/FPV/updates/package.zip','sha256':'a'*64}
         args = helper_args(Path('C:/FPV/FPV-Uhyliant-Update.exe'), Path('C:/FPV'), ready, 42)
-        self.assertEqual(args[1:3], ['--root', 'C:/FPV'])
+        self.assertEqual(args[1:3], ['--root', str(Path('C:/FPV'))])
         self.assertEqual(args[3:5], ['--package', ready['package']])
         self.assertEqual(args[5:7], ['--version', ready['version']])
         self.assertEqual(args[7:9], ['--sha256', ready['sha256']])

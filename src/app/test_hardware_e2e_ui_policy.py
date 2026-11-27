@@ -4,7 +4,9 @@ class Tests(unittest.TestCase):
  def setUp(self):
   root=Path(__file__).parent;self.qml=(root/'HardwareE2EPanel.qml').read_text(encoding='utf-8');self.main=(root/'Main.qml').read_text(encoding='utf-8');self.bootstrap=(root/'main.py').read_text(encoding='utf-8')
  def test_panel_exposes_preflight_without_destructive_execution(self):self.assertIn('hardwareE2ERuntime.readiness',self.qml);self.assertIn('capture("preflight")',self.qml);self.assertNotIn('firmwareUpdateSession.execute',self.qml);self.assertNotIn('sysupgrade',self.qml)
- def test_host_key_is_explicit_user_confirmation(self):self.assertIn('SSH host key перевірено та прийнято',self.qml);self.assertIn('setHostKeyAccepted(checked)',self.qml)
+ def test_update_confirmation_does_not_claim_to_accept_connection_keys(self):
+  for qml in (self.qml,(Path(__file__).parent/'FirmwareCenter.qml').read_text(encoding='utf-8')):
+   self.assertIn('Підтверджую оновлення вибраної камери',qml);self.assertIn('confirmDeviceUpdate(checked)',qml);self.assertIn('не змушує програму довіряти невідомому пристрою',qml)
  def test_artifact_and_plan_are_visible_preflight_gates(self):self.assertIn('ready.checks.firmwareArtifactVerified',self.qml);self.assertIn('ready.checks.executionPlanReady',self.qml);self.assertIn('ready.artifact.sha256',self.qml)
  def test_panel_supports_distinct_e2e_evidence_stages(self):self.assertIn('capture("preflight")',self.qml);self.assertIn('capture("post-update")',self.qml);self.assertIn('capture("failure")',self.qml);self.assertIn('hardwareE2ERuntime.captures',self.qml);self.assertIn('hardwareE2ERuntime.evidenceReadiness',self.qml)
  def test_main_wires_preflight_panel_without_destructive_execution(self):self.assertIn('Hardware E2E',self.main);self.assertIn('HardwareE2EPanel',self.main);self.assertIn('hardwareE2EPopup.open()',self.main);self.assertIn('onOpened:hardwareE2ERuntime.reset()',self.main);self.assertNotIn('onClosed:hardwareE2ERuntime.reset()',self.main)

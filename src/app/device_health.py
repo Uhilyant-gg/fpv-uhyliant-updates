@@ -29,6 +29,26 @@ def device_health(device: Mapping[str, Any] | None):
             safe_actions=("identify-camera",),
         )
 
+    onboarding_state = device.get("onboardingState") or identity.get("onboardingState")
+    if onboarding_state == "pending-firmware":
+        return health_evidence(
+            state="firmware-pending",
+            health=HEALTH_ATTENTION,
+            summary="Потрібно перевірити та встановити сумісну прошивку.",
+            reason_code="camera-firmware-required",
+            evidence={"deviceId": device.get("id"), "platform": identity.get("platform"), "sensor": identity.get("sensor")},
+            safe_actions=("review-firmware",),
+        )
+    if onboarding_state == "pending-video":
+        return health_evidence(
+            state="video-pending",
+            health=HEALTH_ATTENTION,
+            summary="Прошивку підтверджено, але відеопотік ще не перевірено.",
+            reason_code="camera-video-unverified",
+            evidence={"deviceId": device.get("id"), "platform": identity.get("platform"), "sensor": identity.get("sensor")},
+            safe_actions=("find-camera",),
+        )
+
     if identity.get("verified") is not True:
         return health_evidence(
             state="unverified",

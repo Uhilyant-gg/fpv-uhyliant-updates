@@ -17,6 +17,7 @@ SAFE_ACTION_VALUES = frozenset({
     "find-camera",
     "identify-camera",
     "refresh-identity",
+    "review-firmware",
     "show-video",
     "verify-camera",
 })

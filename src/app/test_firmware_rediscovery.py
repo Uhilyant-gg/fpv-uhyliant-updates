@@ -48,7 +48,7 @@ class Tests(unittest.TestCase):
   pool=Pool()
   with mock.patch('firmware_rediscovery.concurrent.futures.ThreadPoolExecutor',return_value=pool):
    r=FirmwareRediscovery(lambda host:{},lambda _:None)._probe_candidates(['192.168.1.60'],'192.168.1.50','ssc30kq','imx335')
-  self.assertEqual(r,(None,None));self.assertEqual(pool.shutdown_calls,[(True,True)])
+  self.assertEqual(r,(None,None,[]));self.assertEqual(pool.shutdown_calls,[(True,True)])
  def test_incomplete_expected_identity_blocks_all_probes(self):
   calls=[];result={'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':['OpenIPC status.cgi']}
   r=FirmwareRediscovery(lambda host:(calls.append(host) or result),lambda _:None,lambda old:['192.168.1.70']).wait('192.168.1.50',1,0,{'platform':'ssc30kq'});self.assertFalse(r['rediscovered']);self.assertEqual(r['attempts'],0);self.assertEqual(calls,[])

@@ -77,6 +77,22 @@ class TimelineRuntimeTests(unittest.TestCase):
             ],
         )
 
+    def test_camera_firmware_lifecycle_records_verified_failure_and_blocked_outcomes(self):
+        timeline = TimelineRuntime(Settings(), clock=lambda: 240)
+        for state in ("hardware-validation-pending", "ready", "reboot-pending", "reboot-pending", "verified", "blocked", "error"):
+            timeline.observe("camera-firmware", state)
+
+        self.assertEqual(
+            [item["title"] for item in timeline.items],
+            [
+                "Не вдалося підтвердити оновлення камери",
+                "Оновлення камери зупинено до початку",
+                "Оновлення камери перевірено",
+                "Оновлення камери розпочато",
+                "Станцію запущено",
+            ],
+        )
+
     def test_device_and_configuration_events_have_safe_timeline_copy(self):
         timeline = TimelineRuntime(Settings(), clock=lambda: 300)
         for event_type in (

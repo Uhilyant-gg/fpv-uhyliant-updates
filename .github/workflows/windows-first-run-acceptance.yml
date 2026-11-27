@@ -1,0 +1,90 @@
+name: Windows first-run acceptance
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/app/**'
+      - 'src/requirements.txt'
+      - 'tools/build_icon.py'
+      - 'assets/**'
+      - 'test/release-public-key.pem'
+      - '.github/workflows/windows-first-run-acceptance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/app/**'
+      - 'src/requirements.txt'
+      - 'tools/build_icon.py'
+      - 'assets/**'
+      - 'test/release-public-key.pem'
+      - '.github/workflows/windows-first-run-acceptance.yml'
+permissions:
+  contents: read
+jobs:
+  packaged-first-run:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Create clean build environment
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\python -m pip install --upgrade pip
+          .\.venv\Scripts\python -m pip install -r src\requirements.txt
+          .\.venv\Scripts\python -m pip install pyinstaller==6.11.1 pillow
+      - name: Prepare assets
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\python tools\build_icon.py
+          New-Item -ItemType Directory -Force src\app\security | Out-Null
+          Copy-Item test\release-public-key.pem src\app\security\production-v1-public.pem -Force
+          Copy-Item assets\fpv-uhyliant.ico src\app\fpv-uhyliant.ico -Force
+      - name: Build packaged application
+        shell: pwsh
+        run: |
+          $qmlArgs = Get-ChildItem src\app\*.qml | Sort-Object Name | ForEach-Object { @('--add-data', "$($_.FullName);.") }
+          & .\.venv\Scripts\pyinstaller --noconfirm --clean --onedir --windowed --name FPV-Uhyliant-First-Run --paths src/app @qmlArgs --add-data "src/app/preview.jpg;." --add-data "src/app/fpv-uhyliant.ico;." --add-data "src/app/security;security" --hidden-import PySide6.QtQml --hidden-import PySide6.QtQuick --hidden-import PySide6.QtQuickControls2 --hidden-import PySide6.QtMultimedia --hidden-import PySide6.QtSerialPort --hidden-import pymavlink --hidden-import pymavlink.mavutil --hidden-import paramiko --collect-all PySide6.QtMultimedia --collect-all pymavlink --collect-all paramiko src/app/main.py
+      - name: Verify packaged first-run UI without network access
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP 'fpv-first-run-evidence'
+          $profile = Join-Path $evidence 'profile'
+          $marker = Join-Path $evidence 'startup-stages.jsonl'
+          New-Item -ItemType Directory -Force $profile | Out-Null
+          $env:LOCALAPPDATA = $profile
+          $exe = Resolve-Path 'dist\FPV-Uhyliant-First-Run\FPV-Uhyliant-First-Run.exe'
+          $process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) -ArgumentList @('--first-run-acceptance-smoke','--startup-marker',"`"$marker`"") -PassThru
+          if (-not $process.WaitForExit(20000)) {
+            Stop-Process -Id $process.Id -Force
+            throw 'Packaged first-run window did not finish within 20 seconds'
+          }
+          if ($process.ExitCode -ne 0) { throw "Packaged first-run window exited with code $($process.ExitCode)" }
+          $output = & .\.venv\Scripts\python src\app\main.py --acceptance-report --startup-marker $marker
+          if ($LASTEXITCODE -ne 0) { Write-Output $output; throw 'Packaged first-run acceptance contract rejected startup' }
+          $report = $output | ConvertFrom-Json
+          if ($report.evidenceMode -ne 'network-free-packaged-first-run-fixture') { throw "Unexpected evidence mode: $($report.evidenceMode)" }
+          if ($report.physicalOperationEvidence -ne 'not-collected') { throw 'Software smoke must not claim physical evidence' }
+          if ($report.healthElapsedMs -ge 10000) { throw "Health took too long: $($report.healthElapsedMs) ms" }
+          $events = @(Get-Content $marker | ForEach-Object { $_ | ConvertFrom-Json })
+          $window = $events | Where-Object stage -eq 'window-visible' | Select-Object -Last 1
+          $devices = $events | Where-Object stage -eq 'devices' | Select-Object -Last 1
+          $action = $events | Where-Object stage -eq 'next-action' | Select-Object -Last 1
+          $discovery = $events | Where-Object stage -eq 'discovery' | Select-Object -Last 1
+          if (-not $window.detail.windowVisible) { throw 'Packaged first-run window was not visible' }
+          if (@($devices.detail.devices).Count -ne 0) { throw 'Expected a clean empty device list in this fixture' }
+          if (-not $action.detail.available -or $action.detail.action -ne 'find-camera') { throw "Unexpected first-run action: $($action.detail.action)" }
+          if (-not $discovery.detail.networkRequestsSuppressed) { throw 'The packaged smoke must suppress network discovery' }
+          Write-Output $output
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-first-run-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/fpv-first-run-evidence/startup-stages.jsonl
+            ${{ runner.temp }}/fpv-first-run-evidence/startup-stages.latest.json
+            ${{ runner.temp }}/fpv-first-run-evidence/profile/FPV-Uhyliant/startup.log
+          if-no-files-found: warn
+          retention-days: 7

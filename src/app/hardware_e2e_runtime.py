@@ -4,7 +4,7 @@ from hardware_e2e import hardware_e2e_readiness
 class HardwareE2ERuntime(QObject):
  changed=Signal()
  def __init__(self,devices,diagnostics,credentials,firmware=None,session=None):
-  super().__init__();self.devices=devices;self.diagnostics=diagnostics;self.credentials=credentials;self.firmware=firmware;self.session=session;self._host_key_accepted=False;self._accepted_identity=None;self._selected_device_id='';self._captures={};self._evidence_binding=None
+  super().__init__();self.devices=devices;self.diagnostics=diagnostics;self.credentials=credentials;self.firmware=firmware;self.session=session;self._update_confirmed=False;self._confirmation_binding=None;self._selected_device_id='';self._captures={};self._evidence_binding=None
   for obj in (devices,diagnostics,credentials,firmware,session):
    signal=getattr(obj,'changed',None) if obj is not None else None
    if signal is not None:signal.connect(self._source_changed)
@@ -21,13 +21,13 @@ class HardwareE2ERuntime(QObject):
  def _source_changed(self):
   current=self._identity_key();session=self._session_result();transaction=session.get('transaction') or {}
   active=bool(transaction) and str(session.get('state') or '') in ('executing','reboot-pending','rediscovering','verified','error')
-  if self._host_key_accepted and current!=self._accepted_identity and not active:self._host_key_accepted=False;self._accepted_identity=None
+  if self._update_confirmed and current!=self._confirmation_binding and not active:self._update_confirmed=False;self._confirmation_binding=None
   if self._evidence_binding is not None and current!=self._evidence_binding and not active:self._captures={};self._evidence_binding=None
   self.changed.emit()
  @Property('QVariantMap',notify=changed)
- def readiness(self):return hardware_e2e_readiness(self._selected(),self._network(),bool(self.credentials.snapshot().get('hasPassword')),self._host_key_accepted and self._identity_key()==self._accepted_identity,self._firmware())
+ def readiness(self):return hardware_e2e_readiness(self._selected(),self._network(),bool(self.credentials.snapshot().get('hasPassword')),self._update_confirmed and self._identity_key()==self._confirmation_binding,self._firmware())
  @Property(bool,notify=changed)
- def hostKeyAccepted(self):return self._host_key_accepted and self._identity_key()==self._accepted_identity
+ def updateConfirmed(self):return self._update_confirmed and self._identity_key()==self._confirmation_binding
  @Property('QVariantMap',notify=changed)
  def captures(self):return deepcopy(self._captures)
  @Property('QVariantMap',notify=changed)
@@ -38,11 +38,11 @@ class HardwareE2ERuntime(QObject):
  def selectDevice(self,device_id):
   device_id=str(device_id or '')
   if device_id==self._selected_device_id:return
-  self._selected_device_id=device_id;self._host_key_accepted=False;self._accepted_identity=None;self._captures={};self._evidence_binding=None;self.changed.emit()
+  self._selected_device_id=device_id;self._update_confirmed=False;self._confirmation_binding=None;self._captures={};self._evidence_binding=None;self.changed.emit()
  @Slot(bool)
- def setHostKeyAccepted(self,value):self._host_key_accepted=bool(value);self._accepted_identity=self._identity_key() if self._host_key_accepted else None;self.changed.emit()
+ def confirmDeviceUpdate(self,value):self._update_confirmed=bool(value);self._confirmation_binding=self._identity_key() if self._update_confirmed else None;self.changed.emit()
  @Slot()
- def reset(self):self._host_key_accepted=False;self._accepted_identity=None;self._selected_device_id='';self._captures={};self._evidence_binding=None;self.changed.emit()
+ def reset(self):self._update_confirmed=False;self._confirmation_binding=None;self._selected_device_id='';self._captures={};self._evidence_binding=None;self.changed.emit()
  @Slot(result=str)
  def exportPreflight(self):return self.capture('preflight')
  @Slot(str,result=str)

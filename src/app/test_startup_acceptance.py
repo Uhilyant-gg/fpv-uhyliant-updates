@@ -46,6 +46,21 @@ class StartupAcceptanceTests(unittest.TestCase):
         self.assertEqual(result["stage"], "discovery")
         self.assertEqual(result["reasonCode"], "startup-stage-failed")
 
+    def test_network_free_packaged_fixture_is_explicit_and_not_physical_evidence(self):
+        data = events()
+        data[3] = {
+            **data[3],
+            "detail": {
+                "mode": "network-free-packaged-first-run-fixture",
+                "networkRequestsSuppressed": True,
+                "started": False,
+            },
+        }
+        result = startup_acceptance_report(data)
+        self.assertEqual(result["status"], "accepted")
+        self.assertEqual(result["evidenceMode"], "network-free-packaged-first-run-fixture")
+        self.assertEqual(result["physicalOperationEvidence"], "not-collected")
+
     def test_file_reader_uses_latest_invocation_only(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "startup.jsonl"

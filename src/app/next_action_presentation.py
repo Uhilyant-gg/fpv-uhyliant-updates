@@ -12,6 +12,8 @@ _LABELS = {
     "identify-camera": "Визначити камеру",
     "refresh-identity": "Оновити ідентифікацію",
     "verify-camera": "Перевірити камеру",
+    "review-firmware": "Перевірити прошивку",
+    "find-camera": "Знайти камеру",
     "show-video": "Показати відео",
 }
 

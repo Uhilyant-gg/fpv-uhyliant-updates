@@ -12,6 +12,7 @@ Item {
  property color raised: "#132235"
  property color accent: "#35e0a1"
  property color blue: "#4195ff"
+ property color amber: "#ffbd59"
  property color line: "#203348"
  property color danger: "#ff7080"
  property var selectedFound: null
@@ -19,7 +20,11 @@ Item {
  property string authHost: ""
  property string authName: ""
  function value(v) { return v === undefined || v === null || v === "" ? "Не визначено" : v }
+ function lastActivity(timestamp) { return !timestamp ? "Ще не спостерігалася" : Qt.formatDateTime(new Date(Number(timestamp) * 1000), "dd.MM.yyyy hh:mm") }
  function selectFound(item) { selectedFound = item }
+ function readiness(item) { return item ? devicesModel.onboardingReadiness(item.host) : ({ready:false,stageable:false,reason:""}) }
+ function readySaved(item) { if (!item) return false; for (var i = 0; i < devicesModel.homeItems.length; i++) if (devicesModel.homeItems[i].host === item.host) return true; return false }
+ function savedStateText(item) { return item.onboardingState === "pending-firmware" ? "Потрібна перевірка прошивки" : (item.onboardingState === "pending-video" ? "Потрібна перевірка відео" : item.healthLabel) }
 
  Rectangle { anchors.fill: parent; color: "#08111b" }
  ColumnLayout {
@@ -28,7 +33,7 @@ Item {
   spacing: 14
   RowLayout {
    Layout.fillWidth: true
-   ColumnLayout { spacing: 3; Text { text: "Камери"; color: fg; font.pixelSize: 26; font.bold: true } Text { text: "Знайдіть і підключіть камеру без ручних мережевих налаштувань"; color: muted; font.pixelSize: 13 } }
+   ColumnLayout { spacing: 3; Text { text: "Пристрої"; color: fg; font.pixelSize: 26; font.bold: true } Text { text: "Перегляньте збережені камери або знайдіть нову автоматично"; color: muted; font.pixelSize: 13 } }
    Item { Layout.fillWidth: true }
    Button { text: "Закрити"; flat: true; onClicked: root.closeRequested(); HoverHint { text: "Повернутися до попереднього екрана." } }
   }
@@ -48,19 +53,21 @@ Item {
     SplitView.preferredWidth: 310; SplitView.minimumWidth: 250; color: surface; radius: 16
     ColumnLayout {
      anchors.fill: parent; anchors.margins: 12; spacing: 10
-     RowLayout { Layout.fillWidth: true; Text { text: "МОЇ КАМЕРИ"; color: muted; font.bold: true; font.pixelSize: 11 } Item { Layout.fillWidth: true } Text { text: devicesModel.count; color: muted } }
+     RowLayout { Layout.fillWidth: true; Text { text: "МОЇ ПРИСТРОЇ"; color: muted; font.bold: true; font.pixelSize: 11 } Item { Layout.fillWidth: true } Text { text: devicesModel.count; color: muted } }
      ListView {
       id: savedList; Layout.fillWidth: true; Layout.fillHeight: true; spacing: 7; clip: true; model: devicesModel.items
+      section.property: "deviceGroupLabel"; section.criteria: ViewSection.FullString
+      section.delegate: Text { required property string section; width: savedList.width; height: 24; verticalAlignment: Text.AlignVCenter; text: section; color: muted; font.bold: true; font.pixelSize: 11 }
       delegate: Rectangle {
        required property var modelData
-       width: savedList.width; height: 72; radius: 12
+       width: savedList.width; height: 98; radius: 12
        color: selectedSaved && selectedSaved.id === modelData.id ? raised : "transparent"
        border.color: modelData.active ? accent : "transparent"
        MouseArea { anchors.fill: parent; onClicked: selectedSaved = modelData }
-       Column { anchors.fill: parent; anchors.margins: 10; spacing: 4; Text { text: modelData.name; color: fg; font.bold: true } Text { text: modelData.host; color: muted; font.pixelSize: 12 } Text { text: modelData.openipcIdentity.verified ? "● OpenIPC підтверджено" : "○ Ідентичність не підтверджена"; color: modelData.openipcIdentity.verified ? accent : muted; font.pixelSize: 11 } }
+       Column { anchors.fill: parent; anchors.margins: 8; spacing: 2; Text { text: modelData.name; color: fg; font.bold: true; elide: Text.ElideRight; width: parent.width } Text { text: modelData.deviceTypeLabel + " · " + modelData.host; color: muted; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width } Text { text: savedStateText(modelData); color: modelData.onboardingState === "ready" ? (modelData.health === "problem" ? danger : accent) : amber; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width } Text { text: "Версія: " + modelData.versionLabel; color: muted; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width } Text { text: "Останній зв’язок: " + lastActivity(modelData.lastObservedAt); color: muted; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width } }
       }
      }
-     RowLayout { Layout.fillWidth: true; Button { text: "Зробити активною"; Layout.fillWidth: true; enabled: selectedSaved !== null; onClicked: root.activateDevice(selectedSaved.id); HoverHint { text: "Вибрати цю камеру як активну для FPV та сервісних функцій." } } Button { text: "⋯"; enabled: selectedSaved !== null; onClicked: savedDetails.open(); HoverHint { text: "Показати збережені відомості про камеру." } } }
+     RowLayout { Layout.fillWidth: true; Button { text: "Зробити активною"; Layout.fillWidth: true; enabled: selectedSaved !== null && selectedSaved.onboardingState === "ready"; onClicked: root.activateDevice(selectedSaved.id); HoverHint { text: "Вибрати лише перевірену камеру як активну для FPV." } } Button { text: "⋯"; enabled: selectedSaved !== null; onClicked: savedDetails.open(); HoverHint { text: "Показати збережені відомості про камеру." } } }
     }
    }
    Item { SplitView.preferredWidth: 12 }
@@ -76,17 +83,30 @@ Item {
        width: foundList.width; height: 78; radius: 13
        color: selectedFound && selectedFound.host === modelData.host ? raised : "#0a141f"
        MouseArea { anchors.fill: parent; onClicked: root.selectFound(modelData) }
-       RowLayout { anchors.fill: parent; anchors.margins: 12; Text { text: modelData.name + "  ·  " + modelData.host; color: fg; Layout.fillWidth: true } Text { text: modelData.openipc ? "OpenIPC підтверджено" : (modelData.authRequired ? "Потрібен логін" : "Кандидат"); color: modelData.openipc ? accent : muted } }
+       RowLayout { anchors.fill: parent; anchors.margins: 12; Text { text: modelData.name + "  ·  " + modelData.host; color: fg; Layout.fillWidth: true } Text { text: root.readiness(modelData).ready ? (root.readySaved(modelData) ? "Готова · додана" : "Готова") : (root.readiness(modelData).stageable ? root.readiness(modelData).reason : (modelData.authRequired ? "Потрібен логін" : "Кандидат")); color: root.readiness(modelData).ready ? accent : muted; elide: Text.ElideRight; Layout.maximumWidth: 260 } }
       }
      }
      ColumnLayout { visible: devicesModel.discovered.length === 0 && !devicesModel.scanning; Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter; Text { text: "Нічого не знайдено"; color: fg; font.pixelSize: 18; font.bold: true } Text { text: "Запустіть пошук або вкажіть IP камери"; color: muted } }
      RowLayout {
       Layout.fillWidth: true
       Button {
-       text: "Додати камеру"; font.bold: true; enabled: selectedFound !== null
-       onClicked: { if (selectedFound.openipc && selectedFound.identityVerified) { var id = devicesModel.addDiscovered(selectedFound.host, selectedFound.name, true); if (id !== "") { selectedSaved = null; selectedFound = null } } else { root.authHost = selectedFound.host; root.authName = selectedFound.name; authPopup.open() } }
-       HoverHint { text: "Додати підтверджену камеру або запросити доступ для перевірки." }
+        text: selectedFound === null ? "Перевірити камеру" : (root.readiness(selectedFound).ready ? (root.readySaved(selectedFound) ? "Вже на головному екрані" : "Додати на головний екран") : (root.readiness(selectedFound).stageable ? (root.readiness(selectedFound).state === "pending-firmware" ? "Підготувати прошивку" : "Зберегти для перевірки") : "Перевірити доступ"))
+        font.bold: true
+        enabled: selectedFound !== null && ((root.readiness(selectedFound).ready && !root.readySaved(selectedFound)) || root.readiness(selectedFound).stageable || (!selectedFound.openipc || !selectedFound.identityVerified))
+        onClicked: {
+         var state = root.readiness(selectedFound)
+         if (state.ready) {
+          var id = devicesModel.addDiscovered(selectedFound.host, selectedFound.name, true)
+          if (id !== "") { selectedSaved = null; selectedFound = null }
+         } else if (state.stageable) {
+          devicesModel.stageDiscovered(selectedFound.host)
+         } else {
+          root.authHost = selectedFound.host; root.authName = selectedFound.name; authPopup.open()
+         }
+        }
+        HoverHint { text: selectedFound !== null && !root.readiness(selectedFound).stageable && selectedFound.openipc ? root.readiness(selectedFound).reason : "Прошивка та відео мають бути підтверджені до появи камери на головному екрані." }
       }
+       Text { visible: selectedFound !== null && selectedFound.openipc && selectedFound.identityVerified && !root.readiness(selectedFound).stageable; text: root.readiness(selectedFound).reason; color: muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
       Button { text: "Відомості"; flat: true; enabled: selectedFound !== null; onClicked: detailsPopup.open(); HoverHint { text: "Показати спостережену ідентичність та технічні відомості." } }
       Item { Layout.fillWidth: true }
      }
@@ -112,15 +132,15 @@ Item {
    Text { visible: !devicesModel.manualBusy && devicesModel.manualMessage !== ""; text: devicesModel.manualMessage; color: devicesModel.manualStatus === "added" || devicesModel.manualStatus === "verified" ? accent : muted; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.bold: true }
    Text { visible: devicesModel.manualError !== ""; text: devicesModel.manualError; color: danger; wrapMode: Text.WordWrap; Layout.fillWidth: true }
    Rectangle { visible: devicesModel.manualStatus === "verified" && manualPopup.verifiedHost !== "" && manualIp.text.trim() === manualPopup.verifiedHost && devicesModel.manualResult.openipc === true && devicesModel.manualResult.identityVerified === true; Layout.fillWidth: true; height: 104; radius: 12; color: "#15392f"; Column { anchors.fill: parent; anchors.margins: 10; spacing: 4; Text { text: "OpenIPC підтверджено"; color: accent; font.bold: true } Text { text: "Платформа / SoC: " + value(devicesModel.manualResult.identity.platform) + " / " + value(devicesModel.manualResult.identity.soc); color: fg } Text { text: "Сенсор: " + value(devicesModel.manualResult.identity.sensor); color: fg } Text { text: "Прошивка: " + value(devicesModel.manualResult.identity.firmware); color: fg } } }
-   Rectangle { visible: devicesModel.manualStatus === "added" && manualPopup.addedHost !== ""; Layout.fillWidth: true; height: 48; radius: 12; color: "#15392f"; Text { anchors.centerIn: parent; text: "Камеру " + manualPopup.addedHost + " додано до Моїх камер"; color: accent; font.bold: true } }
+   Rectangle { visible: devicesModel.manualStatus === "added" && manualPopup.addedHost !== ""; Layout.fillWidth: true; height: 48; radius: 12; color: "#15392f"; Text { anchors.centerIn: parent; text: "Камеру " + manualPopup.addedHost + " додано на головний екран"; color: accent; font.bold: true } }
    RowLayout {
     Layout.fillWidth: true
     Button { text: devicesModel.manualBusy ? "Перевірка…" : "Перевірити"; enabled: !devicesModel.manualBusy; onClicked: devicesModel.inspectManualIp(manualIp.text); HoverHint { text: "Перевірити доступність, OpenIPC та спостережену ідентичність камери." } }
     Button {
-     text: devicesModel.manualStatus === "added" ? "Додано" : "Додати"
+     text: devicesModel.manualStatus === "added" ? "Додано" : (devicesModel.manualStatus === "staged" ? "На перевірці" : "Перевірити готовність")
      enabled: !devicesModel.manualBusy && devicesModel.manualStatus === "verified" && manualPopup.verifiedHost !== "" && manualIp.text.trim() === manualPopup.verifiedHost && devicesModel.manualResult.camera === true && devicesModel.manualResult.openipc === true && devicesModel.manualResult.identityVerified === true
      onClicked: { var id = devicesModel.addDiscovered(manualPopup.verifiedHost, "OpenIPC " + manualPopup.verifiedHost, true); if (id !== "") { selectedSaved = null; manualPopup.addedHost = manualPopup.verifiedHost } }
-     HoverHint { text: "Зберегти лише поточну підтверджену OpenIPC-камеру." }
+     HoverHint { text: "Головний екран покаже камеру лише після підтвердження сумісної прошивки та відеопотоку." }
     }
     Item { Layout.fillWidth: true }
     Button { text: "Закрити"; flat: true; onClicked: manualPopup.close() }
@@ -176,6 +196,7 @@ Item {
    width: parent.width; spacing: 9
    Text { text: selectedSaved ? selectedSaved.name : "Камера"; color: fg; font.pixelSize: 21; font.bold: true }
    Text { text: selectedSaved ? selectedSaved.host : ""; color: muted }
+   Text { visible: selectedSaved && selectedSaved.onboardingState !== "ready"; text: selectedSaved ? root.savedStateText(selectedSaved) : ""; color: amber; wrapMode: Text.WordWrap; Layout.fillWidth: true }
    Text { text: selectedSaved && selectedSaved.openipcIdentity.verified ? "OpenIPC підтверджено" : "OpenIPC не підтверджено"; color: selectedSaved && selectedSaved.openipcIdentity.verified ? accent : muted }
    Text { visible: selectedSaved && selectedSaved.openipcIdentity.verified; text: "Платформа / SoC  " + value(selectedSaved ? selectedSaved.openipcIdentity.platform : "") + " / " + value(selectedSaved ? selectedSaved.openipcIdentity.soc : ""); color: fg }
    Text { visible: selectedSaved && selectedSaved.openipcIdentity.verified; text: "Сенсор  " + value(selectedSaved ? selectedSaved.openipcIdentity.sensor : ""); color: fg }
