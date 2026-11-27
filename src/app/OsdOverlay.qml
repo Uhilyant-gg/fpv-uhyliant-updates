@@ -23,12 +23,14 @@ Item {
  }
  function telemetryText(field, value, suffix, digits) {
   if (telemetry.connected !== true) return "—"
+  if ((telemetry.freshness || {})[field] === false) return "застаріло"
   if (value === undefined || value === null || value === "") return telemetryUnavailable(field)
   return valueText(value, suffix, digits)
  }
  function optionalTelemetryText(field, value, suffix, digits) {
+  if (telemetry.connected !== true) return ""
   if (value === undefined || value === null || value === "") {
-   return telemetry.connected === true && telemetryUnavailable(field) === "застаріло" ? " · застаріло" : ""
+   return telemetryUnavailable(field) === "застаріло" ? " · застаріло" : ""
   }
   return " · " + telemetryText(field, value, suffix, digits)
  }
@@ -45,11 +47,12 @@ Item {
  }
  function gpsFixDisplay() {
   if (telemetry.connected !== true) return "—"
+  if ((telemetry.freshness || {}).gpsFix === false) return "застаріло"
   if (telemetry.gpsFix === undefined || telemetry.gpsFix === null || telemetry.gpsFix === "") return telemetryUnavailable("gpsFix")
   return gpsFixText(telemetry.gpsFix)
  }
  function linkLabel() {
-  if (telemetry.connected === true) return "Телеметрія: актуальна"
+  if (telemetry.connected === true) return "Телеметрія: зв’язок є"
   if (telemetry.connected === false) return "Телеметрія: немає зв’язку"
   return "Телеметрія: не підтверджена"
  }
@@ -80,7 +83,7 @@ Item {
     font.bold: true
    }
    Text {
-    text: "ARM: " + (telemetry.connected !== true || telemetry.armed === null || telemetry.armed === undefined ? "—" : (telemetry.armed ? "активний" : "вимкнений"))
+    text: "ARM: " + (telemetry.connected !== true ? "—" : ((telemetry.freshness || {}).armed === false ? "застаріло" : (telemetry.armed === null || telemetry.armed === undefined ? "—" : (telemetry.armed ? "активний" : "вимкнений"))))
     color: root.foreground
     font.pixelSize: 11 * root.scaleFactor
     font.bold: true

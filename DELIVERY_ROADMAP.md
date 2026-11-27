@@ -133,7 +133,7 @@ Requirements:
 ### P0.10 Layered OSD with flight-controller passthrough
 Complete the station OSD so it remains glanceable and useful without hiding or replacing the OSD already present in the aircraft's incoming video.
 
-**Implemented foundation (repository software):** users can persistently toggle and configure a compact station overlay, adjust its background opacity and text size, choose one of four screen corners, reset to defaults, and preview its layout from Home or Service mode. The overlay presents available telemetry and video state, distinguishes expired field data ("застаріло") from unavailable values for MAVLink, MSP and CRSF, follows detached streams, and leaves incoming video unchanged. Per-field source/timestamp presentation, adaptive per-vehicle profiles, and real-video readability validation remain incomplete.
+**Implemented foundation (repository software):** users can persistently toggle and configure a compact station overlay, adjust its background opacity and text size, choose one of four screen corners, reset to defaults, and preview its layout from Home or Service mode. The overlay presents available telemetry and video state, distinguishes expired field data ("застаріло") from unavailable values for MAVLink, MSP and CRSF, follows detached streams, and leaves incoming video unchanged. MAVLink tracks each field separately, and serial providers notify the UI as data expires even without new packets. Per-field source/timestamp presentation, adaptive per-vehicle profiles, and real-video readability validation remain incomplete.
 
 Requirements:
 - preserve the source video and its existing OSD by default;

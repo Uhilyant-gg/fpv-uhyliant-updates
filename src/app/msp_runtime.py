@@ -2,7 +2,7 @@
 from __future__ import annotations
 import struct,time
 from dataclasses import dataclass
-from PySide6.QtCore import QObject,Property,Signal,Slot
+from PySide6.QtCore import QCoreApplication,QObject,Property,QTimer,Signal,Slot
 MSP_API_VERSION=1;MSP_FC_VARIANT=2;MSP_FC_VERSION=3;MSP_STATUS=101;MSP_RAW_GPS=106;MSP_ATTITUDE=108;MSP_ALTITUDE=109;MSP_ANALOG=110
 READ_ONLY_COMMANDS=(MSP_API_VERSION,MSP_FC_VARIANT,MSP_FC_VERSION,MSP_STATUS,MSP_RAW_GPS,MSP_ATTITUDE,MSP_ALTITUDE,MSP_ANALOG)
 def crc8_dvb_s2(data):
@@ -59,10 +59,11 @@ class MspParser:
   return MspFrame(2,direction,command,payload)
 class MspRuntime(QObject):
  changed=Signal();STALE_SECONDS=3.0
- def __init__(self,clock=time.monotonic):super().__init__();self._clock=clock;self._parser=MspParser();self._values={};self._updated={};self._last_frame=0.0;self._error='';self._fc_variant='';self._fc_version='';self._api_version=''
+ def __init__(self,clock=time.monotonic):
+  super().__init__();self._clock=clock;self._parser=MspParser();self._values={};self._updated={};self._last_frame=None;self._error='';self._fc_variant='';self._fc_version='';self._api_version='';self._expiry_timer=QTimer(self);self._expiry_timer.setInterval(250);self._expiry_timer.timeout.connect(self._refresh_freshness)
  @Property('QVariantMap',notify=changed)
  def telemetry(self):
-  now=self._clock();observed=self._last_frame>0;fresh=observed and now-self._last_frame<=self.STALE_SECONDS;data={k:v for k,v in self._values.items() if now-self._updated.get(k,0)<=self.STALE_SECONDS}
+  now=self._clock();observed=self._last_frame is not None;fresh=observed and now-self._last_frame<=self.STALE_SECONDS;data={k:v for k,v in self._values.items() if now-self._updated.get(k,0)<=self.STALE_SECONDS}
   data.update({'connected':True if fresh else (False if observed else None),'armed':None,'flightMode':None,'health':'ok' if fresh else ('stale' if observed else None),'ages':{k:round(now-v,3) for k,v in self._updated.items()},'freshness':{k:now-stamp<=self.STALE_SECONDS for k,stamp in self._updated.items()},'link':{'protocol':'MSP','fcVariant':self._fc_variant or None,'fcVersion':self._fc_version or None,'apiVersion':self._api_version or None,'frames':self._parser.frames,'checksumErrors':self._parser.checksum_errors}});return data
  @Property(str,notify=changed)
  def error(self):return self._error
@@ -73,7 +74,12 @@ class MspRuntime(QObject):
    self._last_frame=self._clock();changed=True
    if frame.direction=='!':self._error=f'MSP: відповідь із помилкою для команди {frame.command}'
    else:self._decode(frame.command,frame.payload);self._error=''
-  if changed:self.changed.emit()
+  if changed:
+   if QCoreApplication.instance() is not None and not self._expiry_timer.isActive():self._expiry_timer.start()
+   self.changed.emit()
+ def _refresh_freshness(self):
+  if self._last_frame is None or self._clock()-self._last_frame>self.STALE_SECONDS:self._expiry_timer.stop()
+  self.changed.emit()
  def _set(self,values):stamp=self._clock();self._values.update(values);self._updated.update({k:stamp for k in values})
  def _decode(self,command,payload):
   if command==MSP_API_VERSION and len(payload)>=3:self._api_version=f'{payload[1]}.{payload[2]}'
