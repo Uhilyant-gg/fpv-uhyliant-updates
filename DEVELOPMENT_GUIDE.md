@@ -1,6 +1,6 @@
 # FPV Uhyliant development guide
 
-Read this file, `PROJECT_STATE.md`, `PRODUCT_UX.md`, `DELIVERY_ROADMAP.md` and `AUTONOMOUS_DEVELOPMENT.md` from current `main` before development. `main` is the single source of truth.
+Read this file, `PROJECT_STATE.md`, `PRODUCT_UX.md`, and `DELIVERY_ROADMAP.md` from current `main` before development. `main` is the single source of truth.
 
 ## Invariants
 Windows ground station: Python + PySide6 + Qt Quick/QML. FPV remains video-first. Unknown telemetry stays unavailable. Cameras, vehicles/flight controllers and operator RC controllers are distinct physical identities composed in the FPV workspace. Camera presets, video profiles and firmware remain separate. Generic ONVIF is not verified OpenIPC. Recovery/fullflash is not a generic install path. Secrets/private signing keys are not repository data. Cloud metadata is not fresh local hardware evidence. AI output is advisory rather than operational authority.
@@ -45,7 +45,7 @@ A completed SSH/sysupgrade invocation is only `reboot-pending`. Success requires
 Normalized telemetry is tri-state and fallback synthesizes no values. Video runtimes remain isolated and prepared snapshots fail closed after input changes. Pairing secrets and metadata remain separated. Camera presets remain separate from video profiles and require post-apply observation.
 
 ## Workflow
-Inspect actual `main` and all canonical documents before material product work. `DELIVERY_ROADMAP.md` defines delivery order, dependencies, stories and acceptance criteria. `AUTONOMOUS_DEVELOPMENT.md` defines autonomous work selection, stop conditions, branch/PR behavior, CI repair and the Project Doctor interface.
+Inspect actual `main` and all canonical documents before material product work. `DELIVERY_ROADMAP.md` defines delivery order, dependencies, stories and acceptance criteria. Work happens in small reviewable pull requests that must pass CI (`verify`, `scenario-ci`, `packaged-first-run`) before merge; `python tools/project_doctor.py` runs the same repository checks locally.
 
 ## Local project bootstrap
 On a fresh Windows workstation, run `BOOTSTRAP.bat` from the repository root. It prepares `.venv`, installs declared dependencies and performs a bounded QML launch smoke check. The command requires Python 3.10-3.13; otherwise it stops with a clear installation prerequisite instead of creating an incompatible environment. The command reports machine-readable stages with `python tools/project_bootstrap.py --json` for automation and a short human-readable result by default.
