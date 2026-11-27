@@ -17,6 +17,7 @@ Never treat software CI as physical hardware evidence. Never allow a deferred ph
 - E0 real OpenIPC Hardware E2E remains physically incomplete.
 - E8 controller calibration/mapping/profile core exists, but controller discovery, live acquisition, durable persistence and onboarding remain incomplete.
 - The largest product risk is the absence of one evidenced integrated first-run journey that proves the user can launch, understand state, see devices and receive a useful next action without documentation or configuration editing.
+- The latest local first-run report is rejected: only launch evidence is present, restore and later stages are missing, and health is unknown. A full desktop startup run is still required before claiming acceptance.
 
 ## Canonical capability status
 These headings are retained as the machine-validated capability contract.
