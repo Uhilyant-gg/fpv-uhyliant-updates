@@ -6,6 +6,51 @@ import unittest
 
 
 class OsdFreshnessQmlTests(unittest.TestCase):
+    def test_layout_diagnostics_remain_inside_safe_area_across_viewport_shapes(self):
+        script = """
+import sys
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QGuiApplication
+from PySide6.QtQml import QQmlComponent, QQmlEngine
+from PySide6.QtQuick import QQuickWindow
+app = QGuiApplication([])
+engine = QQmlEngine()
+component = QQmlComponent(engine, QUrl.fromLocalFile(sys.argv[1]))
+overlay = component.create()
+if overlay is None:
+    raise RuntimeError([error.toString() for error in component.errors()])
+window = QQuickWindow()
+overlay.setParentItem(window.contentItem())
+overlay.setProperty('editing', True)
+overlay.setProperty('enabledElements', {'homeDistance': True})
+window.show()
+for width, height in ((1280, 720), (1024, 768), (600, 600), (480, 854)):
+    window.resize(width, height)
+    overlay.setWidth(width); overlay.setHeight(height)
+    app.processEvents()
+    overlay.refreshLayoutIssues()
+    assert overlay.property('layoutIssues').toVariant() == [], (width, height, overlay.property('layoutIssues').toVariant())
+    for name in ('osd-link', 'osd-battery', 'osd-homeDistance'):
+        item = next((child for child in overlay.childItems() if child.objectName() == name), None)
+        assert item is not None, name
+        assert item.x() >= overlay.property('safeMarginX'), (width, height, name, item.x())
+        assert item.y() >= overlay.property('safeMarginY'), (width, height, name, item.y())
+overlay.setProperty('positions', {'link': [25, 25], 'battery': [25, 25]})
+app.processEvents()
+overlay.refreshLayoutIssues()
+issues = overlay.property('layoutIssues').toVariant()
+assert any(issue.get('kind') == 'overlap' and {issue.get('first'), issue.get('second')} == {'link', 'battery'} for issue in issues), issues
+overlay.setProperty('positions', {'link': [0, 0]})
+app.processEvents()
+overlay.refreshLayoutIssues()
+issues = overlay.property('layoutIssues').toVariant()
+assert any(issue.get('kind') == 'safe-area' and issue.get('name') == 'link' for issue in issues), issues
+"""
+        env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+        path = str(Path(__file__).with_name("OsdOverlay.qml").resolve())
+        result = subprocess.run([sys.executable, "-c", script, path], capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_dragging_snaps_and_restores_position_after_resize(self):
         script = """
 import sys
@@ -32,7 +77,7 @@ overlay.positionChanged.connect(persist)
 window.show(); app.processEvents()
 tile = next((child for child in overlay.childItems() if child.objectName() == 'osd-link'), None)
 assert tile is not None
-QTest.mousePress(window, Qt.LeftButton, Qt.NoModifier, QPoint(10, 10))
+QTest.mousePress(window, Qt.LeftButton, Qt.NoModifier, QPoint(round(tile.x() + 8), round(tile.y() + 8)))
 QTest.mouseMove(window, QPoint(310, 260), 50)
 app.processEvents()
 assert abs(tile.x() / (overlay.width() / 20) - round(tile.x() / (overlay.width() / 20))) < 0.01, tile.x()

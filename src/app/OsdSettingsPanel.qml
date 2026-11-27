@@ -19,6 +19,19 @@ Item {
   {name:"reticle", label:"Приціл"},
   {name:"horizon", label:"Штучний горизонт"}
  ]
+ property var aspectRatios: [16 / 9, 4 / 3, 1, 9 / 16]
+
+ function elementLabel(name) {
+  for (var i = 0; i < elementOptions.length; i++) {
+   if (elementOptions[i].name === name) return elementOptions[i].label
+  }
+  return name
+ }
+
+ function layoutIssueText(issue) {
+  if (issue.kind === "safe-area") return elementLabel(issue.name) + " виходить за безпечну область"
+  return elementLabel(issue.first) + " перекриває " + elementLabel(issue.second)
+ }
 
  Rectangle {
   anchors.fill: parent
@@ -113,39 +126,81 @@ Item {
     Layout.fillHeight: true
     spacing: 6
     Text { text: "Попередній перегляд · екран польоту"; color: "#dce6f2"; font.bold: true }
-    Rectangle {
-     id: preview
+     RowLayout {
      Layout.fillWidth: true
-     Layout.fillHeight: true
-     Layout.minimumHeight: 150
-     gradient: Gradient {
-      GradientStop { position: 0; color: "#355d78" }
-      GradientStop { position: 0.55; color: "#9db4b1" }
-      GradientStop { position: 0.56; color: "#465c45" }
-      GradientStop { position: 1; color: "#182b23" }
+      Text { text: "Формат перевірки"; color: "#dce6f2" }
+      ComboBox {
+       id: aspectSelector
+       objectName: "osdPreviewAspectSelector"
+       model: ["Широкий 16:9", "Класичний 4:3", "Квадрат 1:1", "Вертикальний 9:16"]
      }
-     border.color: "#273d55"
-     clip: true
-     Repeater {
-      model: 19
-      Rectangle { required property int index; x: preview.width * (index + 1) / 20; height: preview.height; width: 1; color: "#55ffffff" }
+      Item { Layout.fillWidth: true }
      }
-     Repeater {
-      model: 19
-      Rectangle { required property int index; y: preview.height * (index + 1) / 20; width: preview.width; height: 1; color: "#55ffffff" }
+     Item {
+      id: previewHost
+      objectName: "osdPreviewHost"
+      Layout.fillWidth: true
+      Layout.fillHeight: true
+      Layout.minimumHeight: 150
+
+      Rectangle {
+       id: preview
+       objectName: "osdPreviewViewport"
+       property real aspectRatio: root.aspectRatios[aspectSelector.currentIndex]
+       width: Math.min(previewHost.width, previewHost.height * aspectRatio)
+       height: Math.min(previewHost.height, previewHost.width / aspectRatio)
+       anchors.centerIn: parent
+       gradient: Gradient {
+        GradientStop { position: 0; color: "#355d78" }
+        GradientStop { position: 0.55; color: "#9db4b1" }
+        GradientStop { position: 0.56; color: "#465c45" }
+        GradientStop { position: 1; color: "#182b23" }
+       }
+       border.color: "#273d55"
+       clip: true
+       Repeater {
+        model: 19
+        Rectangle { required property int index; x: preview.width * (index + 1) / 20; height: preview.height; width: 1; color: "#55ffffff" }
+       }
+       Repeater {
+        model: 19
+        Rectangle { required property int index; y: preview.height * (index + 1) / 20; width: preview.width; height: 1; color: "#55ffffff" }
+       }
+       Rectangle {
+        anchors.fill: parent
+        anchors.margins: Math.min(preview.width * 0.04, 24 * station.osdScale)
+        color: "transparent"
+        border.color: "#a9e3f2"
+        border.width: 1
+        z: 1
+       }
+       OsdOverlay {
+        id: previewOsd
+        objectName: "osdPreviewOverlay"
+        anchors.fill: parent
+        editing: true
+        positions: station.osdElements
+        enabledElements: station.osdEnabledElements
+        corner: station.osdPosition
+        telemetry: ({connected:true, provider:"MAVLink", armed:false, flightMode:"STABILIZE", batteryVoltage:15.8, batteryRemaining:82, gpsFix:3, satellites:12, altitude:124, groundSpeed:12.4, heading:348, roll:7, pitch:-3, yaw:348, homeDistance:86})
+        video: ({streamId:"simulation", state:"playing"})
+        opacityValue: station.osdOpacity
+        scaleFactor: station.osdScale
+        onPositionChanged: function(name, x, y) { station.setOSDElementPosition(name, x, y) }
+       }
      }
-     OsdOverlay {
-      anchors.fill: parent
-      editing: true
-      positions: station.osdElements
-      enabledElements: station.osdEnabledElements
-      corner: station.osdPosition
-      telemetry: ({connected:true, provider:"MAVLink", armed:false, flightMode:"STABILIZE", batteryVoltage:15.8, batteryRemaining:82, gpsFix:3, satellites:12, altitude:124, groundSpeed:12.4, heading:348, roll:7, pitch:-3, yaw:348, homeDistance:86})
-      video: ({streamId:"simulation", state:"playing"})
-      opacityValue: station.osdOpacity
-      scaleFactor: station.osdScale
-      onPositionChanged: function(name, x, y) { station.setOSDElementPosition(name, x, y) }
      }
+     Text {
+      objectName: "osd-layout-warning"
+      visible: previewOsd.layoutIssues.length > 0
+      text: {
+       var messages = []
+       for (var i = 0; i < previewOsd.layoutIssues.length; i++) messages.push(root.layoutIssueText(previewOsd.layoutIssues[i]))
+       return messages.join(" · ") + ". Перетягніть позначені елементи по сітці. Розташування не змінюється автоматично."
+      }
+      color: "#ffcf70"
+      wrapMode: Text.WordWrap
+      Layout.fillWidth: true
     }
    }
   }

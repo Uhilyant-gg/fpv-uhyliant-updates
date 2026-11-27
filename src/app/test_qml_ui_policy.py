@@ -58,6 +58,15 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
         self.assertIn('"застаріло"', source)
         self.assertIn("optionalTelemetryText", source)
 
+    def test_osd_preview_can_check_common_aspect_ratios_and_explains_layout_issues(self):
+        source = self.qml["OsdSettingsPanel.qml"]
+        for label in ("Широкий 16:9", "Класичний 4:3", "Квадрат 1:1", "Вертикальний 9:16"):
+            self.assertIn(label, source)
+        self.assertIn("previewHost.height * aspectRatio", source)
+        self.assertIn("previewHost.width / aspectRatio", source)
+        self.assertIn("Перетягніть позначені елементи по сітці", source)
+        self.assertIn("Розташування не змінюється автоматично", source)
+
     def test_shared_hover_hint_contract_is_five_seconds(self):
         hint = self.qml["HoverHint.qml"]
         self.assertIn("property int delay:5000", hint)
