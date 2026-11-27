@@ -5,10 +5,15 @@ import unittest
 
 class QmlUiPolicyAuditTests(unittest.TestCase):
     def setUp(self):
-        self.qml = {path.name: path.read_text(encoding="utf-8") for path in Path(__file__).parent.glob("*.qml")}
+        self.qml = {
+            path.name: path.read_text(encoding="utf-8")
+            for path in Path(__file__).parent.glob("*.qml")
+        }
 
     def visible_literals(self, source):
-        return "\n".join(re.findall(r'(?:text|placeholderText|title)\s*:\s*"([^"]*)"', source))
+        return "\n".join(
+            re.findall(r'(?:text|placeholderText|title)\s*:\s*"([^"]*)"', source)
+        )
 
     def test_all_expected_qml_surfaces_are_audited(self):
         self.assertEqual(
@@ -29,32 +34,12 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
 
     def test_visible_ui_does_not_restore_known_english_copy(self):
         obsolete = (
-            "SERVICE MODE",
-            "VIDEO WORKSPACE",
-            "Primary",
-            "Secondary",
-            "Swap",
-            "Firmware",
-            "Telemetry:",
-            "Network:",
-            "IDENTITY",
-            "System / Component",
-            "Vehicle",
-            "System state",
-            "LINK DIAGNOSTICS",
-            "Health",
-            "Message rate",
-            "Last packet",
-            "Estimated lost",
-            "Bad data",
-            "Comm errors",
-            "Controller load",
-            "not broadcast",
-            "Manifest",
-            "Expected SHA-256",
-            "Camera preset",
-            "video profile",
-            "hardware apply",
+            "SERVICE MODE", "VIDEO WORKSPACE", "Primary", "Secondary", "Swap",
+            "Firmware", "Telemetry:", "Network:", "IDENTITY", "System / Component",
+            "Vehicle", "System state", "LINK DIAGNOSTICS", "Health", "Message rate",
+            "Last packet", "Estimated lost", "Bad data", "Comm errors",
+            "Controller load", "not broadcast", "Manifest", "Expected SHA-256",
+            "Camera preset", "video profile", "hardware apply",
         )
         for name, source in self.qml.items():
             visible = self.visible_literals(source)

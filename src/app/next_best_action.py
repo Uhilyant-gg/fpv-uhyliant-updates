@@ -3,7 +3,6 @@
 The selector only chooses actions explicitly exposed by component safeActions.
 It never upgrades health, invents evidence, or authorizes an operation.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,5 +1,4 @@
 """Deterministic scenario/recovery helpers for the side-effect-free E6 simulator."""
-
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -11,28 +10,10 @@ from hardware_simulator import VirtualDeviceState, simulate
 def select_device(devices: Iterable[VirtualDeviceState]) -> dict[str, Any]:
     candidates = list(devices)
     if not candidates:
-        return {
-            "status": "unknown",
-            "reasonCode": "no-simulated-device",
-            "selectedDeviceId": None,
-            "evidenceKind": "simulation",
-            "physicalEvidenceComplete": False,
-        }
+        return {"status": "unknown", "reasonCode": "no-simulated-device", "selectedDeviceId": None, "evidenceKind": "simulation", "physicalEvidenceComplete": False}
     if len(candidates) != 1:
-        return {
-            "status": "unknown",
-            "reasonCode": "simulated-device-ambiguous",
-            "selectedDeviceId": None,
-            "evidenceKind": "simulation",
-            "physicalEvidenceComplete": False,
-        }
-    return {
-        "status": "ready",
-        "reasonCode": "single-simulated-device",
-        "selectedDeviceId": candidates[0].device_id,
-        "evidenceKind": "simulation",
-        "physicalEvidenceComplete": False,
-    }
+        return {"status": "unknown", "reasonCode": "simulated-device-ambiguous", "selectedDeviceId": None, "evidenceKind": "simulation", "physicalEvidenceComplete": False}
+    return {"status": "ready", "reasonCode": "single-simulated-device", "selectedDeviceId": candidates[0].device_id, "evidenceKind": "simulation", "physicalEvidenceComplete": False}
 
 
 def retry_update(state: VirtualDeviceState, retry_count: int, retry_budget: int) -> dict[str, Any]:
@@ -60,53 +41,18 @@ def replay(initial: VirtualDeviceState, events: Iterable[Mapping[str, Any]]) -> 
             result = simulate(state, event)
         trace.append({"index": index, "reasonCode": result["reasonCode"], "status": result["status"]})
         state = VirtualDeviceState(**result["state"])
-        if result["status"] == "problem" or result["reasonCode"] in {
-            "unsupported-simulator-event",
-            "malformed-scenario-event",
-        }:
+        if result["status"] == "problem" or result["reasonCode"] in {"unsupported-simulator-event", "malformed-scenario-event"}:
             return {**result, "trace": trace, "stoppedAt": index}
-    return {
-        "status": "ready" if state.evidence_fresh else "unknown",
-        "reasonCode": "scenario-complete",
-        "state": asdict(state),
-        "trace": trace,
-        "stoppedAt": None,
-        "evidenceKind": "simulation",
-        "physicalEvidenceComplete": False,
-    }
+    return {"status": "ready" if state.evidence_fresh else "unknown", "reasonCode": "scenario-complete", "state": asdict(state), "trace": trace, "stoppedAt": None, "evidenceKind": "simulation", "physicalEvidenceComplete": False}
 
 
 def validate_state(state: Any) -> dict[str, Any]:
     if not isinstance(state, VirtualDeviceState):
-        return {
-            "status": "unknown",
-            "reasonCode": "malformed-virtual-state",
-            "evidenceKind": "simulation",
-            "physicalEvidenceComplete": False,
-        }
-    if (
-        not state.device_id
-        or state.rebooting
-        and not state.reachable
-        and state.update_active
-        or state.update_active
-        and state.update_failed
-    ):
+        return {"status": "unknown", "reasonCode": "malformed-virtual-state", "evidenceKind": "simulation", "physicalEvidenceComplete": False}
+    if not state.device_id or state.rebooting and not state.reachable and state.update_active or state.update_active and state.update_failed:
         return _invalid(state, "contradictory-virtual-state")
-    return {
-        "status": "ready",
-        "reasonCode": "virtual-state-valid",
-        "state": asdict(state),
-        "evidenceKind": "simulation",
-        "physicalEvidenceComplete": False,
-    }
+    return {"status": "ready", "reasonCode": "virtual-state-valid", "state": asdict(state), "evidenceKind": "simulation", "physicalEvidenceComplete": False}
 
 
 def _invalid(state: VirtualDeviceState, reason: str, status: str = "unknown") -> dict[str, Any]:
-    return {
-        "status": status,
-        "reasonCode": reason,
-        "state": asdict(state),
-        "evidenceKind": "simulation",
-        "physicalEvidenceComplete": False,
-    }
+    return {"status": status, "reasonCode": reason, "state": asdict(state), "evidenceKind": "simulation", "physicalEvidenceComplete": False}

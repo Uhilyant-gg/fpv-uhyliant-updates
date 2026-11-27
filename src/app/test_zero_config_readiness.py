@@ -7,9 +7,7 @@ class ZeroConfigReadinessTests(unittest.TestCase):
         self.assertEqual(zero_config_readiness(None, None)["action"], "find-camera")
 
     def test_unknown_camera_is_not_promoted(self):
-        result = zero_config_readiness(
-            {"health": "unknown", "reasonCode": "identity-unknown", "safeActions": ["identify-camera"]}, None
-        )
+        result = zero_config_readiness({"health": "unknown", "reasonCode": "identity-unknown", "safeActions": ["identify-camera"]}, None)
         self.assertEqual(result["health"], "unknown")
         self.assertEqual(result["action"], "identify-camera")
 
@@ -25,18 +23,13 @@ class ZeroConfigReadinessTests(unittest.TestCase):
         self.assertEqual(result["reasonCode"], "fresh-playback-required")
 
     def test_fresh_playback_with_unready_runtime_requires_diagnosis(self):
-        result = zero_config_readiness(
-            {"health": "ready", "safeActions": []},
-            {"primaryId": "main", "freshPlayback": True, "health": "problem", "reasonCode": "video-stalled"},
-        )
+        result = zero_config_readiness({"health": "ready", "safeActions": []}, {"primaryId": "main", "freshPlayback": True, "health": "problem", "reasonCode": "video-stalled"})
         self.assertEqual(result["stage"], "video")
         self.assertEqual(result["action"], "diagnose")
         self.assertEqual(result["reasonCode"], "video-stalled")
 
     def test_ready_camera_primary_stream_and_fresh_ready_playback_reach_operate(self):
-        result = zero_config_readiness(
-            {"health": "ready", "safeActions": []}, {"primaryId": "main", "freshPlayback": True, "health": "ready"}
-        )
+        result = zero_config_readiness({"health": "ready", "safeActions": []}, {"primaryId": "main", "freshPlayback": True, "health": "ready"})
         self.assertEqual(result["health"], "ready")
         self.assertEqual(result["stage"], "operate")
         self.assertIsNone(result["action"])

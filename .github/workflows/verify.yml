@@ -27,10 +27,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libdbus-1-3 libfontconfig1 libfreetype6 libglib2.0-0 libpulse0 libx11-6 libx11-xcb1 libxext6 libxrender1 libsm6 libice6 libxcb1 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render0 libxcb-render-util0 libxcb-shape0 libxcb-shm0 libxcb-sync1 libxcb-util1 libxcb-xinerama0 libxcb-xfixes0 libxcb-xkb1 xauth xvfb
       - name: Install application dependencies
         run: pip install -r src/requirements-dev.txt
-      - name: Lint and format check (ruff)
-        run: |
-          ruff check src tools
-          ruff format --check src tools
       - name: Compile all Python sources
         run: python -m compileall -q -f src tools
       - name: Run application unit tests

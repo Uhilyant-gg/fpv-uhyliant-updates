@@ -1,5 +1,4 @@
 """Conservative device-to-unified-health presentation adapter."""
-
 from typing import Any, Mapping
 
 from unified_health import (

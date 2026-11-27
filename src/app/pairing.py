@@ -1,307 +1,126 @@
 """Station pairing trust lifecycle with secret-store and durable metadata boundaries."""
-
-import hashlib, json, os, secrets, sys, time, uuid
+import hashlib,json,os,secrets,sys,time,uuid
 from copy import deepcopy
 from pathlib import Path
-from PySide6.QtCore import QObject, Property, Signal, Slot
-
-
-class SecretStoreUnavailable(RuntimeError):
-    pass
-
-
-class MetadataStoreUnavailable(RuntimeError):
-    pass
-
-
+from PySide6.QtCore import QObject,Property,Signal,Slot
+class SecretStoreUnavailable(RuntimeError):pass
+class MetadataStoreUnavailable(RuntimeError):pass
 class SecretStore:
-    available = False
-    error = 'Захищене системою сховище секретів недоступне'
-
-    def put(self, key, value):
-        raise SecretStoreUnavailable(self.error)
-
-    def get(self, key):
-        raise SecretStoreUnavailable(self.error)
-
-    def delete(self, key):
-        raise SecretStoreUnavailable(self.error)
-
-    def contains(self, key):
-        raise SecretStoreUnavailable(self.error)
-
-
+ available=False;error='Захищене системою сховище секретів недоступне'
+ def put(self,key,value):raise SecretStoreUnavailable(self.error)
+ def get(self,key):raise SecretStoreUnavailable(self.error)
+ def delete(self,key):raise SecretStoreUnavailable(self.error)
+ def contains(self,key):raise SecretStoreUnavailable(self.error)
 class MetadataStore:
-    available = False
-
-    def load(self):
-        raise MetadataStoreUnavailable('Сховище метаданих парування недоступне')
-
-    def save(self, records):
-        raise MetadataStoreUnavailable('Сховище метаданих парування недоступне')
-
-
+ available=False
+ def load(self):raise MetadataStoreUnavailable('Сховище метаданих парування недоступне')
+ def save(self,records):raise MetadataStoreUnavailable('Сховище метаданих парування недоступне')
 class JsonMetadataStore(MetadataStore):
-    available = True
-
-    def __init__(self, path):
-        self.path = Path(path)
-
-    def load(self):
-        if not self.path.exists():
-            return []
-        raw = json.loads(self.path.read_text(encoding='utf-8'))
-        if (
-            not isinstance(raw, dict)
-            or set(raw) != {'schema', 'version', 'records'}
-            or raw['schema'] != 'fpv-uhyliant-pairing-metadata'
-            or raw['version'] != 1
-            or not isinstance(raw['records'], list)
-        ):
-            raise MetadataStoreUnavailable('Некоректні метадані парування')
-        return [dict(r) for r in raw['records']]
-
-    def save(self, records):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {'schema': 'fpv-uhyliant-pairing-metadata', 'version': 1, 'records': [dict(r) for r in records]}
-        tmp = self.path.with_suffix(self.path.suffix + '.tmp')
-        tmp.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':')), encoding='utf-8')
-        os.replace(tmp, self.path)
-
-
+ available=True
+ def __init__(self,path):self.path=Path(path)
+ def load(self):
+  if not self.path.exists():return []
+  raw=json.loads(self.path.read_text(encoding='utf-8'))
+  if not isinstance(raw,dict) or set(raw)!={'schema','version','records'} or raw['schema']!='fpv-uhyliant-pairing-metadata' or raw['version']!=1 or not isinstance(raw['records'],list):raise MetadataStoreUnavailable('Некоректні метадані парування')
+  return [dict(r) for r in raw['records']]
+ def save(self,records):
+  self.path.parent.mkdir(parents=True,exist_ok=True);payload={'schema':'fpv-uhyliant-pairing-metadata','version':1,'records':[dict(r) for r in records]};tmp=self.path.with_suffix(self.path.suffix+'.tmp');tmp.write_text(json.dumps(payload,ensure_ascii=False,sort_keys=True,separators=(',',':')),encoding='utf-8');os.replace(tmp,self.path)
 class PairingRegistry(QObject):
-    changed = Signal()
-
-    def __init__(self, secret_store=None, metadata_store=None, clock=None):
-        super().__init__()
-        if secret_store is None and sys.platform == 'win32':
-            from windows_secret_store import WindowsCredentialSecretStore
-
-            secret_store = WindowsCredentialSecretStore()
-        self.store = secret_store or SecretStore()
-        self.metadata = metadata_store or MetadataStore()
-        self.clock = clock or time.time
-        self._records = {}
-        self._pending = {}
-        self._metadata_error = ''
-        self._secret_error = ''
-        self._recovery_error = ''
-        self._load()
-
-    def _load(self):
-        if not getattr(self.metadata, 'available', False):
-            return
-        try:
-            records = self.metadata.load()
-            if not all(self._valid_record(r) for r in records):
-                raise MetadataStoreUnavailable('Некоректний запис довіри')
-            if len({r['id'] for r in records}) != len(records):
-                raise MetadataStoreUnavailable('Дубльований запис довіри')
-            self._records = {r['id']: dict(r) for r in records}
-            self._metadata_error = ''
-        except Exception as e:
-            self._records = {}
-            self._metadata_error = str(e)
-
-    def _valid_record(self, r):
-        required = {'id', 'label', 'endpoint', 'fingerprint', 'createdAt', 'trustedAt', 'state', 'secretRef'}
-        return (
-            isinstance(r, dict)
-            and set(r) == required
-            and all(
-                isinstance(r.get(k), str) and r.get(k)
-                for k in ('id', 'label', 'endpoint', 'fingerprint', 'state', 'secretRef')
-            )
-            and r.get('state') == 'trusted'
-            and isinstance(r.get('createdAt'), int)
-            and not isinstance(r.get('createdAt'), bool)
-            and isinstance(r.get('trustedAt'), int)
-            and not isinstance(r.get('trustedAt'), bool)
-            and len(r.get('fingerprint', '')) == 64
-            and all(c in '0123456789abcdef' for c in r['fingerprint'])
-            and r['secretRef'] == 'pairing/' + r['id']
-        )
-
-    def _persist(self, records):
-        if not getattr(self.metadata, 'available', False):
-            return False
-        try:
-            self.metadata.save([deepcopy(v) for v in records.values()])
-            self._metadata_error = ''
-            return True
-        except Exception as e:
-            self._metadata_error = str(e)
-            return False
-
-    def _secret_call(self, operation, *args):
-        try:
-            result = getattr(self.store, operation)(*args)
-            self._secret_error = ''
-            return True, result
-        except Exception as e:
-            self._secret_error = str(e)
-            return False, None
-
-    @Property(bool, notify=changed)
-    def secretStoreAvailable(self):
-        return bool(getattr(self.store, 'available', False))
-
-    @Property(bool, notify=changed)
-    def metadataStoreAvailable(self):
-        return bool(getattr(self.metadata, 'available', False))
-
-    @Property(str, notify=changed)
-    def secretStoreError(self):
-        return self._secret_error or str(getattr(self.store, 'error', ''))
-
-    @Property(str, notify=changed)
-    def metadataError(self):
-        return self._metadata_error
-
-    @Property(str, notify=changed)
-    def recoveryError(self):
-        return self._recovery_error
-
-    @Property('QVariantList', notify=changed)
-    def trusted(self):
-        return [deepcopy(v) for v in self._records.values()]
-
-    @Property('QVariantList', notify=changed)
-    def pending(self):
-        return [deepcopy(v['public']) for v in self._pending.values()]
-
-    def _fingerprint(self, secret):
-        return hashlib.sha256(secret).hexdigest()
-
-    @Slot(str, str, result='QVariantMap')
-    def begin(self, label, endpoint):
-        label = label.strip()
-        endpoint = endpoint.strip()
-        if (
-            not self.secretStoreAvailable
-            or not self.metadataStoreAvailable
-            or self._metadata_error
-            or self._recovery_error
-            or not label
-            or not endpoint
-        ):
-            return {}
-        pid = uuid.uuid4().hex
-        secret = secrets.token_bytes(32)
-        public = {
-            'id': pid,
-            'label': label,
-            'endpoint': endpoint,
-            'fingerprint': self._fingerprint(secret),
-            'createdAt': int(self.clock()),
-            'state': 'pending',
-        }
-        self._pending[pid] = {'public': public, 'secret': secret}
-        self.changed.emit()
-        return deepcopy(public)
-
-    @Slot(str, bool, result=bool)
-    def confirm(self, pairing_id, approved):
-        item = self._pending.get(pairing_id)
-        if not item or not approved:
-            if item:
-                self._pending.pop(pairing_id, None)
-                self.changed.emit()
-            return False
-        if self._recovery_error:
-            return False
-        key = 'pairing/' + pairing_id
-        ok, _ = self._secret_call('put', key, item['secret'])
-        if not ok:
-            self.changed.emit()
-            return False
-        record = {**item['public'], 'state': 'trusted', 'trustedAt': int(self.clock()), 'secretRef': key}
-        candidate = {**self._records, pairing_id: record}
-        if not self._persist(candidate):
-            cleaned, _ = self._secret_call('delete', key)
-            if not cleaned:
-                self._recovery_error = (
-                    'Не вдалося відкотити підтвердження; захищений секрет міг залишитися без метаданих'
-                )
-            self.changed.emit()
-            return False
-        self._pending.pop(pairing_id, None)
-        self._records = candidate
-        self._recovery_error = ''
-        self.changed.emit()
-        return True
-
-    @Slot(str, result=bool)
-    def revoke(self, pairing_id):
-        record = self._records.get(pairing_id)
-        if not record or self._recovery_error:
-            return False
-        ok, secret = self._secret_call('get', record['secretRef'])
-        if not ok:
-            self.changed.emit()
-            return False
-        if secret is None:
-            self._recovery_error = 'Метадані довіри посилаються на відсутній захищений секрет'
-            self.changed.emit()
-            return False
-        ok, _ = self._secret_call('delete', record['secretRef'])
-        if not ok:
-            self.changed.emit()
-            return False
-        candidate = dict(self._records)
-        candidate.pop(pairing_id, None)
-        if not self._persist(candidate):
-            restored, _ = self._secret_call('put', record['secretRef'], secret)
-            if not restored:
-                self._recovery_error = 'Не вдалося відкотити відкликання; стан довіри потребує узгодження'
-            self.changed.emit()
-            return False
-        self._records = candidate
-        self._recovery_error = ''
-        self.changed.emit()
-        return True
-
-    @Slot(str, result=bool)
-    def cancel(self, pairing_id):
-        existed = self._pending.pop(pairing_id, None) is not None
-        if existed:
-            self.changed.emit()
-        return existed
-
-    @Slot()
-    def clearPending(self):
-        self._pending.clear()
-        self.changed.emit()
-
-    @Slot(result=bool)
-    def reconcile(self):
-        if not self.secretStoreAvailable or not self.metadataStoreAvailable:
-            self._recovery_error = 'Для узгодження потрібні і захищене сховище секретів, і сховище метаданих'
-            self.changed.emit()
-            return False
-        if self._metadata_error:
-            self._load()
-            if self._metadata_error:
-                self._recovery_error = 'Не вдалося повторно завантажити метадані; узгодження не завершено'
-                self.changed.emit()
-                return False
-        candidate = dict(self._records)
-        changed = False
-        for pid, record in list(candidate.items()):
-            ok, present = self._secret_call('contains', record['secretRef'])
-            if not ok:
-                self._recovery_error = 'Не вдалося перевірити захищений секрет; узгодження не завершено'
-                self.changed.emit()
-                return False
-            if not present:
-                candidate.pop(pid, None)
-                changed = True
-        if changed and not self._persist(candidate):
-            self._recovery_error = 'Не вдалося зберегти метадані; узгодження не завершено'
-            self.changed.emit()
-            return False
-        if changed:
-            self._records = candidate
-        self._recovery_error = ''
-        self.changed.emit()
-        return True
+ changed=Signal()
+ def __init__(self,secret_store=None,metadata_store=None,clock=None):
+  super().__init__()
+  if secret_store is None and sys.platform=='win32':
+   from windows_secret_store import WindowsCredentialSecretStore
+   secret_store=WindowsCredentialSecretStore()
+  self.store=secret_store or SecretStore();self.metadata=metadata_store or MetadataStore();self.clock=clock or time.time;self._records={};self._pending={};self._metadata_error='';self._secret_error='';self._recovery_error='';self._load()
+ def _load(self):
+  if not getattr(self.metadata,'available',False):return
+  try:
+   records=self.metadata.load()
+   if not all(self._valid_record(r) for r in records):raise MetadataStoreUnavailable('Некоректний запис довіри')
+   if len({r['id'] for r in records})!=len(records):raise MetadataStoreUnavailable('Дубльований запис довіри')
+   self._records={r['id']:dict(r) for r in records};self._metadata_error=''
+  except Exception as e:self._records={};self._metadata_error=str(e)
+ def _valid_record(self,r):
+  required={'id','label','endpoint','fingerprint','createdAt','trustedAt','state','secretRef'}
+  return isinstance(r,dict) and set(r)==required and all(isinstance(r.get(k),str) and r.get(k) for k in ('id','label','endpoint','fingerprint','state','secretRef')) and r.get('state')=='trusted' and isinstance(r.get('createdAt'),int) and not isinstance(r.get('createdAt'),bool) and isinstance(r.get('trustedAt'),int) and not isinstance(r.get('trustedAt'),bool) and len(r.get('fingerprint',''))==64 and all(c in '0123456789abcdef' for c in r['fingerprint']) and r['secretRef']=='pairing/'+r['id']
+ def _persist(self,records):
+  if not getattr(self.metadata,'available',False):return False
+  try:self.metadata.save([deepcopy(v) for v in records.values()]);self._metadata_error='';return True
+  except Exception as e:self._metadata_error=str(e);return False
+ def _secret_call(self,operation,*args):
+  try:result=getattr(self.store,operation)(*args);self._secret_error='';return True,result
+  except Exception as e:self._secret_error=str(e);return False,None
+ @Property(bool,notify=changed)
+ def secretStoreAvailable(self):return bool(getattr(self.store,'available',False))
+ @Property(bool,notify=changed)
+ def metadataStoreAvailable(self):return bool(getattr(self.metadata,'available',False))
+ @Property(str,notify=changed)
+ def secretStoreError(self):return self._secret_error or str(getattr(self.store,'error',''))
+ @Property(str,notify=changed)
+ def metadataError(self):return self._metadata_error
+ @Property(str,notify=changed)
+ def recoveryError(self):return self._recovery_error
+ @Property('QVariantList',notify=changed)
+ def trusted(self):return [deepcopy(v) for v in self._records.values()]
+ @Property('QVariantList',notify=changed)
+ def pending(self):return [deepcopy(v['public']) for v in self._pending.values()]
+ def _fingerprint(self,secret):return hashlib.sha256(secret).hexdigest()
+ @Slot(str,str,result='QVariantMap')
+ def begin(self,label,endpoint):
+  label=label.strip();endpoint=endpoint.strip()
+  if not self.secretStoreAvailable or not self.metadataStoreAvailable or self._metadata_error or self._recovery_error or not label or not endpoint:return {}
+  pid=uuid.uuid4().hex;secret=secrets.token_bytes(32);public={'id':pid,'label':label,'endpoint':endpoint,'fingerprint':self._fingerprint(secret),'createdAt':int(self.clock()),'state':'pending'};self._pending[pid]={'public':public,'secret':secret};self.changed.emit();return deepcopy(public)
+ @Slot(str,bool,result=bool)
+ def confirm(self,pairing_id,approved):
+  item=self._pending.get(pairing_id)
+  if not item or not approved:
+   if item:self._pending.pop(pairing_id,None);self.changed.emit()
+   return False
+  if self._recovery_error:return False
+  key='pairing/'+pairing_id;ok,_=self._secret_call('put',key,item['secret'])
+  if not ok:self.changed.emit();return False
+  record={**item['public'],'state':'trusted','trustedAt':int(self.clock()),'secretRef':key};candidate={**self._records,pairing_id:record}
+  if not self._persist(candidate):
+   cleaned,_=self._secret_call('delete',key)
+   if not cleaned:self._recovery_error='Не вдалося відкотити підтвердження; захищений секрет міг залишитися без метаданих'
+   self.changed.emit();return False
+  self._pending.pop(pairing_id,None);self._records=candidate;self._recovery_error='';self.changed.emit();return True
+ @Slot(str,result=bool)
+ def revoke(self,pairing_id):
+  record=self._records.get(pairing_id)
+  if not record or self._recovery_error:return False
+  ok,secret=self._secret_call('get',record['secretRef'])
+  if not ok:self.changed.emit();return False
+  if secret is None:self._recovery_error='Метадані довіри посилаються на відсутній захищений секрет';self.changed.emit();return False
+  ok,_=self._secret_call('delete',record['secretRef'])
+  if not ok:self.changed.emit();return False
+  candidate=dict(self._records);candidate.pop(pairing_id,None)
+  if not self._persist(candidate):
+   restored,_=self._secret_call('put',record['secretRef'],secret)
+   if not restored:self._recovery_error='Не вдалося відкотити відкликання; стан довіри потребує узгодження'
+   self.changed.emit();return False
+  self._records=candidate;self._recovery_error='';self.changed.emit();return True
+ @Slot(str,result=bool)
+ def cancel(self,pairing_id):
+  existed=self._pending.pop(pairing_id,None) is not None
+  if existed:self.changed.emit()
+  return existed
+ @Slot()
+ def clearPending(self):self._pending.clear();self.changed.emit()
+ @Slot(result=bool)
+ def reconcile(self):
+  if not self.secretStoreAvailable or not self.metadataStoreAvailable:
+   self._recovery_error='Для узгодження потрібні і захищене сховище секретів, і сховище метаданих';self.changed.emit();return False
+  if self._metadata_error:
+   self._load()
+   if self._metadata_error:self._recovery_error='Не вдалося повторно завантажити метадані; узгодження не завершено';self.changed.emit();return False
+  candidate=dict(self._records);changed=False
+  for pid,record in list(candidate.items()):
+   ok,present=self._secret_call('contains',record['secretRef'])
+   if not ok:self._recovery_error='Не вдалося перевірити захищений секрет; узгодження не завершено';self.changed.emit();return False
+   if not present:candidate.pop(pid,None);changed=True
+  if changed and not self._persist(candidate):
+   self._recovery_error='Не вдалося зберегти метадані; узгодження не завершено';self.changed.emit();return False
+  if changed:self._records=candidate
+  self._recovery_error='';self.changed.emit();return True

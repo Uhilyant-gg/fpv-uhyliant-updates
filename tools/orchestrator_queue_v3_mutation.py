@@ -3,7 +3,6 @@
 This module validates that an already-approved patch application plan still targets
 the exact observed repair branch HEAD. It returns mutation data but performs no write.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass

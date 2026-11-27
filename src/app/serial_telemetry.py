@@ -1,5 +1,4 @@
 """Serial transports for read-only MSP polling and passive CRSF telemetry."""
-
 from PySide6.QtCore import QObject, Property, QSettings, QTimer, Signal, Slot
 from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
 from msp_runtime import READ_ONLY_COMMANDS, build_request
@@ -30,32 +29,25 @@ class SerialTelemetryTransport(QObject):
             self.start()
 
     @Property(str, notify=changed)
-    def portName(self):
-        return self._port_name
+    def portName(self): return self._port_name
 
     @Property(int, notify=changed)
-    def baud(self):
-        return self._baud
+    def baud(self): return self._baud
 
     @Property(bool, notify=changed)
-    def enabled(self):
-        return self._enabled
+    def enabled(self): return self._enabled
 
     @Property(bool, notify=changed)
-    def running(self):
-        return self._serial.isOpen()
+    def running(self): return self._serial.isOpen()
 
     @Property(str, notify=changed)
-    def error(self):
-        return self._error
+    def error(self): return self._error
 
     @Property("QStringList", notify=changed)
-    def ports(self):
-        return [port.portName() for port in QSerialPortInfo.availablePorts()]
+    def ports(self): return [port.portName() for port in QSerialPortInfo.availablePorts()]
 
     @Slot()
-    def refreshPorts(self):
-        self.changed.emit()
+    def refreshPorts(self): self.changed.emit()
 
     @Slot(str, int, bool)
     def configure(self, port_name, baud, enabled):
@@ -74,44 +66,33 @@ class SerialTelemetryTransport(QObject):
 
     @Slot(result=bool)
     def start(self):
-        if self._serial.isOpen():
-            return True
+        if self._serial.isOpen(): return True
         if not self._port_name:
-            self._error = f"{self.protocol}: serial port не вибрано"
-            self.changed.emit()
-            return False
+            self._error = f"{self.protocol}: serial port не вибрано"; self.changed.emit(); return False
         self._serial.setPortName(self._port_name)
         self._serial.setBaudRate(self._baud)
         if not self._serial.open(QSerialPort.ReadWrite if self._poll_commands else QSerialPort.ReadOnly):
-            self._error = f"{self.protocol}: {self._serial.errorString()}"
-            self.changed.emit()
-            return False
+            self._error = f"{self.protocol}: {self._serial.errorString()}"; self.changed.emit(); return False
         self._error = ""
-        if self._poll_commands:
-            self._poll.start()
-        self.changed.emit()
-        return True
+        if self._poll_commands: self._poll.start()
+        self.changed.emit(); return True
 
     @Slot()
     def stop(self):
         self._poll.stop()
-        if self._serial.isOpen():
-            self._serial.close()
+        if self._serial.isOpen(): self._serial.close()
         self.changed.emit()
 
     def _read(self):
         data = bytes(self._serial.readAll())
-        if data:
-            self.runtime.feed(data)
+        if data: self.runtime.feed(data)
 
     def _serial_error(self, error):
         if error != QSerialPort.NoError and self._serial.isOpen():
-            self._error = f"{self.protocol}: {self._serial.errorString()}"
-            self.changed.emit()
+            self._error = f"{self.protocol}: {self._serial.errorString()}"; self.changed.emit()
 
     def _poll_once(self):
-        if not self._serial.isOpen() or not self._poll_commands:
-            return
+        if not self._serial.isOpen() or not self._poll_commands: return
         command = self._poll_commands[self._poll_index % len(self._poll_commands)]
         self._poll_index += 1
         self._serial.write(build_request(command))

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Load, validate and derive FPV Uhyliant machine-readable canonical project state."""
-
 import json
 from pathlib import Path
 

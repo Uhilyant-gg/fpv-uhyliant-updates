@@ -3,7 +3,6 @@
 This module maps normal navigation/intents only. It cannot authorize destructive
 firmware or service operations.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass

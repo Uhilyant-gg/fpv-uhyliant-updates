@@ -1,5 +1,4 @@
 """Evidence-gated composition for the normal zero-config startup journey."""
-
 from typing import Any, Mapping
 
 
@@ -13,42 +12,17 @@ def e4_zero_config_orchestrator(e: Mapping[str, Any] | None) -> dict[str, Any]:
     restored = restore.get("restored") is True
     discovered = discovery.get("complete") is True
     if not restored and not discovered:
-        return {
-            "health": "unknown",
-            "stage": "discover",
-            "action": "find-camera",
-            "reasonCode": "discovery-evidence-required",
-        }
+        return {"health": "unknown", "stage": "discover", "action": "find-camera", "reasonCode": "discovery-evidence-required"}
     if restored and not discovered and restore.get("fresh") is not True:
-        return {
-            "health": "unknown",
-            "stage": "discover",
-            "action": "find-camera",
-            "reasonCode": "restored-camera-revalidation-required",
-        }
+        return {"health": "unknown", "stage": "discover", "action": "find-camera", "reasonCode": "restored-camera-revalidation-required"}
     if discovery.get("ambiguous") is True:
         return {"health": "attention", "stage": "discover", "action": None, "reasonCode": "camera-selection-ambiguous"}
     if camera.get("verified") is not True or camera.get("usable") is not True:
-        return {
-            "health": "unknown",
-            "stage": "camera",
-            "action": "verify-camera",
-            "reasonCode": "verified-usable-camera-required",
-        }
+        return {"health": "unknown", "stage": "camera", "action": "verify-camera", "reasonCode": "verified-usable-camera-required"}
     if video.get("prepared") is not True:
-        return {
-            "health": "attention",
-            "stage": "video",
-            "action": "show-video",
-            "reasonCode": "video-preparation-required",
-        }
+        return {"health": "attention", "stage": "video", "action": "show-video", "reasonCode": "video-preparation-required"}
     if video.get("freshPlayback") is not True:
-        return {
-            "health": "attention",
-            "stage": "video",
-            "action": "reconnect-video",
-            "reasonCode": "fresh-playback-required",
-        }
+        return {"health": "attention", "stage": "video", "action": "reconnect-video", "reasonCode": "fresh-playback-required"}
     if video.get("health") != "ready":
         return {"health": "attention", "stage": "video", "action": "diagnose", "reasonCode": "runtime-health-required"}
     return {"health": "ready", "stage": "operate", "action": None, "reasonCode": "zero-config-operational"}

@@ -4,20 +4,17 @@ Queue v3 stores future work as intents only. Exactly one item may be active, and
 post-merge refresh must rebase the remaining queue on the observed merge commit.
 The queue never authorizes merge, hardware verification, secrets, or product choices.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable
 
-BLOCKER_STATUSES = frozenset(
-    {
-        "PHYSICAL_ACTION_REQUIRED",
-        "SECRET_REQUIRED",
-        "PRODUCT_DECISION_REQUIRED",
-        "AUTOMATION_BLOCKED",
-    }
-)
+BLOCKER_STATUSES = frozenset({
+    "PHYSICAL_ACTION_REQUIRED",
+    "SECRET_REQUIRED",
+    "PRODUCT_DECISION_REQUIRED",
+    "AUTOMATION_BLOCKED",
+})
 
 
 @dataclass(frozen=True)

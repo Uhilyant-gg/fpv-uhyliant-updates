@@ -1,5 +1,4 @@
 """Sanitized observability records for Next Best Action decisions."""
-
 from __future__ import annotations
 
 from typing import Any, Mapping

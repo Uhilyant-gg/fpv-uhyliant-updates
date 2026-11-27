@@ -1,7 +1,6 @@
 import unittest
 from e3_progress import REQUIRED_E3_COMPONENTS, e3_progress
 
-
 class E3ProgressTests(unittest.TestCase):
     def test_missing_components_are_reported_without_physical_claim(self):
         result = e3_progress({"selector": True})
@@ -15,6 +14,4 @@ class E3ProgressTests(unittest.TestCase):
         self.assertEqual(result["missingComponents"], [])
         self.assertFalse(result["physicalEvidenceClaimed"])
 
-
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == "__main__": unittest.main()

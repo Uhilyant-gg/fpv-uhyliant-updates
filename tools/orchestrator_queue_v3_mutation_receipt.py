@@ -3,7 +3,6 @@
 The mutation transport is external. This layer accepts its factual receipt only when
 the branch and pre-write HEAD match the approved mutation plan and a new HEAD exists.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass

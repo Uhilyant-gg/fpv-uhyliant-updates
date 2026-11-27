@@ -1,11 +1,8 @@
 """Repository-software progress summary for E3 without claiming physical evidence."""
-
 from __future__ import annotations
 from typing import Mapping
 
-REQUIRED_E3_COMPONENTS = frozenset(
-    {"selector", "runtime-integration", "presentation", "dispatch", "observability", "snapshot"}
-)
+REQUIRED_E3_COMPONENTS = frozenset({"selector", "runtime-integration", "presentation", "dispatch", "observability", "snapshot"})
 
 
 def e3_progress(components: Mapping[str, bool] | None) -> dict[str, object]:

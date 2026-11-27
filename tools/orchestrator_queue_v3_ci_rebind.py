@@ -3,7 +3,6 @@
 A successful mutation changes the repair branch HEAD. This creates the next persisted
 binding only from a validated mutation outcome and never changes the baseline story.
 """
-
 from __future__ import annotations
 
 from dataclasses import replace

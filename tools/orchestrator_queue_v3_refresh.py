@@ -3,7 +3,6 @@
 A completed queue item may advance only from validated merge evidence and fresh
 planner output. Old pending work is never promoted implicitly.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass

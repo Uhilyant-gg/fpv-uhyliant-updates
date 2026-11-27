@@ -4,7 +4,6 @@ The result remains a proposal. Successful acceptance only returns the validated
 output and next lifecycle intent; it does not apply a patch, push, merge, or touch
 hardware/secrets.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass

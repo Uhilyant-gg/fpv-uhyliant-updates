@@ -3,7 +3,6 @@
 Only a previously authorized REPAIR action may create an executor invocation plan.
 The executor remains untrusted and cannot merge, access secrets, or prove hardware.
 """
-
 from __future__ import annotations
 
 from orchestrator_control_plane import InvocationPlan, prepare_invocation

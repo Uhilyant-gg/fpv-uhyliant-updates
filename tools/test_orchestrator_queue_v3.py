@@ -23,9 +23,7 @@ class QueueV3Tests(unittest.TestCase):
     def test_refresh_requires_completed_active_story(self):
         plan = build_queue(baseline_sha="base", items=[self.item("E2-S4")])
         with self.assertRaisesRegex(ValueError, "completed-story-not-active"):
-            refresh_after_merge(
-                plan, completed_story_id="E2-S5", merge_commit_sha="merge", refreshed_items=[self.item("E2-S6")]
-            )
+            refresh_after_merge(plan, completed_story_id="E2-S5", merge_commit_sha="merge", refreshed_items=[self.item("E2-S6")])
 
     def test_post_merge_queue_uses_fresh_merge_baseline_and_fresh_order(self):
         plan = build_queue(baseline_sha="base", items=[self.item("E2-S4"), self.item("old-plan")])
@@ -41,9 +39,7 @@ class QueueV3Tests(unittest.TestCase):
 
     def test_no_fresh_work_completes_queue(self):
         plan = build_queue(baseline_sha="base", items=[self.item("E2-S4")])
-        self.assertIsNone(
-            refresh_after_merge(plan, completed_story_id="E2-S4", merge_commit_sha="merge", refreshed_items=[])
-        )
+        self.assertIsNone(refresh_after_merge(plan, completed_story_id="E2-S4", merge_commit_sha="merge", refreshed_items=[]))
 
     def test_human_boundaries_stop_queue(self):
         self.assertFalse(can_continue(blocker_status="PHYSICAL_ACTION_REQUIRED"))

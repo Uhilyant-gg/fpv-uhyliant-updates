@@ -3,7 +3,6 @@
 A green Queue v3 decision still waits for the existing merge authority. This bridge
 binds that wait state to fresh PR/check/review evidence; it never performs a merge.
 """
-
 from __future__ import annotations
 
 from orchestrator_privileged_merge import MergeAuthorization, authorize

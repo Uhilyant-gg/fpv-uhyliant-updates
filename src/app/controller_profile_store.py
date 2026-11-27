@@ -4,7 +4,6 @@ Only validated calibration/mapping profiles and a display name are persisted. A
 stored record is never evidence that the controller is present: restore still
 requires a fresh matching observation (see ``controller_restore``).
 """
-
 from __future__ import annotations
 
 import json

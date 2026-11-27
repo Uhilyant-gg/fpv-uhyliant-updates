@@ -1,5 +1,4 @@
 """Cross-boundary acceptance checks for the canonical E2 health contract."""
-
 import unittest
 
 from device_health import device_health
@@ -10,12 +9,10 @@ from vehicle_health import vehicle_health
 
 class E2UnifiedHealthAcceptanceTests(unittest.TestCase):
     def test_camera_vehicle_station_share_canonical_schema(self):
-        camera = device_health(
-            {
-                "id": "cam-1",
-                "openipcIdentity": {"verified": True, "platform": "ssc338q", "sensor": "imx335"},
-            }
-        )
+        camera = device_health({
+            "id": "cam-1",
+            "openipcIdentity": {"verified": True, "platform": "ssc338q", "sensor": "imx335"},
+        })
         vehicle = vehicle_health(
             {"telemetry": {"connected": True}, "video": {"state": "playing"}},
             {"issues": []},
@@ -37,13 +34,11 @@ class E2UnifiedHealthAcceptanceTests(unittest.TestCase):
         self.assertEqual(combined.health, HEALTH_UNKNOWN)
 
     def test_component_problem_remains_problem_at_station_boundary(self):
-        camera = device_health(
-            {
-                "id": "cam-1",
-                "connection": "error",
-                "openipcIdentity": {"verified": True, "platform": "ssc338q", "sensor": "imx335"},
-            }
-        )
+        camera = device_health({
+            "id": "cam-1",
+            "connection": "error",
+            "openipcIdentity": {"verified": True, "platform": "ssc338q", "sensor": "imx335"},
+        })
         vehicle = vehicle_health(
             {"telemetry": {"connected": True}, "video": {"state": "playing"}},
             {"issues": []},

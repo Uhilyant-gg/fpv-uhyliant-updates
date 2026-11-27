@@ -30,18 +30,14 @@ class QueueV3CycleTests(unittest.TestCase):
         return QueueObservation(**values)
 
     def test_running_waits(self):
-        self.assertEqual(
-            decide_cycle(plan=self.plan, persisted=self.persisted, observation=self.observe()).action, QueueAction.WAIT
-        )
+        self.assertEqual(decide_cycle(plan=self.plan, persisted=self.persisted, observation=self.observe()).action, QueueAction.WAIT)
 
     def test_failed_uses_persisted_repair_budget(self):
         result = decide_cycle(plan=self.plan, persisted=self.persisted, observation=self.observe(ci_status="failed"))
         self.assertEqual(result.action, QueueAction.REPAIR)
 
     def test_green_merged_refreshes(self):
-        result = decide_cycle(
-            plan=self.plan, persisted=self.persisted, observation=self.observe(ci_status="green", merged=True)
-        )
+        result = decide_cycle(plan=self.plan, persisted=self.persisted, observation=self.observe(ci_status="green", merged=True))
         self.assertEqual(result.action, QueueAction.REFRESH)
 
     def test_blocker_stops(self):

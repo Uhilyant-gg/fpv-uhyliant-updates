@@ -9,12 +9,8 @@ class UiLanguagePolicyTests(unittest.TestCase):
         self.sources = {
             name: (here / name).read_text(encoding="utf-8")
             for name in (
-                "FirmwareCenter.qml",
-                "UpdatePanel.qml",
-                "DevicesPanel.qml",
-                "DiagnosticsPanel.qml",
-                "PairingPanel.qml",
-                "Main.qml",
+                "FirmwareCenter.qml", "UpdatePanel.qml", "DevicesPanel.qml",
+                "DiagnosticsPanel.qml", "PairingPanel.qml", "Main.qml",
                 "MavlinkDiagnostics.qml",
             )
         }
@@ -31,30 +27,12 @@ class UiLanguagePolicyTests(unittest.TestCase):
         for text in ("ЦЕНТР ПРОШИВКИ", "Перевірити оновлення", "Оновити камеру"):
             self.assertIn(text, visible)
         self.assertIn('advanced?"Сховати додатково":"Додатково"', source)
-        for obsolete in (
-            "FIRMWARE CENTER",
-            "IMAGE VERIFIED",
-            "PRE-CHECK APPROVED",
-            "EXECUTION PLAN READY",
-            "Expected SHA-256",
-            "Flash layout verified",
-            "Recovery path verified",
-        ):
+        for obsolete in ("FIRMWARE CENTER", "IMAGE VERIFIED", "PRE-CHECK APPROVED", "EXECUTION PLAN READY", "Expected SHA-256", "Flash layout verified", "Recovery path verified"):
             self.assertNotIn(obsolete, visible)
 
     def test_devices_surface_core_copy_is_ukrainian(self):
         visible = self.visible(self.sources["DevicesPanel.qml"])
-        for obsolete in (
-            "OPENIPC IDENTITY",
-            "Platform / SoC",
-            "Sensor:",
-            "Firmware:",
-            "Evidence:",
-            "Hostname:",
-            "Camera preset",
-            "video profile",
-            "hardware apply",
-        ):
+        for obsolete in ("OPENIPC IDENTITY", "Platform / SoC", "Sensor:", "Firmware:", "Evidence:", "Hostname:", "Camera preset", "video profile", "hardware apply"):
             self.assertNotIn(obsolete, visible)
 
     def test_diagnostics_surface_core_copy_is_ukrainian(self):
@@ -66,70 +44,21 @@ class UiLanguagePolicyTests(unittest.TestCase):
 
     def test_pairing_surface_core_copy_is_ukrainian(self):
         visible = self.visible(self.sources["PairingPanel.qml"])
-        for obsolete in (
-            "PAIRING TRUST",
-            "Protected secret store",
-            "Trust metadata store",
-            "Recovery required",
-            "Fingerprint:",
-            "trusted",
-        ):
+        for obsolete in ("PAIRING TRUST", "Protected secret store", "Trust metadata store", "Recovery required", "Fingerprint:", "trusted"):
             self.assertNotIn(obsolete, visible)
 
     def test_main_surface_core_copy_is_ukrainian(self):
         visible = self.visible(self.sources["Main.qml"])
-        for expected in (
-            "СЕРВІСНИЙ РЕЖИМ",
-            "ВІДЕО",
-            "Основний",
-            "Додатковий",
-            "Поміняти місцями",
-            "Прошивка",
-            "Телеметрія: ",
-            "Мережа: ",
-        ):
+        for expected in ("СЕРВІСНИЙ РЕЖИМ", "ВІДЕО", "Основний", "Додатковий", "Поміняти місцями", "Прошивка", "Телеметрія: ", "Мережа: "):
             self.assertIn(expected, visible)
-        for obsolete in (
-            "SERVICE MODE",
-            "VIDEO WORKSPACE",
-            "Primary",
-            "Secondary",
-            "Swap",
-            "Firmware",
-            "Telemetry: ",
-            "Network: ",
-        ):
+        for obsolete in ("SERVICE MODE", "VIDEO WORKSPACE", "Primary", "Secondary", "Swap", "Firmware", "Telemetry: ", "Network: "):
             self.assertNotIn(obsolete, visible)
 
     def test_mavlink_diagnostics_surface_is_ukrainian(self):
         visible = self.visible(self.sources["MavlinkDiagnostics.qml"])
-        for expected in (
-            "ІДЕНТИФІКАЦІЯ",
-            "Система / компонент",
-            "Літальний апарат",
-            "Стан системи",
-            "ДІАГНОСТИКА КАНАЛУ",
-            "Частота повідомлень",
-            "Оцінка втрат",
-            "Помилки зв’язку",
-            "Завантаження контролера",
-        ):
+        for expected in ("ІДЕНТИФІКАЦІЯ", "Система / компонент", "Літальний апарат", "Стан системи", "ДІАГНОСТИКА КАНАЛУ", "Частота повідомлень", "Оцінка втрат", "Помилки зв’язку", "Завантаження контролера"):
             self.assertIn(expected, visible)
-        for obsolete in (
-            "IDENTITY",
-            "System / Component",
-            "Vehicle",
-            "System state",
-            "LINK DIAGNOSTICS",
-            "Health",
-            "Message rate",
-            "Last packet",
-            "Estimated lost",
-            "Bad data",
-            "Comm errors",
-            "Controller load",
-            "not broadcast",
-        ):
+        for obsolete in ("IDENTITY", "System / Component", "Vehicle", "System state", "LINK DIAGNOSTICS", "Health", "Message rate", "Last packet", "Estimated lost", "Bad data", "Comm errors", "Controller load", "not broadcast"):
             self.assertNotIn(obsolete, visible)
 
     def test_update_surface_has_delayed_help(self):
@@ -137,11 +66,7 @@ class UiLanguagePolicyTests(unittest.TestCase):
 
     def test_firmware_surface_keeps_explanatory_copy(self):
         visible = self.visible(self.sources["FirmwareCenter.qml"])
-        for expected in (
-            "Безпечне автоматичне оновлення OpenIPC-камери",
-            "Дані потрібні лише для цього сеансу й не зберігаються.",
-            "Це окремий експертний сценарій, не рекомендоване автоматичне оновлення.",
-        ):
+        for expected in ("Безпечне автоматичне оновлення OpenIPC-камери", "Дані потрібні лише для цього сеансу й не зберігаються.", "Це окремий експертний сценарій, не рекомендоване автоматичне оновлення."):
             self.assertIn(expected, visible)
 
     def test_devices_and_pairing_have_delayed_help(self):

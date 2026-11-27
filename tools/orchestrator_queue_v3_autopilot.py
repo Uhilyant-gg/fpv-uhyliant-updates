@@ -4,7 +4,6 @@ This module routes one observed cycle into the already-established WAIT, bounded
 REPAIR, merge-authorization, REFRESH, or STOP boundaries. It performs no merge,
 code mutation, provider invocation, secret access, or hardware action itself.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass

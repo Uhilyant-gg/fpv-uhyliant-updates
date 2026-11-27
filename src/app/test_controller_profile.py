@@ -35,9 +35,7 @@ class ControllerProfileTests(unittest.TestCase):
 
     def test_invalid_samples_and_identity_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "sample-invalid"):
-            calibrate_controller(
-                "radio-1", [[1000, 1000, 1000, 1000], [1500, float("nan"), 1500, 1500], SAMPLES[2]], MAPPING
-            )
+            calibrate_controller("radio-1", [[1000, 1000, 1000, 1000], [1500, float("nan"), 1500, 1500], SAMPLES[2]], MAPPING)
         with self.assertRaisesRegex(ValueError, "identity-unavailable"):
             calibrate_controller("", SAMPLES, MAPPING)
 

@@ -10,9 +10,7 @@ class HardwareSimulatorScenarioTests(unittest.TestCase):
         self.assertFalse(result["physicalEvidenceComplete"])
 
     def test_revalidation_after_fault_restores_freshness(self):
-        fault = simulate(
-            VirtualDeviceState("camera-1", identity_verified=True, evidence_fresh=True), {"type": "identity-stale"}
-        )
+        fault = simulate(VirtualDeviceState("camera-1", identity_verified=True, evidence_fresh=True), {"type": "identity-stale"})
         recovered = simulate(VirtualDeviceState(**fault["state"]), {"type": "verify-identity", "verified": True})
         self.assertTrue(recovered["state"]["evidence_fresh"])
         self.assert_synthetic(recovered)
@@ -61,12 +59,7 @@ class HardwareSimulatorScenarioTests(unittest.TestCase):
 
     def test_scenario_replay_is_deterministic(self):
         initial = VirtualDeviceState("camera-1")
-        events = [
-            {"type": "verify-identity", "verified": True},
-            {"type": "disconnect"},
-            {"type": "reconnect"},
-            {"type": "verify-identity", "verified": True},
-        ]
+        events = [{"type": "verify-identity", "verified": True}, {"type": "disconnect"}, {"type": "reconnect"}, {"type": "verify-identity", "verified": True}]
         self.assertEqual(replay(initial, events), replay(initial, events))
         result = replay(initial, events)
         self.assertEqual(result["reasonCode"], "scenario-complete")
@@ -74,9 +67,7 @@ class HardwareSimulatorScenarioTests(unittest.TestCase):
         self.assert_synthetic(result)
 
     def test_scenario_stops_on_deterministic_failure(self):
-        result = replay(
-            VirtualDeviceState("camera-1"), [{"type": "start-update"}, {"type": "fail-update"}, {"type": "observe"}]
-        )
+        result = replay(VirtualDeviceState("camera-1"), [{"type": "start-update"}, {"type": "fail-update"}, {"type": "observe"}])
         self.assertEqual(result["reasonCode"], "update-failed-simulated")
         self.assertEqual(result["stoppedAt"], 1)
         self.assertEqual(len(result["trace"]), 2)

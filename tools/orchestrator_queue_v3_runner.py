@@ -4,7 +4,6 @@ This layer decides whether the queue waits, repairs, refreshes after merge, or
 stops. It never performs merge, invokes hardware, supplies secrets, or promotes
 stale pending work.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass
