@@ -22,6 +22,10 @@ EVENTS = {
     "device-discovery-completed": ("Пошук пристроїв завершено", "info"),
     "device-discovery-cancelled": ("Пошук пристроїв скасовано", "warning"),
     "device-discovery-failed": ("Не вдалося завершити пошук пристроїв", "warning"),
+    "app-update-available": ("Знайдено оновлення програми", "info"),
+    "app-update-ready": ("Оновлення програми підготовлено", "info"),
+    "app-update-installing": ("Встановлення оновлення розпочато", "info"),
+    "app-update-failed": ("Не вдалося завершити оновлення програми", "warning"),
 }
 STATE_EVENTS = {
     "telemetry": {
@@ -51,6 +55,12 @@ STATE_EVENTS = {
         "completed": "device-discovery-completed",
         "cancelled": "device-discovery-cancelled",
         "failed": "device-discovery-failed",
+    },
+    "update": {
+        "available": "app-update-available",
+        "ready": "app-update-ready",
+        "installing": "app-update-installing",
+        "error": "app-update-failed",
     },
 }
 
@@ -134,7 +144,7 @@ class TimelineRuntime(QObject):
     @Slot(str, str)
     def observe(self, source, state):
         state_events = STATE_EVENTS.get(source)
-        if state_events is None or state not in {"connected", "ready", "degraded", "lost", "playing", "stopped", "scanning", "completed", "cancelled", "failed", "unknown"}:
+        if state_events is None or state not in {"connected", "ready", "degraded", "lost", "playing", "stopped", "scanning", "completed", "cancelled", "failed", "available", "installing", "error", "current", "unknown"}:
             return
         previous = self._last_states.get(source)
         self._last_states[source] = state

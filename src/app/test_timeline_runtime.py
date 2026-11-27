@@ -61,6 +61,22 @@ class TimelineRuntimeTests(unittest.TestCase):
             ],
         )
 
+    def test_application_update_lifecycle_records_only_meaningful_states(self):
+        timeline = TimelineRuntime(Settings(), clock=lambda: 240)
+        for state in ("check", "available", "available", "download", "ready", "installing", "error", "error"):
+            timeline.observe("update", state)
+
+        self.assertEqual(
+            [item["title"] for item in timeline.items],
+            [
+                "Не вдалося завершити оновлення програми",
+                "Встановлення оновлення розпочато",
+                "Оновлення програми підготовлено",
+                "Знайдено оновлення програми",
+                "Станцію запущено",
+            ],
+        )
+
     def test_new_events_notify_timeline_consumers(self):
         timeline = TimelineRuntime(Settings(), clock=lambda: 120)
         changes = []

@@ -5,6 +5,10 @@ class Tests(unittest.TestCase):
  def setUp(self):
   self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name);self.original=updater_engine.UP;updater_engine.UP=self.root;self.payload=self.root/'package.zip';self.payload.write_bytes(b'payload');self.digest=hashlib.sha256(b'payload').hexdigest();self.manifest={'version':'2.0.11','package':{'file':'package.zip','sha256':self.digest}};(self.root/'ready.json').write_text(json.dumps({'version':'2.0.11','package':str(self.payload),'sha256':self.digest}),encoding='utf-8')
  def tearDown(self):updater_engine.UP=self.original;self.temp.cleanup()
+ def installed_root(self):
+  root=self.root/'install';(root/'app'/'current').mkdir(parents=True)
+  for path in (root/'FPV-Uhyliant-Update.exe',root/'FPV-Uhyliant-Launcher.exe',root/'app'/'current'/'FPV-Uhyliant.exe'):path.write_bytes(b'installed')
+  return root
  def test_ready_state_binds_version_file_and_digest(self):self.assertEqual(updater_engine.load_ready(self.manifest)['sha256'],self.digest)
  def test_rejects_changed_package_after_download(self):self.payload.write_bytes(b'tampered');self.assertRaises(RuntimeError,updater_engine.load_ready,self.manifest)
  def test_rejects_manifest_version_or_digest_mismatch(self):
@@ -31,4 +35,16 @@ class Tests(unittest.TestCase):
   message=updater_engine.human_update_error('check',caught.exception);self.assertIn('некоректну версію',message);self.assertNotIn('private.invalid',message)
   raw=updater_engine.human_update_error('check',RuntimeError('socket error at C:\\private\\updates'))
   self.assertIn('Операцію зупинено',raw);self.assertNotIn('socket error',raw);self.assertNotIn('private',raw)
+ def test_install_validation_failure_hides_exception_details(self):
+  from unittest.mock import patch
+  updater=updater_engine.Updater(self.installed_root(),guard=lambda:(True,''));updater.state='ready'
+  with patch('updater_engine.load_ready',return_value={'version':'2.0.11','package':'package.zip','sha256':self.digest}),patch('updater_engine.stage_ready_package',side_effect=RuntimeError('socket error at C:\\private\\updates')):
+   updater.install()
+  self.assertEqual(updater.updateState,'error');self.assertIn('Операцію зупинено',updater.updateStatus);self.assertNotIn('socket error',updater.updateStatus);self.assertNotIn('private',updater.updateStatus)
+ def test_successful_install_handoff_is_reported_as_installing(self):
+  from unittest.mock import patch
+  ready={'version':'2.0.11','package':'package.zip','sha256':self.digest};updater=updater_engine.Updater(self.installed_root(),guard=lambda:(True,''));updater.state='ready'
+  with patch('updater_engine.load_ready',return_value=ready),patch('updater_engine.stage_ready_package',return_value=ready),patch('updater_engine.subprocess.Popen'),patch('updater_engine.QTimer.singleShot'):
+   updater.install()
+  self.assertEqual(updater.updateState,'installing');self.assertIn('розпочато',updater.updateStatus)
 if __name__=='__main__':unittest.main()

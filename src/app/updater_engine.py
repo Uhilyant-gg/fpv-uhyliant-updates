@@ -133,8 +133,9 @@ class Updater(QObject):
   if decision=='blocked':self.state='blocked';self.status=why;self.changed.emit();return
   if decision=='unavailable':self.state='error';self.status='Компонент оновлення недоступний: запустіть встановлену програму через FPV-Uhyliant-Launcher.exe';self.changed.emit();return
   try:r=stage_ready_package(self.root,load_ready(self.m));args=helper_args(self.root/'FPV-Uhyliant-Update.exe',self.root,r,os.getpid());subprocess.Popen(args,cwd=self.root,creationflags=getattr(subprocess,'DETACHED_PROCESS',0))
-  except RuntimeError as e:self.state='error';self.status=str(e);self.changed.emit();return
+  except RuntimeError as e:self.state='error';self.status=human_update_error('install',e);self.changed.emit();return
   except (OSError,ValueError) as e:self.state='error';self.status=human_update_error('install',e);self.changed.emit();return
+  self.state='installing';self.status='Встановлення оновлення розпочато';self.changed.emit()
   QTimer.singleShot(300,QCoreApplication.quit)
  def _start(self,a,p,s):
   if self.busy:self.status='Операція оновлення вже виконується';self.changed.emit();return
