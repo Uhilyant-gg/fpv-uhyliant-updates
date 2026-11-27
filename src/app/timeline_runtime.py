@@ -32,6 +32,10 @@ EVENTS = {
     "device-list-restored": ("Список пристроїв відновлено", "info"),
     "station-osd-settings-saved": ("Налаштування OSD збережено", "info"),
     "backup-created": ("Резервну копію створено", "info"),
+    "camera-firmware-update-started": ("Оновлення камери розпочато", "info"),
+    "camera-firmware-update-verified": ("Оновлення камери перевірено", "info"),
+    "camera-firmware-update-failed": ("Не вдалося підтвердити оновлення камери", "warning"),
+    "camera-firmware-update-blocked": ("Оновлення камери зупинено до початку", "warning"),
 }
 STATE_EVENTS = {
     "telemetry": {
@@ -68,6 +72,12 @@ STATE_EVENTS = {
         "installing": "app-update-installing",
         "error": "app-update-failed",
         "blocked": "app-update-failed",
+    },
+    "camera-firmware": {
+        "reboot-pending": "camera-firmware-update-started",
+        "verified": "camera-firmware-update-verified",
+        "error": "camera-firmware-update-failed",
+        "blocked": "camera-firmware-update-blocked",
     },
 }
 
@@ -151,7 +161,7 @@ class TimelineRuntime(QObject):
     @Slot(str, str)
     def observe(self, source, state):
         state_events = STATE_EVENTS.get(source)
-        if state_events is None or state not in {"connected", "ready", "degraded", "lost", "playing", "stopped", "scanning", "completed", "cancelled", "failed", "available", "installing", "error", "blocked", "current", "unknown"}:
+        if state_events is None or state not in {"connected", "ready", "degraded", "lost", "playing", "stopped", "scanning", "completed", "cancelled", "failed", "available", "installing", "reboot-pending", "verified", "error", "blocked", "current", "unknown"}:
             return
         previous = self._last_states.get(source)
         self._last_states[source] = state
