@@ -35,9 +35,9 @@ def main():
   return emit("BLOCKED","repository","canonical-state","project-state-invalid","Machine-readable project state is invalid",checks)
  checks.append(run("compile",[sys.executable,"-m","compileall","-q","-f","src","tools"]))
  if not checks[-1]["ok"]:return emit("BLOCKED","repository","compile","compile-failed","Python source compilation failed",checks)
- checks.append(run("app-tests",[sys.executable,"-m","unittest","discover","-s",".","-p","test_*.py"],ROOT/"src"/"app"))
+ checks.append(run("app-tests",[sys.executable,"-m","pytest","-q","-p","no:cacheprovider","."],ROOT/"src"/"app"))
  if not checks[-1]["ok"]:return emit("BLOCKED","application","tests","app-tests-failed","Application tests failed",checks)
- checks.append(run("tool-tests",[sys.executable,"-m","unittest","discover","-s",".","-p","test_*.py"],ROOT/"tools"))
+ checks.append(run("tool-tests",[sys.executable,"-m","pytest","-q","-p","no:cacheprovider","."],ROOT/"tools"))
  if not checks[-1]["ok"]:return emit("BLOCKED","tooling","tests","tool-tests-failed","Tool tests failed",checks)
  software=project_state["softwareTrack"]
  return emit(software["status"],"repository","validation","ready","Repository software validation passed; physical Hardware E2E status is tracked separately",checks,software.get("nextMilestone"),0 if software["status"]=="READY" else 1)
