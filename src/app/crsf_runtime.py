@@ -134,5 +134,14 @@ class CrsfRuntime(QObject):
                     'satellites': payload[14],
                 }
             )
-        elif frame_type == CRSF_FRAMETYPE_LINK_STATISTICS and len(payload) >= 3:
-            self._set({'rssi': payload[2]})
+        elif frame_type == CRSF_FRAMETYPE_LINK_STATISTICS and len(payload) >= 5:
+            # Uplink RSSI ant1/ant2 (-dBm), uplink link quality (%), uplink SNR (int8),
+            # active antenna. Link quality is a percentage, not a raw RSSI value.
+            antenna = 1 if payload[4] == 1 else 0
+            self._set(
+                {
+                    'rssiDbm': -int(payload[antenna]),
+                    'linkQuality': int(payload[2]),
+                    'snr': payload[3] - 256 if payload[3] > 127 else payload[3],
+                }
+            )

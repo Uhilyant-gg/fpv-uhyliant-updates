@@ -1,5 +1,12 @@
 import unittest
-from crsf_runtime import CRSF_FRAMETYPE_BATTERY_SENSOR, CRSF_FRAMETYPE_GPS, CrsfParser, CrsfRuntime, crc8_dvb_s2
+from crsf_runtime import (
+    CRSF_FRAMETYPE_BATTERY_SENSOR,
+    CRSF_FRAMETYPE_GPS,
+    CRSF_FRAMETYPE_LINK_STATISTICS,
+    CrsfParser,
+    CrsfRuntime,
+    crc8_dvb_s2,
+)
 
 
 def frame(frame_type, payload, address=0xC8):
@@ -74,6 +81,26 @@ class CrsfRuntimeTests(unittest.TestCase):
         self.assertNotIn('batteryVoltage', telemetry)
         self.assertTrue(telemetry['freshness']['groundSpeed'])
         self.assertEqual(telemetry['groundSpeed'], 45.0)
+
+    def test_link_statistics_report_quality_and_active_antenna_rssi(self):
+        runtime = CrsfRuntime(clock=lambda: 10.0)
+        # ant1 -72 dBm, ant2 -80 dBm, LQ 98 %, SNR -3 dB, active antenna 0, rf mode, tx power,
+        # downlink RSSI -60 dBm, downlink LQ 100 %, downlink SNR 5 dB
+        payload = bytes((72, 80, 98, (-3) & 0xFF, 0, 2, 3, 60, 100, 5))
+        runtime.feed(frame(CRSF_FRAMETYPE_LINK_STATISTICS, payload))
+        telemetry = runtime.telemetry
+        self.assertEqual(telemetry['linkQuality'], 98)
+        self.assertEqual(telemetry['rssiDbm'], -72)
+        self.assertEqual(telemetry['snr'], -3)
+        self.assertNotIn('rssi', telemetry)  # LQ percent is not a raw RSSI value
+        payload = bytes((72, 80, 90, 4, 1, 2, 3, 60, 100, 5))
+        runtime.feed(frame(CRSF_FRAMETYPE_LINK_STATISTICS, payload))
+        self.assertEqual(runtime.telemetry['rssiDbm'], -80)
+
+    def test_short_link_statistics_frame_is_ignored(self):
+        runtime = CrsfRuntime(clock=lambda: 10.0)
+        runtime.feed(frame(CRSF_FRAMETYPE_LINK_STATISTICS, bytes((72, 80, 98))))
+        self.assertNotIn('linkQuality', runtime.telemetry)
 
 
 if __name__ == '__main__':
