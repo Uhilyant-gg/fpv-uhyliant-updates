@@ -131,6 +131,7 @@ def main():
     from controller_onboarding import ControllerOnboarding
     from controller_profile_store import JsonControllerProfileStore
     from controller_runtime import ControllerRuntime
+    from flight_alerts_runtime import FlightAlertsRuntime
 
     harness.mark('application-imports-complete')
     DATA.mkdir(parents=True, exist_ok=True)
@@ -241,6 +242,8 @@ def main():
     )
     app._runtime_refs = app._runtime_refs + (display_runtime, controller)
     home.setController(controller)
+    flight_alerts = FlightAlertsRuntime(telemetry, s)
+    app._runtime_refs = app._runtime_refs + (flight_alerts,)
     ctx = e.rootContext()
     for name, obj in [
         ('station', s),
@@ -271,6 +274,7 @@ def main():
         ('diagnosticsRuntime', diag),
         ('hardwareE2ERuntime', hardware_e2e),
         ('controllerRuntime', controller),
+        ('flightAlerts', flight_alerts),
     ]:
         ctx.setContextProperty(name, obj)
     ctx.setContextProperty('appWindowTitle', WINDOW_TITLE)
