@@ -77,6 +77,22 @@ class TimelineRuntimeTests(unittest.TestCase):
             ],
         )
 
+    def test_device_changes_and_restore_have_safe_timeline_copy(self):
+        timeline = TimelineRuntime(Settings(), clock=lambda: 300)
+        for event_type in ("device-added", "device-updated", "device-removed", "device-list-restored"):
+            self.assertTrue(timeline.recordEvent(event_type))
+
+        self.assertEqual(
+            [item["title"] for item in timeline.items],
+            [
+                "Список пристроїв відновлено",
+                "Пристрій видалено",
+                "Налаштування пристрою змінено",
+                "Пристрій додано",
+                "Станцію запущено",
+            ],
+        )
+
     def test_new_events_notify_timeline_consumers(self):
         timeline = TimelineRuntime(Settings(), clock=lambda: 120)
         changes = []

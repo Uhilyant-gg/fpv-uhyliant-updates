@@ -148,6 +148,7 @@ class Devices(LegacyDevices):
         name=name.strip();host=host.strip();from devices import valid_host
         if not name or not valid_host(host):return False
         try:
-            with self._connect() as db:db.execute("UPDATE devices SET name=?,host=?,port=?,notes=? WHERE id=?",(name,host,max(1,min(int(port),65535)),notes.strip(),did))
+            with self._connect() as db:changed=db.execute("UPDATE devices SET name=?,host=?,port=?,notes=? WHERE id=?",(name,host,max(1,min(int(port),65535)),notes.strip(),did)).rowcount>0
         except Exception:return False
-        self._remember_host(host,False);self._load();self.changed.emit();return True
+        if not changed:return False
+        self._remember_host(host,False);self._load();self.changed.emit();self.deviceUpdated.emit();return True

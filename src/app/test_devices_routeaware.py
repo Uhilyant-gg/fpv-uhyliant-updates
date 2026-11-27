@@ -48,6 +48,10 @@ class Tests(unittest.TestCase):
   d=module.Devices();d._manual_busy=True;d._manual_requested_host='192.168.1.40';d._on_manual_done(self.verified(),'');self.assertFalse(d.manualBusy);self.assertEqual(d.manualStatus,'error');self.assertEqual(d.manualResult,{});self.assertIn('поточній адресі',d.manualError)
  def test_verified_manual_candidate_adds_and_reports_success(self):
   d=module.Devices();d._manual_result=self.verified();did=d.addDiscovered('192.168.1.50','Camera',True);self.assertTrue(did);self.assertEqual(d.count,1);self.assertEqual(d.manualStatus,'added');self.assertIn('додано',d.manualMessage.lower());saved=d.items[0];self.assertTrue(saved['openipcIdentity']['verified']);self.assertEqual(saved['openipcIdentity']['sensor'],'imx335')
+ def test_device_update_emits_change_event_only_for_existing_device(self):
+  d=module.Devices();did=d.addDevice('Camera','OpenIPC','192.168.1.40',80,'Network','');events=[];d.deviceUpdated.connect(lambda:events.append(True))
+  self.assertTrue(d.updateDevice(did,'Updated camera','192.168.1.41',8080,'Updated notes'));self.assertEqual(events,[True]);self.assertEqual(d.items[0]['name'],'Updated camera')
+  self.assertFalse(d.updateDevice('missing','Unknown','192.168.1.42',80,''));self.assertEqual(events,[True])
  def test_duplicate_add_is_idempotent_and_visible(self):
   d=module.Devices();d._manual_result=self.verified();first=d.addDiscovered('192.168.1.50','Camera',True);second=d.addDiscovered('192.168.1.50','Camera',True);self.assertEqual(second,first);self.assertEqual(d.count,1);self.assertEqual(d.manualStatus,'added');self.assertIn('вже',d.manualMessage.lower())
  def test_unverified_candidate_fails_closed_with_visible_error(self):

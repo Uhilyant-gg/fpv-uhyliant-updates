@@ -26,6 +26,10 @@ EVENTS = {
     "app-update-ready": ("Оновлення програми підготовлено", "info"),
     "app-update-installing": ("Встановлення оновлення розпочато", "info"),
     "app-update-failed": ("Не вдалося завершити оновлення програми", "warning"),
+    "device-added": ("Пристрій додано", "info"),
+    "device-updated": ("Налаштування пристрою змінено", "info"),
+    "device-removed": ("Пристрій видалено", "warning"),
+    "device-list-restored": ("Список пристроїв відновлено", "info"),
 }
 STATE_EVENTS = {
     "telemetry": {

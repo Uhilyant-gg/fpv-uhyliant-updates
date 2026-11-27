@@ -79,7 +79,7 @@ Audit QML and backend presentation boundaries for raw exception, socket, RTSP, S
 ### P0.5 Timeline integration
 Convert meaningful startup, discovery, configuration, backup, update and recovery events into human-readable chronological entries. Do not make raw logs the normal experience.
 
-**Implemented foundation (repository software):** Timeline presents localized station start, camera selection, video, telemetry, network, navigation, device-discovery lifecycle and meaningful application-update events, while filtering internal diagnostic messages. Only allowlisted event codes and timestamps are stored locally, capped at 200 events or 30 days, with one-click clearing. Configuration, backup and recovery coverage remains incomplete.
+**Implemented foundation (repository software):** Timeline presents localized station start, camera selection, video, telemetry, network, navigation, device-discovery lifecycle, device add/update/remove/restore and meaningful application-update events, while filtering internal diagnostic messages. Only allowlisted event codes and timestamps are stored locally, capped at 200 events or 30 days, with one-click clearing. Broader configuration, automatic backup and recovery coverage remains incomplete.
 
 ### P0.6 Backup and one-click recovery
 Before critical reversible configuration changes, create an identity-bound validated backup and provide a clear restore action. Ambiguous or invalid restore fails closed with a human explanation.
