@@ -74,6 +74,43 @@ class ControllerPanelQmlTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("ok", result.stdout)
 
+    def test_preflight_shows_controller_row(self):
+        script = r"""
+import sys
+from pathlib import Path
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QGuiApplication
+from PySide6.QtQml import QQmlComponent, QQmlEngine
+app = QGuiApplication(sys.argv)
+engine = QQmlEngine()
+component = QQmlComponent(engine, QUrl.fromLocalFile(str(Path("PreflightPanel.qml").resolve())))
+panel = component.create()
+assert panel is not None, [e.toString() for e in component.errors()]
+def row():
+    checks = panel.property("checks")
+    checks = checks.toVariant() if hasattr(checks, "toVariant") else checks
+    return next(c for c in checks if c["label"] == "Пульт")
+assert row()["state"] == "unavailable"
+for health, state in (("ready", "ready"), ("attention", "attention"), ("problem", "error"), ("unknown", "unavailable")):
+    panel.setProperty("controllerHealth", health)
+    panel.setProperty("controllerDetail", "деталь")
+    assert row()["state"] == state, (health, row())
+    assert row()["detail"] == "деталь"
+assert panel.stateLabel("attention") == "Потрібна дія"
+print("ok")
+"""
+        env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software")
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=Path(__file__).resolve().parent,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("ok", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

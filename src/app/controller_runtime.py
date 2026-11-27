@@ -101,6 +101,12 @@ class ControllerRuntime(QObject):
         self._tick()
 
     @Slot()
+    def observe(self):
+        """Take one fresh observation without starting continuous polling."""
+        if self._wizard is None:
+            self._apply(self.onboarding.refresh())
+
+    @Slot()
     def deactivate(self):
         self._active = False
         self._timer.stop()
