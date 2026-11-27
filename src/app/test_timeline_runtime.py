@@ -43,6 +43,24 @@ class TimelineRuntimeTests(unittest.TestCase):
             ["Зв’язок із телеметрією втрачено", "Телеметрію підключено", "Станцію запущено"],
         )
 
+    def test_device_discovery_lifecycle_is_human_readable_and_deduplicated(self):
+        timeline = TimelineRuntime(Settings(), clock=lambda: 180)
+        for state in ("unknown", "scanning", "scanning", "completed", "completed", "scanning", "failed", "failed", "scanning", "cancelled", "cancelled"):
+            timeline.observe("discovery", state)
+
+        self.assertEqual(
+            [item["title"] for item in timeline.items],
+            [
+                "Пошук пристроїв скасовано",
+                "Пошук пристроїв розпочато",
+                "Не вдалося завершити пошук пристроїв",
+                "Пошук пристроїв розпочато",
+                "Пошук пристроїв завершено",
+                "Пошук пристроїв розпочато",
+                "Станцію запущено",
+            ],
+        )
+
     def test_new_events_notify_timeline_consumers(self):
         timeline = TimelineRuntime(Settings(), clock=lambda: 120)
         changes = []

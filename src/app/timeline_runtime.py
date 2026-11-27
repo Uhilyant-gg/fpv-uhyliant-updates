@@ -18,6 +18,10 @@ EVENTS = {
     "navigation-ready": ("Зовнішню навігацію підтверджено", "info"),
     "navigation-degraded": ("Якість зовнішньої навігації погіршилась", "warning"),
     "navigation-lost": ("Зовнішня навігація недоступна", "warning"),
+    "device-discovery-started": ("Пошук пристроїв розпочато", "info"),
+    "device-discovery-completed": ("Пошук пристроїв завершено", "info"),
+    "device-discovery-cancelled": ("Пошук пристроїв скасовано", "warning"),
+    "device-discovery-failed": ("Не вдалося завершити пошук пристроїв", "warning"),
 }
 STATE_EVENTS = {
     "telemetry": {
@@ -41,6 +45,12 @@ STATE_EVENTS = {
     "secondary-video": {
         "playing": "secondary-video-started",
         "stopped": "secondary-video-stopped",
+    },
+    "discovery": {
+        "scanning": "device-discovery-started",
+        "completed": "device-discovery-completed",
+        "cancelled": "device-discovery-cancelled",
+        "failed": "device-discovery-failed",
     },
 }
 
@@ -124,7 +134,7 @@ class TimelineRuntime(QObject):
     @Slot(str, str)
     def observe(self, source, state):
         state_events = STATE_EVENTS.get(source)
-        if state_events is None or state not in {"connected", "ready", "degraded", "lost", "playing", "stopped", "unknown"}:
+        if state_events is None or state not in {"connected", "ready", "degraded", "lost", "playing", "stopped", "scanning", "completed", "cancelled", "failed", "unknown"}:
             return
         previous = self._last_states.get(source)
         self._last_states[source] = state
