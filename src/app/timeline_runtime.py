@@ -61,6 +61,7 @@ STATE_EVENTS = {
         "ready": "app-update-ready",
         "installing": "app-update-installing",
         "error": "app-update-failed",
+        "blocked": "app-update-failed",
     },
 }
 
@@ -144,7 +145,7 @@ class TimelineRuntime(QObject):
     @Slot(str, str)
     def observe(self, source, state):
         state_events = STATE_EVENTS.get(source)
-        if state_events is None or state not in {"connected", "ready", "degraded", "lost", "playing", "stopped", "scanning", "completed", "cancelled", "failed", "available", "installing", "error", "current", "unknown"}:
+        if state_events is None or state not in {"connected", "ready", "degraded", "lost", "playing", "stopped", "scanning", "completed", "cancelled", "failed", "available", "installing", "error", "blocked", "current", "unknown"}:
             return
         previous = self._last_states.get(source)
         self._last_states[source] = state

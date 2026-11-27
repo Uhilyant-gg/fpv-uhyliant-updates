@@ -63,7 +63,7 @@ class TimelineRuntimeTests(unittest.TestCase):
 
     def test_application_update_lifecycle_records_only_meaningful_states(self):
         timeline = TimelineRuntime(Settings(), clock=lambda: 240)
-        for state in ("check", "available", "available", "download", "ready", "installing", "error", "error"):
+        for state in ("check", "available", "available", "download", "ready", "installing", "blocked", "blocked"):
             timeline.observe("update", state)
 
         self.assertEqual(
