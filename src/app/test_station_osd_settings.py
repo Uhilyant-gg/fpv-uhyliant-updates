@@ -1,0 +1,106 @@
+import unittest
+
+from PySide6.QtCore import QSettings
+
+from backend import Station
+
+
+class Settings:
+    def __init__(self, values=None):
+        self.values = dict(values or {})
+        self.sync_status = QSettings.NoError
+
+    def value(self, key, default=None):
+        return self.values.get(key, default)
+
+    def setValue(self, key, value):
+        self.values[key] = value
+
+    def sync(self):
+        pass
+
+    def status(self):
+        return self.sync_status
+
+
+class StationOsdSettingsTests(unittest.TestCase):
+    def test_station_osd_is_enabled_by_default_and_persisted_when_changed(self):
+        settings = Settings()
+        station = Station(settings)
+
+        self.assertTrue(station.osdEnabled)
+        station.setOSDEnabled(False)
+        self.assertFalse(station.osdEnabled)
+        self.assertIs(settings.values[Station.OSD_ENABLED_KEY], False)
+
+        restored = Station(settings)
+        self.assertFalse(restored.osdEnabled)
+
+    def test_legacy_false_setting_disables_only_station_overlay(self):
+        settings = Settings({Station.OSD_ENABLED_KEY: "false"})
+        station = Station(settings)
+
+        self.assertFalse(station.osdEnabled)
+        self.assertEqual(station.osdSource, "station")
+
+    def test_enabling_station_overlay_does_not_change_source_osd_mode(self):
+        station = Station(Settings({Station.OSD_ENABLED_KEY: False}))
+
+        station.setOSDEnabled(True)
+
+        self.assertTrue(station.osdEnabled)
+        self.assertEqual(station.osdSource, "station")
+
+    def test_osd_style_and_position_persist(self):
+        settings = Settings()
+        station = Station(settings)
+
+        self.assertTrue(station.setOSDStyle(0.7, 1.2))
+        self.assertTrue(station.setOSDPosition("bottom-right"))
+
+        restored = Station(settings)
+        self.assertEqual(restored.osdOpacity, 0.7)
+        self.assertEqual(restored.osdScale, 1.2)
+        self.assertEqual(restored.osdPosition, "bottom-right")
+
+    def test_osd_style_rejects_out_of_range_values_and_clamps_saved_values(self):
+        settings = Settings({
+            Station.OSD_OPACITY_KEY: 2,
+            Station.OSD_SCALE_KEY: 0.1,
+            Station.OSD_POSITION_KEY: "center",
+        })
+        station = Station(settings)
+
+        self.assertEqual(station.osdOpacity, 0.8)
+        self.assertEqual(station.osdScale, 0.85)
+        self.assertEqual(station.osdPosition, "top-left")
+        self.assertFalse(station.setOSDStyle(0.9, 1.0))
+        self.assertFalse(station.setOSDPosition("center"))
+        self.assertEqual(station.osdOpacity, 0.8)
+        self.assertEqual(station.osdPosition, "top-left")
+
+    def test_osd_style_can_be_reset_to_defaults(self):
+        settings = Settings()
+        station = Station(settings)
+        station.setOSDStyle(0.7, 1.2)
+        station.setOSDPosition("bottom-right")
+
+        station.resetOSDStyle()
+
+        self.assertEqual(station.osdOpacity, Station.OSD_DEFAULT_OPACITY)
+        self.assertEqual(station.osdScale, Station.OSD_DEFAULT_SCALE)
+        self.assertEqual(station.osdPosition, Station.OSD_DEFAULT_POSITION)
+        restored = Station(settings)
+        self.assertEqual(restored.osdPosition, Station.OSD_DEFAULT_POSITION)
+
+    def test_osd_persistence_error_is_explained(self):
+        settings = Settings()
+        settings.sync_status = QSettings.AccessError
+        station = Station(settings)
+
+        self.assertFalse(station.setOSDStyle(0.7, 1.2))
+        self.assertIn("Не вдалося зберегти налаштування OSD", station.osdSettingsError)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 Item {
  id:root
- signal openDevices();signal openFirmware();signal openUpdate();signal openDiagnostics();signal connectDevice(string deviceId);signal runNextAction(string action)
+ signal openDevices();signal openFirmware();signal openUpdate();signal openDiagnostics();signal openPreflight();signal openTimeline();signal openOsdSettings();signal connectDevice(string deviceId);signal runNextAction(string action)
  property color fg:"#f5f8fc";property color sub:"#8799ad";property color surface:"#0d1723";property color elevated:"#132235";property color line:"#203348";property color green:"#35e0a1"
  function canEnterFpv(deviceId){if(!deviceId)return false;for(var i=0;i<devicesModel.items.length;i++)if(devicesModel.items[i].id===deviceId){var streams=devicesModel.streams;for(var n=0;n<streams.length;n++)if(streams[n].device_id===deviceId&&streams[n].enabled===true)return true;return false}return false}
  Rectangle{anchors.fill:parent;color:"#08111b"}
@@ -14,6 +14,9 @@ Item {
    Button{visible:updater.updateState==="available"||updater.updateState==="ready";text:updater.updateState==="ready"?"Встановити "+updater.availableVersion:"Оновити до "+updater.availableVersion;font.bold:true;onClicked:root.openUpdate();HoverHint{text:"Доступна нова версія програми."}}
    Text{visible:updater.busy;text:updater.updateStatus;color:sub;font.pixelSize:11}
    Item{Layout.fillWidth:true}
+   Button{text:"OSD";flat:true;onClicked:root.openOsdSettings();HoverHint{text:"Змінити розташування та вигляд OSD станції."}}
+   Button{text:"Події";flat:true;onClicked:root.openTimeline();HoverHint{text:"Переглянути важливі зміни в поточній сесії."}}
+   Button{text:"Підготовка";flat:true;onClicked:root.openPreflight();HoverHint{text:"Переглянути відео, телеметрію, мережу та доступність керування."}}
    Button{text:"Прошивка";flat:true;onClicked:root.openFirmware();HoverHint{text:"Безпечне керування прошивкою камери."}}
    Button{text:"Діагностика";flat:true;onClicked:root.openDiagnostics();HoverHint{text:"Переглянути фактично доступну діагностику."}}
   }

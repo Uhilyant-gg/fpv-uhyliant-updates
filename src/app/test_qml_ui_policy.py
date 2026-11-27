@@ -27,7 +27,11 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
                 "HoverHint.qml",
                 "Main.qml",
                 "MavlinkDiagnostics.qml",
+                "OsdOverlay.qml",
+                "OsdSettingsPanel.qml",
                 "PairingPanel.qml",
+                "PreflightPanel.qml",
+                "TimelinePanel.qml",
                 "UpdatePanel.qml",
             },
         )

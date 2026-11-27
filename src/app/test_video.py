@@ -37,6 +37,21 @@ class VideoRuntimeTests(unittest.TestCase):
  @patch('video.socket.create_connection',side_effect=OSError('offline'))
  def test_failed_secondary_prepare_disables_pip(self,c):
   w=VideoWorkspaceRuntime(FakeDevices());w.setPipEnabled(True);self.assertFalse(w.prepareSecondary('sub'));self.assertFalse(w.pipEnabled);self.assertEqual(w.secondary.state,'error')
+ @patch('video.socket.create_connection',side_effect=OSError('RTSP timeout: Connection refused, socket error'))
+ def test_connection_errors_are_explained_without_transport_details(self,c):
+  r=VideoRuntime(FakeDevices());self.assertFalse(r.prepare('main'))
+  for message in (r.error,r.diagnostics['error']):
+   self.assertIn('Перевірте',message)
+   self.assertNotIn('RTSP',message)
+   self.assertNotIn('Connection refused',message)
+   self.assertNotIn('socket error',message)
+ @patch('video.socket.create_connection')
+ def test_playback_errors_do_not_expose_player_error_strings(self,c):
+  c.return_value.__enter__.return_value=object();r=VideoRuntime(FakeDevices());self.assertTrue(r.prepare('main'))
+  r.playbackError('Unknown exception: RTSP timeout, Connection refused')
+  self.assertIn('Перевірте з’єднання',r.error)
+  self.assertNotIn('Unknown exception',r.error)
+  self.assertNotIn('RTSP',r.diagnostics['error'])
  @patch('video.socket.create_connection')
  def test_reconnect_fails_closed_if_stream_was_removed(self,c):
   c.return_value.__enter__.return_value=object();d=FakeDevices();r=VideoRuntime(d);self.assertTrue(r.prepare('main'));d.streams=[];self.assertFalse(r.reconnect());self.assertEqual(r.state,'error');self.assertEqual(r.streamId,'');self.assertIsNone(r.diagnostics['endpointCheckMs'])
