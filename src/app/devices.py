@@ -18,7 +18,9 @@ def interfaces():
 class Devices(QObject):
  changed=Signal();streamsChanged=Signal();discoveryChanged=Signal();deviceAdded=Signal();deviceUpdated=Signal();deviceRemoved=Signal();deviceListRestored=Signal()
  def __init__(self):
-  super().__init__();DATA.mkdir(parents=True,exist_ok=True);self._items=[];self._streams=[];self._active='';self._discovered=[];self._scanning=False;self._stage='';self._status='';self._pd=0;self._pt=0;self._found=0;self._worker=None;self._init();self._load()
+  super().__init__();DATA.mkdir(parents=True,exist_ok=True);self._items=[];self._streams=[];self._active='';self._discovered=[];self._scanning=False;self._stage='';self._status='';self._pd=0;self._pt=0;self._found=0;self._worker=None;self._before_critical_change=None;self._init();self._load()
+ def setBackupGuard(self,guard):self._before_critical_change=guard
+ def _protect_change(self):return self._before_critical_change is None or self._before_critical_change()
  def _connect(self):return sqlite3.connect(DB)
  def _init(self):
   with self._connect() as d:
@@ -72,6 +74,7 @@ class Devices(QObject):
  @Slot(str)
  def removeDevice(self,did):
   existed=any(x.get('id')==did for x in self._items)
+  if not existed or not self._protect_change():return
   with self._connect() as d:d.execute('DELETE FROM streams WHERE device_id=?',(did,));d.execute('DELETE FROM devices WHERE id=?',(did,))
   self._load();self.changed.emit();self.streamsChanged.emit()
   if existed:self.deviceRemoved.emit()
@@ -94,6 +97,7 @@ class Devices(QObject):
   self._load();self.streamsChanged.emit();return sid
  @Slot(str)
  def removeStream(self,sid):
+  if not any(x.get('id')==sid for x in self._streams) or not self._protect_change():return
   with self._connect() as d:d.execute('DELETE FROM streams WHERE id=?',(sid,))
   self._load();self.streamsChanged.emit()
  @Slot(str,bool)
@@ -123,6 +127,7 @@ class Devices(QObject):
  @Slot('QVariantMap',result=bool)
  def restoreSnapshot(self,value):
   if not self.validateSnapshot(value):return False
+  if not self._protect_change():return False
   try:
    with self._connect() as d:
     d.execute('BEGIN IMMEDIATE');d.execute('DELETE FROM streams');d.execute('DELETE FROM devices')

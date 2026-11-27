@@ -37,7 +37,7 @@ class WindowsCredentialSecretStore(SecretStore):
   try:self._api=self._api or _WinCredApi();self.available=True
   except Exception as exc:self.error=str(exc)
  def _target(self,key):
-  if not isinstance(key,str) or not key.startswith('pairing/') or len(key)<=len('pairing/'):raise SecretStoreUnavailable('invalid pairing secret key')
+  if not isinstance(key,str) or not any(key.startswith(prefix) and len(key)>len(prefix) for prefix in ('pairing/','backup/')):raise SecretStoreUnavailable('invalid secret key')
   return self._prefix+key
  def put(self,key,value):
   if not self.available:raise SecretStoreUnavailable(self.error or 'Windows Credential Manager unavailable')

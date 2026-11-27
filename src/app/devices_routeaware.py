@@ -147,6 +147,7 @@ class Devices(LegacyDevices):
     def updateDevice(self,did,name,host,port,notes):
         name=name.strip();host=host.strip();from devices import valid_host
         if not name or not valid_host(host):return False
+        if not any(x['id']==did for x in self._items) or not self._protect_change():return False
         try:
             with self._connect() as db:changed=db.execute("UPDATE devices SET name=?,host=?,port=?,notes=? WHERE id=?",(name,host,max(1,min(int(port),65535)),notes.strip(),did)).rowcount>0
         except Exception:return False

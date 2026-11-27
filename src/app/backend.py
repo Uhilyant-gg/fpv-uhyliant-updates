@@ -71,6 +71,7 @@ class Station(QObject):
  def osdPosition(self):return self._position
  @Property(str,notify=changed)
  def osdSettingsError(self):return self._osd_settings_error
+ def exportOsdSnapshot(self):return {'enabled':self._osd_enabled,'opacity':self._opacity,'scale':self._scale,'position':self._position}
  @Slot()
  def toggleMenu(self):self._menu=not self._menu;self.changed.emit()
  @Slot()

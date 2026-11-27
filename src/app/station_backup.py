@@ -21,8 +21,13 @@ def _open(wrapper,password):
  plain=AESGCM(_derive(password,salt)).decrypt(nonce,cipher,_aad(header));return json.loads(plain.decode('utf-8'))
 
 class StationBackup(QObject):
- changed=Signal()
- def __init__(self,devices):super().__init__();self.devices=devices;self._result={'ready':False,'reason':'Backup operation not started','manifest':{}};self._pending=None
+ changed=Signal();automaticFailure=Signal(str)
+ def __init__(self,devices,automatic=None):
+  super().__init__();self.devices=devices;self.automatic=automatic;self._result={'ready':False,'reason':'Backup operation not started','manifest':{}};self._pending=None
+  if automatic is not None:devices.setBackupGuard(self._protect_change)
+ def _protect_change(self):
+  if self.automatic.create():return True
+  self.automaticFailure.emit(self.automatic.error);return False
  @Property('QVariantMap',notify=changed)
  def result(self):return dict(self._result)
  def _payload(self):return {'schema':SCHEMA,'version':VERSION,'devices':self.devices.exportSnapshot()}
@@ -41,11 +46,18 @@ class StationBackup(QObject):
    if not valid:self._set(False,'Backup payload is invalid or incompatible');return {}
    self._pending=payload['devices'];plan={'schema':SCHEMA,'version':VERSION,'encrypted':True,'cipher':CIPHER,'deviceCount':len(self._pending['devices']),'execution':'explicit-confirmation-required'};self._set(True,'Restore plan verified; live data unchanged',plan);return dict(plan)
   except (OSError,TypeError,ValueError,KeyError,json.JSONDecodeError,InvalidTag):self._set(False,'Backup authentication, compatibility, or read verification failed');return {}
+ @Slot(result='QVariantMap')
+ def inspectAutomatic(self):
+  self._pending=None
+  if self.automatic is None:self._set(False,'Automatic backups unavailable');return {}
+  payload=self.automatic.latest()
+  if payload is None:self.automaticFailure.emit(self.automatic.error);self._set(False,self.automatic.error);return {}
+  self._pending=payload['devices'];plan={'schema':SCHEMA,'version':VERSION,'encrypted':True,'deviceCount':len(self._pending['devices']),'execution':'explicit-confirmation-required','automatic':True};self._set(True,'Restore plan verified; live data unchanged',plan);return dict(plan)
  @Slot(bool,result=bool)
  def restoreInspected(self,confirmed):
   if not confirmed or self._pending is None:self._set(False,'Restore requires explicit confirmation and a verified import plan');return False
   snapshot=self._pending;self._pending=None
-  if not self.devices.restoreSnapshot(snapshot):self._set(False,'Transactional restore failed; live state preserved');return False
+  if not self.devices.restoreSnapshot(snapshot):self._set(False,(self.automatic.error if self.automatic and self.automatic.error else 'Transactional restore failed; live state preserved'));return False
   self._set(True,'Transactional restore completed',{'schema':SCHEMA,'version':VERSION,'restored':True});return True
  @Slot()
  def cancelRestore(self):self._pending=None;self._set(False,'Restore plan cleared')
