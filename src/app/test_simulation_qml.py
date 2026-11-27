@@ -54,6 +54,27 @@ def single_shot(delay, callback):
         video = window.findChild(QObject, 'mainFlightVideoOutput')
         assert scene is not None and scene.property('visible')
         assert video is not None and not video.property('visible')
+        lazy_panels = {
+            'streamsPopup': 'streamsContent',
+            'timelinePopup': 'timelineContent',
+            'backupPopup': 'backupContent',
+            'osdSettingsPopup': 'osdSettingsLoader',
+            'preflightPopup': 'preflightContent',
+            'diagnostics': 'diagnosticsContent',
+            'firmwarePopup': 'firmwarePanelLoader',
+            'hardwareE2EPopup': 'hardwareE2EContent',
+            'updatePopup': 'updateContent',
+            'devices': 'devicesContent',
+        }
+        popups = {}
+        for popup_name, loader_name in lazy_panels.items():
+            popup = window.findChild(QObject, popup_name)
+            loader = window.findChild(QObject, loader_name)
+            assert popup is not None and loader is not None, (popup_name, loader_name)
+            assert not loader.property('active'), (popup_name, loader.property('active'))
+            popups[popup_name] = (popup, loader)
+        popup, _ = popups['osdSettingsPopup']
+        assert popup.findChild(QObject, 'osdPreviewOverlay') is None
         first = value_map(window.property('simulatedTelemetry'))
         assert all(field in first for field in ('roll', 'pitch', 'yaw', 'homeDistance', 'batteryVoltage', 'gpsFix', 'groundSpeed'))
         window.setProperty('simulationTick', 10)
@@ -73,14 +94,21 @@ def single_shot(delay, callback):
         assert edit is not None and edit.property('enabled')
         edit.clicked.emit()
         app.processEvents()
-        popup = window.findChild(QObject, 'osdSettingsPopup')
-        assert popup is not None and popup.property('visible')
+        assert popup.property('visible')
         preview_osd = popup.findChild(QObject, 'osdPreviewOverlay')
         assert preview_osd is not None and preview_osd.property('editing')
         lock_notice = popup.findChild(QObject, 'osd-editing-locked')
         assert lock_notice is not None and not lock_notice.property('visible')
         popup.close()
         app.processEvents()
+        for popup_name, (panel_popup, loader) in popups.items():
+            if popup_name == 'osdSettingsPopup':
+                continue
+            panel_popup.open()
+            app.processEvents()
+            assert loader.property('active') and loader.property('item') is not None, popup_name
+            panel_popup.close()
+            app.processEvents()
         close = window.findChild(QObject, 'exitSimulation')
         assert close is not None
         close.clicked.emit()

@@ -81,8 +81,8 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
         main = self.qml["Main.qml"]
         panel = self.qml["OsdSettingsPanel.qml"]
         main = re.sub(r"\s+", "", main)
-        self.assertIn("functionopenOsdSettings(){osdSettingsPanel.editingAllowed=w.simulation||t.armed!==true;osdSettingsPopup.open()}", main)
-        self.assertIn("if(osdSettingsPopup.visible&&!w.simulation)osdSettingsPanel.editingAllowed=t.armed!==true", main)
+        self.assertIn("functionopenOsdSettings(){if(!osdSettingsLoader.active){osdSettingsLoader.active=true;Qt.callLater(openOsdSettings);return}osdSettingsLoader.item.editingAllowed=w.simulation||t.armed!==true;osdSettingsPopup.open()}", main)
+        self.assertIn("if(osdSettingsPopup.visible&&!w.simulation&&osdSettingsLoader.item)osdSettingsLoader.item.editingAllowed=t.armed!==true", main)
         self.assertNotIn("editingAllowed:w.simulation||t.armed!==true", main)
         self.assertIn("enabled: root.editingAllowed", panel)
         self.assertIn("editing: root.editingAllowed", panel)
