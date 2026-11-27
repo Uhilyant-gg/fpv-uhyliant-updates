@@ -33,7 +33,10 @@ class ManualWorker(QThread):
         try:self.done.emit(fingerprint(self.host,self.cancel),"")
         except Exception:self.done.emit({},"inspection-failed")
 
-class Devices(LegacyDevices):
+class RouteAwareDevices(LegacyDevices):
+    # Must not reuse the base class name: PySide6 then silently drops this
+    # subclass's signals, properties and slots from the Qt meta-object, so QML
+    # cannot see them even though Python calls still work.
     manualChanged=Signal()
     scanStateChanged=Signal()
     firmwarePreparationRequested=Signal(str)
@@ -212,3 +215,6 @@ class Devices(LegacyDevices):
         except Exception:return False
         if not changed:return False
         self._remember_host(host,False);self._load();self.changed.emit();self.deviceUpdated.emit();return True
+
+
+Devices = RouteAwareDevices

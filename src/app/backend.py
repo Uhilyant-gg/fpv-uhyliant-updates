@@ -27,6 +27,8 @@ class HomeDashboard(QObject):
  @Property(int,notify=changed)
  def verifiedCount(self):return self._model["verifiedCount"]
  @Property(int,notify=changed)
+ def pendingCount(self):return self._model["pendingCount"]
+ @Property(int,notify=changed)
  def warningCount(self):return self._model["warningCount"]
  @Property('QVariantMap',notify=changed)
  def nextAction(self):return dict(self._model["nextAction"])
@@ -93,6 +95,7 @@ class Station(QObject):
  def osdEnabledElements(self):return dict(self._element_visibility)
  @Property(str,notify=changed)
  def osdSettingsError(self):return self._osd_settings_error
+ def exportOsdSnapshot(self):return {'enabled':self._osd_enabled,'opacity':self._opacity,'scale':self._scale,'position':self._position}
  @Slot()
  def toggleMenu(self):self._menu=not self._menu;self.changed.emit()
  @Slot()
