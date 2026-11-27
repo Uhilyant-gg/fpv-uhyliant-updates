@@ -46,6 +46,11 @@ Item {
   messageOk=stationBackup.restoreInspected(true)
   message=messageOk?"Список пристроїв і відеопотоків відновлено.":"Не вдалося відновити копію. Поточні дані не змінено."
  }
+ function inspectAutomatic(){
+  restorePlan=stationBackup.inspectAutomatic()
+  if(!restorePlan.execution){message="Автоматичну копію не перевірено.";messageOk=false;return}
+  message="";restoreConfirmation.open()
+ }
  function cancelRestore(){
   var pending=restorePlan.execution
   restorePlan=({})
@@ -77,6 +82,8 @@ Item {
     Text{text:"Відновити з копії";color:root.fg;font.bold:true}
     TextField{id:restorePassword;Layout.fillWidth:true;placeholderText:"Пароль резервної копії";echoMode:TextInput.Password;inputMethodHints:Qt.ImhSensitiveData|Qt.ImhNoPredictiveText}
     Button{text:"Перевірити копію";onClicked:root.chooseRestore()}
+    Button{text:"Перевірити останню автоматичну копію";onClicked:root.inspectAutomatic()}
+    Text{text:"Автоматична копія зберігається лише на цій станції. Відновлення OSD з неї поки не підтримується.";color:root.sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
     Text{visible:root.message!=="";text:root.message;color:root.messageOk?"#27d59a":root.red;wrapMode:Text.WordWrap;Layout.fillWidth:true}
     Item{Layout.fillHeight:true}
    }

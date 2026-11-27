@@ -24,4 +24,6 @@ class Tests(unittest.TestCase):
  def test_api_failure_does_not_turn_into_false_absence(self):
   a=Api();a.fail='get';s=WindowsCredentialSecretStore(api=a,platform='win32')
   with self.assertRaises(OSError):s.contains('pairing/abc')
+ def test_backup_key_uses_distinct_namespace(self):
+  a=Api();s=WindowsCredentialSecretStore(api=a,platform='win32');s.put('backup/abc',b'key');self.assertEqual(s.get('backup/abc'),b'key');self.assertIn('FPV-Uhyliant/backup/abc',a.data)
 if __name__=='__main__':unittest.main()

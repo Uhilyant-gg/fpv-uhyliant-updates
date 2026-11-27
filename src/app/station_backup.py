@@ -21,8 +21,13 @@ def _open(wrapper,password):
  plain=AESGCM(_derive(password,salt)).decrypt(nonce,cipher,_aad(header));return json.loads(plain.decode('utf-8'))
 
 class StationBackup(QObject):
- changed=Signal()
- def __init__(self,devices):super().__init__();self.devices=devices;self._result={'ready':False,'reason':'Резервну копію ще не створено.','manifest':{}};self._pending=None
+ changed=Signal();automaticFailure=Signal(str)
+ def __init__(self,devices,automatic=None):
+  super().__init__();self.devices=devices;self.automatic=automatic;self._result={'ready':False,'reason':'Резервну копію ще не створено.','manifest':{}};self._pending=None
+  if automatic is not None:devices.setBackupGuard(self._protect_change)
+ def _protect_change(self):
+  if self.automatic.create():return True
+  self.automaticFailure.emit(self.automatic.error);return False
  @Property('QVariantMap',notify=changed)
  def result(self):return dict(self._result)
  def _payload(self):return {'schema':SCHEMA,'version':VERSION,'devices':self.devices.exportSnapshot()}
@@ -41,11 +46,18 @@ class StationBackup(QObject):
    if not valid:self._set(False,'Не вдалося перевірити резервну копію. Перевірте пароль, файл і його сумісність.');return {}
    self._pending=payload['devices'];plan={'schema':SCHEMA,'version':VERSION,'encrypted':True,'cipher':CIPHER,'deviceCount':len(self._pending['devices']),'execution':'explicit-confirmation-required'};self._set(True,'Копію перевірено. Поточні дані не змінено.',plan);return dict(plan)
   except (OSError,TypeError,ValueError,KeyError,json.JSONDecodeError,InvalidTag):self._set(False,'Не вдалося перевірити резервну копію. Перевірте пароль, файл і його сумісність.');return {}
+ @Slot(result='QVariantMap')
+ def inspectAutomatic(self):
+  self._pending=None
+  if self.automatic is None:self._set(False,'Автоматичні резервні копії недоступні.');return {}
+  payload=self.automatic.latest()
+  if payload is None:self.automaticFailure.emit(self.automatic.error);self._set(False,self.automatic.error);return {}
+  self._pending=payload['devices'];plan={'schema':SCHEMA,'version':VERSION,'encrypted':True,'deviceCount':len(self._pending['devices']),'execution':'explicit-confirmation-required','automatic':True};self._set(True,'Копію перевірено. Поточні дані не змінено.',plan);return dict(plan)
  @Slot(bool,result=bool)
  def restoreInspected(self,confirmed):
   if not confirmed or self._pending is None:self._set(False,'Для відновлення підтвердьте перевірену резервну копію.');return False
   snapshot=self._pending;self._pending=None
-  if not self.devices.restoreSnapshot(snapshot):self._set(False,'Не вдалося відновити копію. Поточні дані не змінено.');return False
+  if not self.devices.restoreSnapshot(snapshot):self._set(False,(self.automatic.error if self.automatic and self.automatic.error else 'Не вдалося відновити копію. Поточні дані не змінено.'));return False
   self._set(True,'Пристрої та відеопотоки відновлено.',{'schema':SCHEMA,'version':VERSION,'restored':True});return True
  @Slot()
  def cancelRestore(self):self._pending=None;self._set(False,'Відновлення скасовано.')
