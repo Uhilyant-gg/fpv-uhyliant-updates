@@ -31,7 +31,7 @@ class HomeDashboard(QObject):
  @Property('QVariantMap',notify=changed)
  def nextAction(self):return dict(self._model["nextAction"])
 class Station(QObject):
- changed=Signal(); notice=Signal(str)
+ changed=Signal(); notice=Signal(str); osdSettingsSaved=Signal()
  OSD_ENABLED_KEY="osd/station-enabled"
  OSD_OPACITY_KEY="osd/station-opacity"
  OSD_SCALE_KEY="osd/station-scale"
@@ -81,24 +81,33 @@ class Station(QObject):
  def setOSDEnabled(self,value):
   enabled=bool(value)
   if enabled==self._osd_enabled:return
-  self._osd_enabled=enabled;self._settings.setValue(self.OSD_ENABLED_KEY,enabled);self._save_osd_settings();self.changed.emit()
+  self._osd_enabled=enabled;self._settings.setValue(self.OSD_ENABLED_KEY,enabled)
+  if self._save_osd_settings():self.osdSettingsSaved.emit()
+  self.changed.emit()
  @Slot(bool)
  def setOSDEdit(self,v):self._edit=v;self.changed.emit()
  @Slot(float,float,result=bool)
  def setOSDStyle(self,o,s):
   if not math.isfinite(o) or not math.isfinite(s) or not .25<=o<=.8 or not .85<=s<=1.3:return False
-  self._opacity=o;self._scale=s;self._settings.setValue(self.OSD_OPACITY_KEY,o);self._settings.setValue(self.OSD_SCALE_KEY,s);self._save_osd_settings();self.changed.emit();return self._osd_settings_error==""
+  self._opacity=o;self._scale=s;self._settings.setValue(self.OSD_OPACITY_KEY,o);self._settings.setValue(self.OSD_SCALE_KEY,s);saved=self._save_osd_settings()
+  if saved:self.osdSettingsSaved.emit()
+  self.changed.emit();return saved
  @Slot(str,result=bool)
  def setOSDPosition(self,value):
   if value not in self.OSD_POSITIONS:return False
-  self._position=value;self._settings.setValue(self.OSD_POSITION_KEY,value);self._save_osd_settings();self.changed.emit();return self._osd_settings_error==""
+  self._position=value;self._settings.setValue(self.OSD_POSITION_KEY,value);saved=self._save_osd_settings()
+  if saved:self.osdSettingsSaved.emit()
+  self.changed.emit();return saved
  @Slot()
  def resetOSDStyle(self):
   self._opacity=self.OSD_DEFAULT_OPACITY;self._scale=self.OSD_DEFAULT_SCALE;self._position=self.OSD_DEFAULT_POSITION
-  self._settings.setValue(self.OSD_OPACITY_KEY,self._opacity);self._settings.setValue(self.OSD_SCALE_KEY,self._scale);self._settings.setValue(self.OSD_POSITION_KEY,self._position);self._save_osd_settings();self.changed.emit()
+  self._settings.setValue(self.OSD_OPACITY_KEY,self._opacity);self._settings.setValue(self.OSD_SCALE_KEY,self._scale);self._settings.setValue(self.OSD_POSITION_KEY,self._position)
+  if self._save_osd_settings():self.osdSettingsSaved.emit()
+  self.changed.emit()
  def _save_osd_settings(self):
   self._settings.sync()
   self._osd_settings_error="Не вдалося зберегти налаштування OSD. Перевірте доступ до папки даних." if self._settings.status()!=QSettings.NoError else ""
+  return self._osd_settings_error==""
  @Slot(str)
  def action(self,v):self.notice.emit(v)
  def canInstallUpdate(self):

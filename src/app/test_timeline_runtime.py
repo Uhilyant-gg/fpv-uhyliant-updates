@@ -79,12 +79,19 @@ class TimelineRuntimeTests(unittest.TestCase):
 
     def test_device_changes_and_restore_have_safe_timeline_copy(self):
         timeline = TimelineRuntime(Settings(), clock=lambda: 300)
-        for event_type in ("device-added", "device-updated", "device-removed", "device-list-restored"):
+        for event_type in (
+            "device-added",
+            "device-updated",
+            "device-removed",
+            "device-list-restored",
+            "station-osd-settings-saved",
+        ):
             self.assertTrue(timeline.recordEvent(event_type))
 
         self.assertEqual(
             [item["title"] for item in timeline.items],
             [
+                "Налаштування OSD збережено",
                 "Список пристроїв відновлено",
                 "Пристрій видалено",
                 "Налаштування пристрою змінено",

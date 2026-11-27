@@ -63,6 +63,18 @@ class StationOsdSettingsTests(unittest.TestCase):
         self.assertEqual(restored.osdScale, 1.2)
         self.assertEqual(restored.osdPosition, "bottom-right")
 
+    def test_persisted_osd_changes_emit_a_safe_observation(self):
+        station = Station(Settings())
+        changes = []
+        station.osdSettingsSaved.connect(lambda: changes.append(True))
+
+        station.setOSDEnabled(False)
+        station.setOSDStyle(0.7, 1.2)
+        station.setOSDPosition("bottom-right")
+        station.resetOSDStyle()
+
+        self.assertEqual(changes, [True, True, True, True])
+
     def test_osd_style_rejects_out_of_range_values_and_clamps_saved_values(self):
         settings = Settings({
             Station.OSD_OPACITY_KEY: 2,
@@ -97,9 +109,12 @@ class StationOsdSettingsTests(unittest.TestCase):
         settings = Settings()
         settings.sync_status = QSettings.AccessError
         station = Station(settings)
+        changes = []
+        station.osdSettingsSaved.connect(lambda: changes.append(True))
 
         self.assertFalse(station.setOSDStyle(0.7, 1.2))
         self.assertIn("Не вдалося зберегти налаштування OSD", station.osdSettingsError)
+        self.assertEqual(changes, [])
 
 
 if __name__ == "__main__":
