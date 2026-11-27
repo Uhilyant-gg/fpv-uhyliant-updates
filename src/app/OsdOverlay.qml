@@ -79,6 +79,17 @@ Item {
   if (telemetry.gpsFix === undefined || telemetry.gpsFix === null || telemetry.gpsFix === "") return telemetryUnavailable("gpsFix")
   return gpsFixText(telemetry.gpsFix)
  }
+ function homeArrow() {
+  // Direction to home relative to the drone's current heading; only from fresh values.
+  if (telemetry.connected !== true) return ""
+  var freshness = telemetry.freshness || {}
+  if (freshness.homeBearing === false || freshness.heading === false) return ""
+  var bearing = Number(telemetry.homeBearing), heading = Number(telemetry.heading)
+  if (telemetry.homeBearing === null || telemetry.homeBearing === undefined || telemetry.heading === null || telemetry.heading === undefined) return ""
+  if (!isFinite(bearing) || !isFinite(heading)) return ""
+  var relative = ((bearing - heading) % 360 + 360) % 360
+  return " " + "↑↗→↘↓↙←↖".charAt(Math.round(relative / 45) % 8)
+ }
  function linkDetails() {
   // Radio link quality (CRSF LQ %) and signal strength, only from fresh telemetry.
   return root.optionalTelemetryText("linkQuality", telemetry.linkQuality, "%", 0).replace(" · ", " · LQ ") +
@@ -143,7 +154,7 @@ Item {
   {name:"speed", defaultX:5, defaultY:41, text:"Швидкість: " + root.telemetryText("groundSpeed", telemetry.groundSpeed, root.speedSuffix(), 1)},
   {name:"heading", defaultX:5, defaultY:47, text:"Напрямок: " + root.telemetryText("heading", telemetry.heading, "°", 0)},
   {name:"video", defaultX:5, defaultY:53, text:"Відео: " + (video.streamId ? (video.state === "playing" ? "активне" : "перевіряється") : "немає")},
-  {name:"homeDistance", defaultX:5, defaultY:59, text:"До точки повернення: " + root.telemetryText("homeDistance", telemetry.homeDistance, " м", 0)}
+  {name:"homeDistance", defaultX:5, defaultY:59, text:"До точки повернення: " + root.telemetryText("homeDistance", telemetry.homeDistance, " м", 0) + root.homeArrow()}
  ]
  property var visibleTiles: root.tiles.filter(function(tileData) { return root.elementEnabled(tileData.name) })
  function tilePosition(tile, axis, itemExtent) {
