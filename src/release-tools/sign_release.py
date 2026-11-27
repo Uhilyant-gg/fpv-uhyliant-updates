@@ -26,9 +26,7 @@ def main():
     obj = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     obj.pop("signature", None)
 
-    private_key = serialization.load_pem_private_key(
-        Path(args.key).read_bytes(), password=None
-    )
+    private_key = serialization.load_pem_private_key(Path(args.key).read_bytes(), password=None)
     signature = private_key.sign(canonical_manifest(obj))
     obj["signature"] = {
         "algorithm": "Ed25519",

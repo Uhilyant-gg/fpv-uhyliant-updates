@@ -1,4 +1,5 @@
 """Deterministic, side-effect-free virtual hardware state for E6 tests."""
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
@@ -18,7 +19,13 @@ class VirtualDeviceState:
 
 
 def _result(state: VirtualDeviceState, reason: str, status: str = "ready") -> dict[str, Any]:
-    return {"status": status, "reasonCode": reason, "evidenceKind": "simulation", "physicalEvidenceComplete": False, "state": asdict(state)}
+    return {
+        "status": status,
+        "reasonCode": reason,
+        "evidenceKind": "simulation",
+        "physicalEvidenceComplete": False,
+        "state": asdict(state),
+    }
 
 
 def simulate(state: VirtualDeviceState, event: Mapping[str, Any]) -> dict[str, Any]:
@@ -77,6 +84,11 @@ def simulate(state: VirtualDeviceState, event: Mapping[str, Any]) -> dict[str, A
     if kind == "complete-update":
         if not state.update_active:
             return _result(state, "update-completion-without-transaction", "unknown")
-        values.update(update_active=False, update_failed=False, firmware_version=event.get("firmwareVersion") or state.firmware_version, evidence_fresh=False)
+        values.update(
+            update_active=False,
+            update_failed=False,
+            firmware_version=event.get("firmwareVersion") or state.firmware_version,
+            evidence_fresh=False,
+        )
         return _result(VirtualDeviceState(**values), "update-complete-revalidation-required", "unknown")
     return _result(state, "unsupported-simulator-event", "unknown")

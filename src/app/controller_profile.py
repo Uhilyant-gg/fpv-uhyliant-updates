@@ -1,4 +1,5 @@
 """Calibrate and apply a locally observed controller input profile."""
+
 from __future__ import annotations
 
 import math
@@ -66,11 +67,13 @@ def calibrate_controller(
     for channel in range(channel_count):
         values = [frame[channel] for frame in frames]
         minimum, maximum = min(values), max(values)
-        calibration.append({
-            "minimum": minimum,
-            "center": median(values),
-            "maximum": maximum,
-        })
+        calibration.append(
+            {
+                "minimum": minimum,
+                "center": median(values),
+                "maximum": maximum,
+            }
+        )
 
     for axis in CONTROL_AXES:
         channel = validated_mapping[axis]["channel"]
@@ -91,7 +94,13 @@ def calibrate_controller(
 
 def validate_controller_profile(profile: Any) -> dict[str, Any]:
     """Return a validated copy of a stored profile or raise ``controller-profile-invalid``."""
-    if not isinstance(profile, Mapping) or set(profile) != {"schemaVersion", "controllerId", "channelCount", "calibration", "mapping"}:
+    if not isinstance(profile, Mapping) or set(profile) != {
+        "schemaVersion",
+        "controllerId",
+        "channelCount",
+        "calibration",
+        "mapping",
+    }:
         raise ValueError("controller-profile-invalid")
     if profile.get("schemaVersion") != _PROFILE_SCHEMA_VERSION:
         raise ValueError("controller-profile-invalid")

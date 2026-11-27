@@ -128,7 +128,10 @@ assert (test_root / 'simulation-tested').is_file(), 'simulation interaction did 
             result = subprocess.run(
                 [sys.executable, "-c", script, temp],
                 cwd=str(Path(__file__).parent),
-                capture_output=True, text=True, env=env, timeout=30,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=30,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
 

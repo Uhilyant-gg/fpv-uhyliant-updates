@@ -3,6 +3,7 @@
 The bridge converts already-observed lifecycle facts into a Queue v3 decision. It
 performs no merge, repair, hardware operation, secret access, or queue promotion.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

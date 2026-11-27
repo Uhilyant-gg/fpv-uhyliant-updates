@@ -3,6 +3,7 @@
 A Queue v3 REPAIR decision is only an intent. This layer requires current GitHub
 evidence and the persisted repair budget before repair invocation may be authorized.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

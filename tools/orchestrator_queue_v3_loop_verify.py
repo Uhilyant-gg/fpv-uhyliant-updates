@@ -3,12 +3,13 @@
 After mutation/rebind, fresh GitHub evidence must be for the new HEAD. The cycle
 then either returns to bounded repair, waits, or reaches the existing merge gate.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from orchestrator_queue_v3 import QueuePlan
-from orchestrator_queue_v3_autopilot import AutopilotAction, AutopilotDecision, decide_autopilot_cycle
+from orchestrator_queue_v3_autopilot import AutopilotDecision, decide_autopilot_cycle
 from orchestrator_queue_v3_cycle import QueueObservation
 from orchestrator_state import PersistedState
 from orchestrator_v2 import GitHubEvidence, State

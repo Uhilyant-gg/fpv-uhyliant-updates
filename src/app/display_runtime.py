@@ -8,10 +8,12 @@ def display_inventory(screens):
     displays = []
     for index, screen in enumerate(screens):
         geometry = screen.availableGeometry()
-        displays.append({
-            "index": index,
-            "label": f"Екран {index + 1} · {geometry.width()} × {geometry.height()}",
-        })
+        displays.append(
+            {
+                "index": index,
+                "label": f"Екран {index + 1} · {geometry.width()} × {geometry.height()}",
+            }
+        )
     return displays
 
 
@@ -60,20 +62,14 @@ class DisplayRuntime(QObject):
         )
         if reference is None:
             reference = weakref.ref(window)
-            window.screenChanged.connect(
-                lambda _screen, tracked=reference: self._remember_window_screen(tracked)
-            )
+            window.screenChanged.connect(lambda _screen, tracked=reference: self._remember_window_screen(tracked))
         self._remember_window_screen(reference)
         return True
 
     def _remember_window_screen(self, reference):
         window = reference()
         if window is None:
-            self._window_refs = [
-                (ref, screen)
-                for ref, screen in self._window_refs
-                if ref() is not None
-            ]
+            self._window_refs = [(ref, screen) for ref, screen in self._window_refs if ref() is not None]
             return
         screen = window.screen()
         self._window_refs = [

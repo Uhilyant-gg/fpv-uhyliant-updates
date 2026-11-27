@@ -4,12 +4,10 @@ Python tests call model methods directly, so a member missing from the Qt
 meta-object (for example after PySide drops a subclass's members) only breaks
 the real UI. This test reads the QML and checks the meta-object QML uses.
 """
-import os
+
 import re
-import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent
 _JS_MEMBERS = {"length", "toString", "valueOf", "connect", "disconnect"}

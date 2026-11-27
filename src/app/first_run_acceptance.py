@@ -1,4 +1,5 @@
 """Deterministic acceptance contract for the normal first-run journey."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,8 +9,14 @@ from typing import Any, Callable, Iterable, Mapping
 STAGES = ("launch", "discovery", "health", "devices", "next-action", "operation")
 HEALTH = {"ready", "attention", "problem", "unknown"}
 TECHNICAL_MARKERS = (
-    "traceback", "exception", "connection refused", "socket error", "rtsp timeout",
-    "ssh transport", "errno", "stack trace",
+    "traceback",
+    "exception",
+    "connection refused",
+    "socket error",
+    "rtsp timeout",
+    "ssh transport",
+    "errno",
+    "stack trace",
 )
 
 

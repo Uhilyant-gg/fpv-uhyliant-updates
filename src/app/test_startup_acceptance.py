@@ -13,9 +13,21 @@ def events(health_ms=8500):
         {"stage": "restore", "status": "ok", "pid": 7, "elapsedMs": 120},
         {"stage": "discovery", "status": "ok", "pid": 7, "elapsedMs": 700},
         {"stage": "window-visible", "status": "ok", "pid": 7, "elapsedMs": 900},
-        {"stage": "health", "status": "ok", "pid": 7, "elapsedMs": health_ms, "detail": {"health": "unknown", "summary": "Стан перевіряється"}},
+        {
+            "stage": "health",
+            "status": "ok",
+            "pid": 7,
+            "elapsedMs": health_ms,
+            "detail": {"health": "unknown", "summary": "Стан перевіряється"},
+        },
         {"stage": "devices", "status": "ok", "pid": 7, "elapsedMs": health_ms, "detail": {"devices": []}},
-        {"stage": "next-action", "status": "ok", "pid": 7, "elapsedMs": health_ms, "detail": {"available": True, "action": "find-camera"}},
+        {
+            "stage": "next-action",
+            "status": "ok",
+            "pid": 7,
+            "elapsedMs": health_ms,
+            "detail": {"available": True, "action": "find-camera"},
+        },
     ]
 
 

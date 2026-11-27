@@ -1,4 +1,5 @@
 """Select a zero-config startup camera only when evidence is unambiguous."""
+
 from __future__ import annotations
 from typing import Any, Iterable, Mapping
 
@@ -15,8 +16,8 @@ def select_startup_camera(candidates: Iterable[Mapping[str, Any]] | None) -> dic
             usable.append({"host": host, "id": item.get("id"), "evidence": list(evidence)})
     unique = {item["host"]: item for item in usable}
     if not unique:
-        return {"health":"unknown","selected":None,"action":"find-camera","reasonCode":"no-verified-camera"}
+        return {"health": "unknown", "selected": None, "action": "find-camera", "reasonCode": "no-verified-camera"}
     if len(unique) != 1:
-        return {"health":"attention","selected":None,"action":None,"reasonCode":"camera-selection-ambiguous"}
+        return {"health": "attention", "selected": None, "action": None, "reasonCode": "camera-selection-ambiguous"}
     selected = next(iter(unique.values()))
-    return {"health":"ready","selected":selected,"action":"connect-camera","reasonCode":"single-verified-camera"}
+    return {"health": "ready", "selected": selected, "action": "connect-camera", "reasonCode": "single-verified-camera"}
