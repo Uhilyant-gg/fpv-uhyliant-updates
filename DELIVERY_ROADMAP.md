@@ -110,7 +110,7 @@ Do not assume a Starlink model/API, modem control capability, or automatic 4G/5G
 ### P0.9 Multi-controller, multi-vehicle and multi-display workspace
 Support several detected operator controllers and separate operation sessions for multiple vehicles, while keeping each vehicle's camera, telemetry, map and controller assignment distinct. A controller is assigned to a vehicle session, not a camera.
 
-**Implemented foundation (repository software):** the primary and secondary video streams can each open in a separate movable window, select a detected display, and return to the main workspace without changing their media source; the station OSD follows each stream. Detached windows are tracked and moved to the primary display when their screen is removed. Topology-aware layout restore, physical unplug validation, and multi-vehicle identity isolation remain incomplete.
+**Implemented foundation (repository software):** the primary and secondary video streams can each open in a separate movable window, select a detected display, and return to the main workspace without changing their media source; the station OSD follows each stream. When a tracked display is removed, its detached stream returns to the main workspace with playback preserved and a brief explanation. Topology-aware layout restore, physical unplug validation, and multi-vehicle identity isolation remain incomplete.
 
 Requirements:
 - automatically discover and add multiple supported controllers in one onboarding flow; identify each controller and bind its profile to stable observed identity;

@@ -1,6 +1,9 @@
 import unittest
+import weakref
 
-from display_runtime import display_inventory
+from PySide6.QtCore import QObject
+
+from display_runtime import DisplayRuntime, display_inventory
 
 
 class Geometry:
@@ -32,6 +35,25 @@ class DisplayRuntimeTests(unittest.TestCase):
                 {"index": 1, "label": "Екран 2 · 1280 × 720"},
             ],
         )
+
+    def test_removed_display_returns_only_its_tracked_windows_to_workspace(self):
+        runtime = DisplayRuntime.__new__(DisplayRuntime)
+        QObject.__init__(runtime)
+        removed_screen = object()
+        remaining_screen = object()
+        removed_window = QObject()
+        remaining_window = QObject()
+        runtime._window_refs = [
+            (weakref.ref(removed_window), removed_screen),
+            (weakref.ref(remaining_window), remaining_screen),
+        ]
+        returned = []
+        runtime.windowReturnedToWorkspace.connect(returned.append)
+
+        runtime._screen_removed(removed_screen)
+
+        self.assertEqual(returned, [removed_window])
+        self.assertEqual(runtime._window_refs, [(weakref.ref(remaining_window), remaining_screen)])
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ def display_inventory(screens):
 
 class DisplayRuntime(QObject):
     changed = Signal()
+    windowReturnedToWorkspace = Signal(QObject)
 
     def __init__(self, application=None):
         super().__init__()
@@ -53,20 +54,47 @@ class DisplayRuntime(QObject):
     def trackWindow(self, window):
         if not isinstance(window, QWindow):
             return False
-        self._window_refs = [ref for ref in self._window_refs if ref() is not None and ref() is not window]
-        self._window_refs.append(weakref.ref(window))
+        reference = next(
+            (ref for ref, _screen in self._window_refs if ref() is window),
+            None,
+        )
+        if reference is None:
+            reference = weakref.ref(window)
+            window.screenChanged.connect(
+                lambda _screen, tracked=reference: self._remember_window_screen(tracked)
+            )
+        self._remember_window_screen(reference)
         return True
+
+    def _remember_window_screen(self, reference):
+        window = reference()
+        if window is None:
+            self._window_refs = [
+                (ref, screen)
+                for ref, screen in self._window_refs
+                if ref() is not None
+            ]
+            return
+        screen = window.screen()
+        self._window_refs = [
+            (ref, tracked_screen)
+            for ref, tracked_screen in self._window_refs
+            if ref() is not None and ref() is not window
+        ]
+        self._window_refs.append((reference, screen))
 
     def _screen_changed(self, _screen):
         self.changed.emit()
 
     def _screen_removed(self, removed):
-        screens = self._application.screens()
-        primary = self._application.primaryScreen()
-        if primary is not None and primary in screens:
-            primary_index = screens.index(primary)
-            for reference in tuple(self._window_refs):
-                window = reference()
-                if window is not None and window.screen() == removed:
-                    self.moveWindow(window, primary_index)
+        remaining = []
+        for reference, screen in self._window_refs:
+            window = reference()
+            if window is None:
+                continue
+            if screen == removed:
+                self.windowReturnedToWorkspace.emit(window)
+            else:
+                remaining.append((reference, screen))
+        self._window_refs = remaining
         self.changed.emit()
