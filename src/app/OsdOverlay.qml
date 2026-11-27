@@ -79,6 +79,11 @@ Item {
   if (telemetry.gpsFix === undefined || telemetry.gpsFix === null || telemetry.gpsFix === "") return telemetryUnavailable("gpsFix")
   return gpsFixText(telemetry.gpsFix)
  }
+ function linkDetails() {
+  // Radio link quality (CRSF LQ %) and signal strength, only from fresh telemetry.
+  return root.optionalTelemetryText("linkQuality", telemetry.linkQuality, "%", 0).replace(" · ", " · LQ ") +
+   root.optionalTelemetryText("rssiDbm", telemetry.rssiDbm, " dBm", 0)
+ }
  function linkLabel() {
   if (telemetry.connected === true) return "Телеметрія: зв’язок є"
   if (telemetry.connected === false) return "Телеметрія: немає зв’язку"
@@ -129,7 +134,7 @@ Item {
  }
 
  property var tiles: [
-  {name:"link", defaultX:5, defaultY:5, text:root.linkLabel()},
+  {name:"link", defaultX:5, defaultY:5, text:root.linkLabel() + root.linkDetails()},
   {name:"arm", defaultX:5, defaultY:11, text:"ARM: " + (telemetry.connected !== true ? "—" : ((telemetry.freshness || {}).armed === false ? "застаріло" : (telemetry.armed === null || telemetry.armed === undefined ? "—" : (telemetry.armed ? "активний" : "вимкнений"))))},
   {name:"mode", defaultX:5, defaultY:17, text:"Режим: " + root.telemetryText("flightMode", telemetry.flightMode)},
   {name:"battery", defaultX:5, defaultY:23, text:"АКБ: " + root.telemetryText("batteryVoltage", telemetry.batteryVoltage, " В", 1) + root.optionalTelemetryText("batteryRemaining", telemetry.batteryRemaining, "%", 0)},

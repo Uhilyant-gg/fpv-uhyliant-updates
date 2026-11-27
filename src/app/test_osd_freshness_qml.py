@@ -125,6 +125,12 @@ overlay.setProperty('telemetry', {'connected': True, 'freshness': {'altitude': T
 assert overlay.telemetryText('altitude', 123, ' м', 0) == '123 м'
 overlay.setProperty('telemetry', {'connected': False})
 assert overlay.telemetryText('altitude', 123, ' м', 0) == '—'
+overlay.setProperty('telemetry', {'connected': True, 'linkQuality': 98, 'rssiDbm': -72, 'freshness': {'linkQuality': True, 'rssiDbm': True}})
+assert overlay.linkDetails() == ' · LQ 98% · -72 dBm', overlay.linkDetails()
+overlay.setProperty('telemetry', {'connected': True, 'freshness': {'linkQuality': False}})
+assert overlay.linkDetails() == ' · LQ застаріло', overlay.linkDetails()
+overlay.setProperty('telemetry', {'connected': True})
+assert overlay.linkDetails() == '', overlay.linkDetails()
 """
         env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
         path = str(Path(__file__).with_name("OsdOverlay.qml").resolve())

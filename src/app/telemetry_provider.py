@@ -20,6 +20,8 @@ NORMALIZED_FIELDS = (
     "pitch",
     "yaw",
     "rssi",
+    "rssiDbm",
+    "linkQuality",
     "health",
     "ages",
     "freshness",
