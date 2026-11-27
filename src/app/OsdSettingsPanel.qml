@@ -7,20 +7,31 @@ Item {
  signal closeRequested()
  property bool editingAllowed: true
  property var elementOptions: [
-  {name:"link", label:"Стан зв’язку"},
-  {name:"arm", label:"Стан ARM"},
-  {name:"mode", label:"Режим польоту"},
+  {name:"link", label:"Стан зв’язку", shortLabel:"Зв’язок"},
+  {name:"arm", label:"Стан ARM", shortLabel:"ARM"},
+  {name:"mode", label:"Режим польоту", shortLabel:"Режим"},
   {name:"battery", label:"Акумулятор"},
-  {name:"gps", label:"GPS і супутники"},
+  {name:"gps", label:"GPS і супутники", shortLabel:"GPS"},
   {name:"altitude", label:"Висота"},
   {name:"speed", label:"Швидкість"},
   {name:"heading", label:"Напрямок"},
-  {name:"video", label:"Стан відео"},
-  {name:"homeDistance", label:"Відстань до точки повернення"},
+  {name:"video", label:"Стан відео", shortLabel:"Відео"},
+  {name:"homeDistance", label:"Відстань до точки повернення", shortLabel:"Відстань додому"},
   {name:"reticle", label:"Приціл"},
-  {name:"horizon", label:"Штучний горизонт"}
+  {name:"horizon", label:"Штучний горизонт", shortLabel:"Горизонт"}
  ]
  property var aspectRatios: [16 / 9, 4 / 3, 1, 9 / 16]
+ property var layoutOptions: [
+  {value:"corners", label:"По кутах (рекомендовано)"},
+  {value:"top-left", label:"Стовпчиком зліва вгорі"},
+  {value:"top-right", label:"Стовпчиком справа вгорі"},
+  {value:"bottom-left", label:"Стовпчиком зліва внизу"},
+  {value:"bottom-right", label:"Стовпчиком справа внизу"}
+ ]
+ function layoutIndex(value) {
+  for (var i = 0; i < layoutOptions.length; i++) if (layoutOptions[i].value === value) return i
+  return 0
+ }
 
  function elementLabel(name) {
   for (var i = 0; i < elementOptions.length; i++) {
@@ -69,22 +80,32 @@ Item {
 
    ScrollView {
     enabled: root.editingAllowed
-    Layout.preferredWidth: 300
+    id: settingsScroll
+    Layout.preferredWidth: 360
     Layout.fillHeight: true
     contentWidth: availableWidth
+    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
     clip: true
     ColumnLayout {
-     width: parent.width
+     width: settingsScroll.availableWidth - 12
      spacing: 10
 
-     Switch { text: "Додавати OSD станції поверх відео"; checked: station.osdEnabled; onToggled: station.setOSDEnabled(checked) }
+     Switch { text: "Показувати OSD станції"; Layout.fillWidth: true; checked: station.osdEnabled; onToggled: station.setOSDEnabled(checked) }
      Text {
       text: "Відео з камери не змінюється. Якщо її OSD вбудоване в зображення, приховати його тут неможливо."
       color: "#b7c8da"
       wrapMode: Text.WordWrap
       Layout.fillWidth: true
      }
-     Text { text: "Оберіть потрібні елементи. Перетягування прилипає до сітки з кроком 5%."; color: "#dce6f2"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+     Text { text: "Розміщення елементів"; color: "#dce6f2"; font.bold: true }
+     ComboBox {
+      objectName: "osdLayoutSelector"
+      Layout.fillWidth: true
+      model: root.layoutOptions.map(function(option) { return option.label })
+      currentIndex: root.layoutIndex(station.osdPosition)
+      onActivated: function(index) { station.setOSDPosition(root.layoutOptions[index].value) }
+     }
+     Text { text: "Елемент можна перетягнути на попередньому перегляді — він прилипає до сітки з кроком 5% і залишається на своєму місці."; color: "#9fb2c6"; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 12 }
 
      Text { text: "Прозорість підкладки: " + Math.round((1 - station.osdOpacity) * 100) + "%"; color: "#dce6f2"; font.bold: true }
      Slider {
@@ -110,15 +131,22 @@ Item {
      }
 
      Text { text: "Елементи"; color: "#dce6f2"; font.bold: true; font.pixelSize: 15 }
-     Repeater {
-      model: root.elementOptions
-      CheckBox {
-       required property var modelData
-       objectName: "osd-toggle-" + modelData.name
-       Layout.fillWidth: true
-       text: modelData.label
-       checked: station.osdEnabledElements[modelData.name] === true
-       onToggled: station.setOSDElementEnabled(modelData.name, checked)
+     GridLayout {
+      columns: 2
+      columnSpacing: 4
+      rowSpacing: 0
+      Layout.fillWidth: true
+      Repeater {
+       model: root.elementOptions
+       CheckBox {
+        required property var modelData
+        objectName: "osd-toggle-" + modelData.name
+        Layout.fillWidth: true
+        Layout.preferredWidth: 1
+        text: modelData.shortLabel || modelData.label
+        checked: station.osdEnabledElements[modelData.name] === true
+        onToggled: station.setOSDElementEnabled(modelData.name, checked)
+       }
       }
      }
      Button {
@@ -194,6 +222,7 @@ Item {
       ComboBox {
        id: aspectSelector
        objectName: "osdPreviewAspectSelector"
+       Layout.preferredWidth: 220
        model: ["Широкий 16:9", "Класичний 4:3", "Квадрат 1:1", "Вертикальний 9:16"]
      }
       Item { Layout.fillWidth: true }
@@ -230,7 +259,10 @@ Item {
        }
        Rectangle {
         anchors.fill: parent
-        anchors.margins: Math.min(preview.width * 0.04, 24 * station.osdScale)
+        anchors.leftMargin: previewOsd.safeMarginX
+        anchors.rightMargin: previewOsd.safeMarginX
+        anchors.topMargin: previewOsd.safeMarginY
+        anchors.bottomMargin: previewOsd.safeMarginY
         color: "transparent"
         border.color: "#a9e3f2"
         border.width: 1

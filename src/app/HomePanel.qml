@@ -15,6 +15,10 @@ Item {
  signal openSimulation()
  signal openController()
  signal openPresets()
+ signal openRecording()
+ signal openStationSettings()
+ signal openVehicleSettings()
+ signal openService()
  signal connectDevice(string deviceId)
  signal runNextAction(string action)
 
@@ -26,15 +30,10 @@ Item {
  property color green: "#35e0a1"
  property bool menuOpen: false
  readonly property var menuItems: [
-  {label: "Камери", detail: "Знайти або вибрати пристрій", glyph: "◉", action: "devices"},
-  {label: "Пульт", detail: "Підключити та налаштувати стіки", glyph: "✥", action: "controller"},
-  {label: "Пресети", detail: "Налаштування під кожен дрон", glyph: "☰", action: "presets"},
-  {label: "Підготовка", detail: "Перевірити стан системи", glyph: "✓", action: "preflight"},
-  {label: "Симуляція", detail: "Налаштувати екран без обладнання", glyph: "▣", action: "simulation"},
-  {label: "Події", detail: "Історія важливих змін", glyph: "⌁", action: "timeline"},
-  {label: "Прошивка", detail: "Оновлення камери", glyph: "↑", action: "firmware"},
-  {label: "Діагностика", detail: "Перевірити підключення", glyph: "⌕", action: "diagnostics"},
-  {label: "Резервна копія", detail: "Зберегти або відновити", glyph: "▤", action: "backup"}
+  {label: "Камери", detail: "Знайти, вибрати або додати камеру", glyph: "◉", action: "devices", section: "main"},
+  {label: "Дрони і пресети", detail: "Пресети, OSD і попередження для кожного дрона", glyph: "☰", action: "vehicles", section: "main"},
+  {label: "Налаштування станції", detail: "Пульт, запис відео, резервна копія", glyph: "⚙", action: "station", section: "main"},
+  {label: "Обслуговування", detail: "Діагностика, події, прошивка камери", glyph: "⌕", action: "service", section: "main"}
  ]
 
  function canEnterFpv(deviceId) {
@@ -58,6 +57,10 @@ Item {
   else if (action === "backup") openBackup()
   else if (action === "controller") openController()
   else if (action === "presets") openPresets()
+  else if (action === "recording") openRecording()
+  else if (action === "station") openStationSettings()
+  else if (action === "vehicles") openVehicleSettings()
+  else if (action === "service") openService()
  }
 
  Rectangle {
@@ -100,6 +103,19 @@ Item {
      spacing: 1
      Text { text: "ФПВ УХИЛЯНТ"; color: root.fg; font.pixelSize: 21; font.bold: true; font.letterSpacing: 1 }
      Text { text: "НАЗЕМНА СТАНЦІЯ  ·  v" + updater.currentVersion; color: root.sub; font.pixelSize: 12 }
+    }
+
+    Button {
+     objectName: "homeUpdate"
+     visible: updater.updateState === "available" || updater.updateState === "ready"
+     text: updater.updateState === "ready" ? "Встановити " + updater.availableVersion : "Оновити до " + updater.availableVersion
+     font.pixelSize: 14
+     font.bold: true
+     Layout.preferredHeight: 40
+     onClicked: root.openUpdate()
+     contentItem: Text { text: parent.text; font: parent.font; color: "#06130d"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#5cf0bd" : root.green }
+     HoverHint { text: "Вийшла нова версія програми." }
     }
 
     Item { Layout.fillWidth: true }
@@ -222,12 +238,8 @@ Item {
      Text { text: "МОЇ КАМЕРИ"; color: root.fg; font.bold: true; font.pixelSize: 15; font.letterSpacing: 1 }
      Text { text: homeDashboard.deviceCount ? homeDashboard.deviceCount + " готово" : (homeDashboard.pendingCount ? homeDashboard.pendingCount + " на перевірці" : "ще не додано"); color: root.sub; font.pixelSize: 13 }
      Item { Layout.fillWidth: true }
-     Button {
-      visible: updater.updateState === "available" || updater.updateState === "ready"
-      text: updater.updateState === "ready" ? "Встановити " + updater.availableVersion : "Оновити до " + updater.availableVersion
-      font.pixelSize: 14
-      onClicked: root.openUpdate()
-     }
+     Button { objectName: "homePreflight"; text: "✓ Підготовка"; font.pixelSize: 14; onClicked: root.openPreflight() }
+     Button { objectName: "homeSimulation"; text: "▣ Симуляція"; font.pixelSize: 14; visible: devicesModel.homeItems.length > 0; onClicked: root.openSimulation() }
     }
 
     ListView {
@@ -277,7 +289,14 @@ Item {
       visible: devicesModel.homeItems.length === 0
       spacing: 6
       Text { anchors.horizontalCenter: parent.horizontalCenter; text: devicesModel.pendingCount ? "Камера ще проходить перевірку" : "Камер ще не додано"; color: root.fg; font.pixelSize: 19; font.bold: true }
-      Text { anchors.horizontalCenter: parent.horizontalCenter; text: devicesModel.pendingCount ? "На головний екран камера потрапить після підтвердження прошивки та відео." : "Відкрийте меню та виберіть «Камери»"; color: root.sub; font.pixelSize: 15; wrapMode: Text.WordWrap; width: list.width * 0.8; horizontalAlignment: Text.AlignHCenter }
+      Text { anchors.horizontalCenter: parent.horizontalCenter; text: devicesModel.pendingCount ? "На головний екран камера потрапить після підтвердження прошивки та відео." : "Підключіть камеру до мережі цього комп’ютера і запустіть пошук. Без обладнання можна спробувати симуляцію."; color: root.sub; font.pixelSize: 15; wrapMode: Text.WordWrap; width: list.width * 0.8; horizontalAlignment: Text.AlignHCenter }
+      Row {
+       anchors.horizontalCenter: parent.horizontalCenter
+       topPadding: 10
+       spacing: 10
+       Button { objectName: "emptyFindCamera"; text: "Знайти камеру"; font.pixelSize: 15; font.bold: true; visible: !(homeDashboard.nextAction.available && homeDashboard.nextAction.action === "find-camera"); onClicked: root.openDevices() }
+       Button { objectName: "emptyOpenSimulation"; text: "Спробувати симуляцію"; font.pixelSize: 15; visible: devicesModel.pendingCount === 0; onClicked: root.openSimulation() }
+      }
      }
     }
    }
@@ -302,57 +321,65 @@ Item {
   anchors.topMargin: 96
   anchors.rightMargin: 20
   width: Math.min(350, root.width - 40)
-  height: Math.min(drawerContent.implicitHeight + 30, root.height - 116)
+  height: Math.min(drawerContent.implicitHeight + 24, root.height - 116)
   radius: 12
   color: "#f20a1420"
   border.color: "#71879c"
   clip: true
 
-  ColumnLayout {
-   id: drawerContent
+  Flickable {
+   id: drawerScroll
    anchors.fill: parent
-   anchors.margins: 14
-   spacing: 5
-   Text { text: "МЕНЮ СТАНЦІЇ"; color: root.sub; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1; Layout.bottomMargin: 4 }
-   Repeater {
-    model: root.menuItems
-    delegate: Button {
-     required property var modelData
-     objectName: "menu-" + modelData.action
-     Layout.fillWidth: true
-     Layout.preferredHeight: 58
-     flat: true
-     onClicked: root.activateMenuItem(modelData.action)
-     background: Rectangle {
-      radius: 8
-      color: parent.hovered ? "#40566e" : "#181a2b3c"
-      border.color: parent.hovered ? "#7897b5" : "#3b566d"
-     }
-     contentItem: RowLayout {
-      spacing: 12
-      Rectangle {
-       Layout.preferredWidth: 36; Layout.preferredHeight: 36; radius: 8
-       color: "#2b4259"
-       Text { anchors.centerIn: parent; text: modelData.glyph; color: "#f2f7fc"; font.pixelSize: 19; font.bold: true }
+   anchors.margins: 12
+   contentHeight: drawerContent.implicitHeight
+   clip: true
+   boundsBehavior: Flickable.StopAtBounds
+   ScrollBar.vertical: ScrollBar { policy: drawerScroll.contentHeight > drawerScroll.height ? ScrollBar.AlwaysOn : ScrollBar.AsNeeded }
+
+   ColumnLayout {
+    id: drawerContent
+    width: drawerScroll.width
+    spacing: 4
+    Repeater {
+     model: [{title: "МЕНЮ СТАНЦІЇ", section: "main"}]
+     delegate: ColumnLayout {
+      required property var modelData
+      Layout.fillWidth: true
+      spacing: 4
+      Text { text: modelData.title; color: root.sub; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1; Layout.bottomMargin: 2 }
+      Repeater {
+       model: root.menuItems.filter(function(item) { return item.section === modelData.section })
+       delegate: Button {
+        required property var modelData
+        objectName: "menu-" + modelData.action
+        Layout.fillWidth: true
+        Layout.preferredHeight: 58
+        flat: true
+        onClicked: root.activateMenuItem(modelData.action)
+        background: Rectangle {
+         radius: 8
+         color: parent.hovered ? "#40566e" : "#181a2b3c"
+         border.color: parent.hovered ? "#7897b5" : "#3b566d"
+        }
+        contentItem: RowLayout {
+         spacing: 12
+         Rectangle {
+          Layout.preferredWidth: 32; Layout.preferredHeight: 32; radius: 8
+          color: "#2b4259"
+          Text { anchors.centerIn: parent; text: modelData.glyph; color: "#f2f7fc"; font.pixelSize: 17; font.bold: true }
+         }
+         ColumnLayout {
+          Layout.fillWidth: true
+          spacing: 0
+          Text { text: modelData.label; color: root.fg; font.pixelSize: 15; font.bold: true }
+          Text { text: modelData.detail; color: root.sub; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+         }
+         Text { text: "›"; color: "#d8e5f1"; font.pixelSize: 22 }
+        }
+       }
       }
-      ColumnLayout {
-       Layout.fillWidth: true
-       spacing: 1
-       Text { text: modelData.label; color: root.fg; font.pixelSize: 16; font.bold: true }
-       Text { text: modelData.detail; color: root.sub; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
-      }
-      Text { text: "›"; color: "#d8e5f1"; font.pixelSize: 22 }
      }
     }
-   }
-   Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
-   Text {
-    text: "Налаштування OSD доступні в розділі «Підготовка»."
-    color: root.sub
-    wrapMode: Text.WordWrap
-    font.pixelSize: 12
-    Layout.fillWidth: true
-    Layout.topMargin: 2
    }
   }
  }

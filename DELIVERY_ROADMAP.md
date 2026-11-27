@@ -168,6 +168,8 @@ Requirements:
 - keep local profiles and workspace layouts available offline; use cached maps when supported and clearly disclose missing remote resources;
 - test component loss/restoration, stale data and offline restart separately from physical acceptance.
 
+**Flight video recording (repository software):** the pilot starts and stops recording with the «● REC» button on the flight screen, the flight menu or F9. Frames come from the primary player's video sink, so the file shows what is on screen, without the station OSD. They are encoded by Qt Multimedia into MP4: H.264 where the platform offers an encoder, as on Windows, and MPEG-4 Part 2 on Linux CI. The recordings folder is a station setting, not part of a preset. It is chosen in «Запис відео» and checked before each start for access and at least 500 MB free; recording stops itself below 200 MB, and closing the app waits up to 5 s for the file to finish. Telemetry recording and recording on real hardware are not done yet.
+
 ## P1: Extensibility and recovery quality
 ### P1.1 Plugin Host
 Define a versioned plugin contract for metadata, capabilities, discovery hooks, health hooks and safe actions. Plugins cannot bypass common presentation, backup, secret or safety boundaries.

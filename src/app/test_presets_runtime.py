@@ -54,7 +54,7 @@ class PresetsRuntimeTests(unittest.TestCase):
         quad = next(p for p in self.runtime.presets if p["name"].startswith("Квадрик"))
         self.assertTrue(self.runtime.selectPreset(quad["id"]))
         self.assertEqual(self.station.alertThresholds["cellCount"], 4)
-        self.assertEqual(self.station.osdPosition, "top-left")
+        self.assertEqual(self.station.osdPosition, "corners")
         self.assertFalse(self.runtime.dirty)
         self.assertIn("Квадрик", self.runtime.message)
 

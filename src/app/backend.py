@@ -382,6 +382,9 @@ class Station(QObject):
         )
         return self._osd_settings_error == ""
 
+    def setRecordingActive(self, active):
+        self._recording = bool(active)
+
     @Slot(str)
     def action(self, v):
         self.notice.emit(v)

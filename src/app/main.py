@@ -133,6 +133,7 @@ def main():
     from controller_runtime import ControllerRuntime
     from flight_alerts_runtime import FlightAlertsRuntime
     from presets_runtime import PresetsRuntime
+    from dvr_runtime import DvrRuntime
     from settings_presets import PresetStore
 
     harness.mark('application-imports-complete')
@@ -248,7 +249,9 @@ def main():
     flight_alerts = FlightAlertsRuntime(telemetry, s)
     presets = PresetsRuntime(preset_store, s)
     backup.restored.connect(presets.reload)
-    app._runtime_refs = app._runtime_refs + (flight_alerts, presets)
+    dvr_runtime = DvrRuntime()
+    dvr_runtime.recordingChanged.connect(lambda: s.setRecordingActive(dvr_runtime.recording))
+    app._runtime_refs = app._runtime_refs + (flight_alerts, presets, dvr_runtime)
     ctx = e.rootContext()
     for name, obj in [
         ('station', s),
@@ -281,6 +284,7 @@ def main():
         ('controllerRuntime', controller),
         ('flightAlerts', flight_alerts),
         ('presetsRuntime', presets),
+        ('dvrRuntime', dvr_runtime),
     ]:
         ctx.setContextProperty(name, obj)
     ctx.setContextProperty('appWindowTitle', WINDOW_TITLE)
@@ -291,6 +295,7 @@ def main():
     def shutdown():
         hardware_e2e.reset()
         credentials.clear()
+        dvr_runtime.shutdown()
         video.stopAll()
         links.clear()
         pairing.clearPending()

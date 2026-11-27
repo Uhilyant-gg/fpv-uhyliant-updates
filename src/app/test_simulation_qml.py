@@ -44,7 +44,9 @@ def single_shot(delay, callback):
                 if found is not None:
                     return found
             return None
-        button = find_item(drawer, 'menu-simulation')
+        for action in ('devices', 'vehicles', 'station', 'service'):
+            assert find_item(drawer, 'menu-' + action) is not None, action
+        button = window.findChild(QObject, 'emptyOpenSimulation')
         assert button is not None, [(child.objectName(), child.metaObject().className()) for child in drawer.childItems()]
         button.clicked.emit()
         app.processEvents()
@@ -65,6 +67,7 @@ def single_shot(delay, callback):
             'hardwareE2EPopup': 'hardwareE2EContent',
             'updatePopup': 'updateContent',
             'devices': 'devicesContent',
+            'recordingPopup': 'recordingContent',
         }
         popups = {}
         for popup_name, loader_name in lazy_panels.items():
@@ -88,8 +91,20 @@ def single_shot(delay, callback):
         app.processEvents()
         menu = window.findChild(QObject, 'flightMenu')
         assert menu is not None and menu.property('visible')
+        content = window.findChild(QObject, 'flightMenuContent')
+        assert content is not None and content.property('width') <= menu.property('width'), 'flight menu content fits the menu'
         hardware_devices = window.findChild(QObject, 'flightMenuDevices')
         assert hardware_devices is not None and not hardware_devices.property('enabled')
+        flight_video = window.findChild(QObject, 'mainFlightVideoOutput')
+        assert attached_sinks and isinstance(attached_sinks[-1], dvr_runtime.QVideoSink)
+        assert attached_sinks[-1] == flight_video.property('videoSink'), 'recording follows the flight video'
+        dvr_button = window.findChild(QObject, 'dvrToggle')
+        assert dvr_button is not None and not dvr_button.property('visible'), 'no recording of the simulation'
+        flight_bar = window.findChild(QObject, 'flightBar')
+        assert flight_bar is not None and flight_bar.property('visible')
+        video_area = window.findChild(QObject, 'flightVideoArea')
+        assert video_area.property('y') >= flight_bar.property('height') > 0, 'video starts below the bar'
+        assert window.findChild(QObject, 'flightMenuRecordingSettings') is not None
         edit = window.findChild(QObject, 'flightMenuOsdSettings')
         assert edit is not None and edit.property('enabled')
         edit.clicked.emit()
@@ -109,6 +124,32 @@ def single_shot(delay, callback):
             assert loader.property('active') and loader.property('item') is not None, popup_name
             panel_popup.close()
             app.processEvents()
+        from PySide6.QtCore import QMetaObject, Q_ARG
+        hubs = {
+            'openStationSettings': ('stationSettingsPopup', ('controller', 'recording', 'backup')),
+            'openVehicleSettings': ('vehicleSettingsPopup', ('presets', 'osd')),
+            'openService': ('servicePopup', ('diagnostics', 'timeline', 'firmware')),
+        }
+        hub_loaders = {
+            'stationSettingsPopup': 'stationSettingsContent',
+            'vehicleSettingsPopup': 'vehicleSettingsContent',
+            'servicePopup': 'serviceContent',
+        }
+        for function, (popup_name, keys) in hubs.items():
+            for key in keys:
+                QMetaObject.invokeMethod(window, function, Q_ARG('QVariant', key))
+                app.processEvents()
+                hub_popup = window.findChild(QObject, popup_name)
+                assert hub_popup.property('visible'), (popup_name, key)
+                page = hub_popup.findChild(QObject, 'hubPage')
+                assert page is not None and page.property('item') is not None, (popup_name, key)
+                hub = hub_popup.findChild(QObject, 'tabbedHub')
+                assert hub is not None and hub.property('currentKey') == key, (popup_name, key)
+                tab = find_item(hub, 'hubTab-' + key)
+                assert tab is not None and tab.property('checked'), (popup_name, key)
+            hub_popup.close()
+            app.processEvents()
+            assert not window.findChild(QObject, hub_loaders[popup_name]).property('active'), 'closing a section releases its pages'
         close = window.findChild(QObject, 'exitSimulation')
         assert close is not None
         close.clicked.emit()
@@ -118,6 +159,13 @@ def single_shot(delay, callback):
         (test_root / 'simulation-tested').write_text('ok')
     return original_single_shot(delay, verify)
 QTimer.singleShot = single_shot
+import dvr_runtime
+attached_sinks = []
+original_set_sink = dvr_runtime.DvrRuntime.setVideoSink
+def record_sink(self, sink):
+    attached_sinks.append(sink)
+    return original_set_sink(self, sink)
+dvr_runtime.DvrRuntime.setVideoSink = record_sink
 import main
 sys.argv = ['main.py', '--first-run-acceptance-smoke']
 assert main.main() == 0
