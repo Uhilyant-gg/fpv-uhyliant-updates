@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 Item {
  id:root
- signal openDevices();signal openFirmware();signal openUpdate();signal openDiagnostics();signal openPreflight();signal openTimeline();signal openOsdSettings();signal connectDevice(string deviceId);signal runNextAction(string action)
+ signal openDevices();signal openFirmware();signal openUpdate();signal openDiagnostics();signal openPreflight();signal openTimeline();signal openOsdSettings();signal openBackup();signal connectDevice(string deviceId);signal runNextAction(string action)
  property color fg:"#f5f8fc";property color sub:"#8799ad";property color surface:"#0d1723";property color elevated:"#132235";property color line:"#203348";property color green:"#35e0a1"
  function canEnterFpv(deviceId){if(!deviceId)return false;for(var i=0;i<devicesModel.items.length;i++)if(devicesModel.items[i].id===deviceId){var streams=devicesModel.streams;for(var n=0;n<streams.length;n++)if(streams[n].device_id===deviceId&&streams[n].enabled===true)return true;return false}return false}
  Rectangle{anchors.fill:parent;color:"#08111b"}
@@ -19,6 +19,7 @@ Item {
    Button{text:"Підготовка";flat:true;onClicked:root.openPreflight();HoverHint{text:"Переглянути відео, телеметрію, мережу та доступність керування."}}
    Button{text:"Прошивка";flat:true;onClicked:root.openFirmware();HoverHint{text:"Безпечне керування прошивкою камери."}}
    Button{text:"Діагностика";flat:true;onClicked:root.openDiagnostics();HoverHint{text:"Переглянути фактично доступну діагностику."}}
+   Button{text:"Резервна копія";flat:true;onClicked:root.openBackup();HoverHint{text:"Зберегти або безпечно відновити список пристроїв."}}
   }
   RowLayout{Layout.fillWidth:true;spacing:8
    Text{text:"КАМЕРИ";color:sub;font.bold:true;font.pixelSize:11;font.letterSpacing:1}

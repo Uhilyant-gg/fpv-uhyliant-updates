@@ -31,6 +31,7 @@ EVENTS = {
     "device-removed": ("Пристрій видалено", "warning"),
     "device-list-restored": ("Список пристроїв відновлено", "info"),
     "station-osd-settings-saved": ("Налаштування OSD збережено", "info"),
+    "backup-created": ("Резервну копію створено", "info"),
 }
 STATE_EVENTS = {
     "telemetry": {

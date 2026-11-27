@@ -19,6 +19,7 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
         self.assertEqual(
             set(self.qml),
             {
+                "BackupPanel.qml",
                 "DevicesPanel.qml",
                 "DiagnosticsPanel.qml",
                 "FirmwareCenter.qml",

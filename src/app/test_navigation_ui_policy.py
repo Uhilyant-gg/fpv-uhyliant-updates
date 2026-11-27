@@ -11,6 +11,8 @@ class NavigationUiPolicyTests(unittest.TestCase):
   self.assertNotIn('Пристрої · Додати камеру',self.home);self.assertNotIn('Відео передусім',self.home)
  def test_home_checks_for_updates_and_routes_contextual_action_to_guarded_ui(self):
   self.assertIn('Component.onCompleted:updater.check()',self.home);self.assertIn('onClicked:root.openUpdate()',self.home)
+ def test_home_exposes_encrypted_backup_and_restore(self):
+  self.assertIn('signal openBackup()',self.home);self.assertIn('Резервна копія',self.home);self.assertIn('onOpenBackup:backupPopup.open()',self.main)
  def test_saved_camera_rows_are_direct_fpv_entry(self):
   self.assertIn('model:devicesModel.items',self.home);self.assertIn('devicesModel.streams',self.home);self.assertIn('streams[n].enabled===true',self.home);self.assertIn('root.connectDevice(modelData.id)',self.home)
  def test_devices_activation_uses_unified_fpv_handoff(self):

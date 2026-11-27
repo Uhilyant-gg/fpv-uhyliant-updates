@@ -79,10 +79,12 @@ Audit QML and backend presentation boundaries for raw exception, socket, RTSP, S
 ### P0.5 Timeline integration
 Convert meaningful startup, discovery, configuration, backup, update and recovery events into human-readable chronological entries. Do not make raw logs the normal experience.
 
-**Implemented foundation (repository software):** Timeline presents localized station start, camera selection, video, telemetry, network, navigation, device-discovery lifecycle, device add/update/remove/restore, successfully saved station-OSD settings and meaningful application-update events, while filtering internal diagnostic messages. Rapid OSD slider saves are coalesced into one timeline entry. Only allowlisted event codes and timestamps are stored locally, capped at 200 events or 30 days, with one-click clearing. Other configuration, automatic backup and recovery coverage remains incomplete.
+**Implemented foundation (repository software):** Timeline presents localized station start, camera selection, video, telemetry, network, navigation, device-discovery lifecycle, device add/update/remove/restore, encrypted backup creation, successfully saved station-OSD settings and meaningful application-update events, while filtering internal diagnostic messages. Rapid OSD slider saves are coalesced into one timeline entry. Only allowlisted event codes and timestamps are stored locally, capped at 200 events or 30 days, with one-click clearing. Other configuration, automatic backup and recovery coverage remains incomplete.
 
 ### P0.6 Backup and one-click recovery
 Before critical reversible configuration changes, create an identity-bound validated backup and provide a clear restore action. Ambiguous or invalid restore fails closed with a human explanation.
+
+**Implemented foundation (repository software):** Home now exposes the existing encrypted device/stream backup: password-confirmed export, password-verified import, a clear replacement warning and explicit restore confirmation. Passwords are cleared from the UI after use and are not persisted; Timeline records backup creation, and restore emits the existing device-list recovery event. Automatic pre-change snapshots and inclusion of station OSD preferences remain incomplete.
 
 ### P0.7 Physical OpenIPC Hardware E2E | RELEASE-BLOCKING PHYSICAL EVIDENCE
 Complete real-hardware evidence for verified identity, compatible artifact, guarded update, reboot-pending, bounded rediscovery, hardware continuity, observed post-update firmware and sanitized staged evidence.
