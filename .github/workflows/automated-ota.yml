@@ -42,9 +42,19 @@ jobs:
         shell: pwsh
         run: |
           python -m compileall -q -f src tools
-          Push-Location src\app; python -m pytest -v -p no:cacheprovider .; Pop-Location
-          Push-Location tools; python -m pytest -v -p no:cacheprovider .; Pop-Location
+          if ($LASTEXITCODE -ne 0) { throw 'Python source compilation failed' }
+          Push-Location src\app
+          try {
+            python -m pytest -v -p no:cacheprovider .
+            if ($LASTEXITCODE -ne 0) { throw 'Application unit tests failed' }
+          } finally { Pop-Location }
+          Push-Location tools
+          try {
+            python -m pytest -v -p no:cacheprovider .
+            if ($LASTEXITCODE -ne 0) { throw 'Tool unit tests failed' }
+          } finally { Pop-Location }
           python src/app/main.py --mavlink-self-test
+          if ($LASTEXITCODE -ne 0) { throw 'MAVLink backend self-test failed' }
       - name: Prepare assets
         shell: pwsh
         run: |
