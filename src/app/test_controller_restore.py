@@ -35,3 +35,15 @@ def test_fresh_match_with_valid_inputs_restores():
 def test_restore_needs_controller_bound_profile():
  r=controller_restore({'id':'x','profile':{**PROFILE,'controllerId':'other'}},{'id':'x','connected':True,'channels':[1500]*4})
  assert r['restored'] is False and r['reasonCode']=='controller-profile-unavailable'
+
+
+def load_tests(loader, tests, pattern):
+    """Expose this module's pytest-style test functions to unittest (CI and Project Doctor)."""
+    import inspect
+    import unittest
+
+    suite = unittest.TestSuite(tests)
+    for name, function in list(globals().items()):
+        if name.startswith("test_") and inspect.isfunction(function) and function.__module__ == __name__:
+            suite.addTest(unittest.FunctionTestCase(function, description=f"{__name__}.{name}"))
+    return suite

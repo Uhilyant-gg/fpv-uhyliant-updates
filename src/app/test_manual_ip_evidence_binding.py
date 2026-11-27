@@ -35,3 +35,15 @@ def test_add_discovered_normalizes_and_revalidates_host():
     assert 'not candidate.get("openipc")' in source
     assert 'not candidate.get("identityVerified")' in source
     assert 'not identity.get("verified")' in source
+
+
+def load_tests(loader, tests, pattern):
+    """Expose this module's pytest-style test functions to unittest (CI and Project Doctor)."""
+    import inspect
+    import unittest
+
+    suite = unittest.TestSuite(tests)
+    for name, function in list(globals().items()):
+        if name.startswith("test_") and inspect.isfunction(function) and function.__module__ == __name__:
+            suite.addTest(unittest.FunctionTestCase(function, description=f"{__name__}.{name}"))
+    return suite

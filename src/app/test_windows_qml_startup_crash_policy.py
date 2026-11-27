@@ -17,4 +17,16 @@ def test_qml_runtime_objects_have_process_lifetime():
     value=assignments[0].value
     assert isinstance(value,(ast.Tuple,ast.List))
     refs={element.id for element in value.elts if isinstance(element,ast.Name)}
-    assert {"video","streams","telemetry","diag","hardware_e2e","fwsession"} <= refs
+    assert {"video","streams","telemetry","diag","hardware_e2e","fwsession","display_runtime"} <= refs
+
+
+def load_tests(loader, tests, pattern):
+    """Expose this module's pytest-style test functions to unittest (CI and Project Doctor)."""
+    import inspect
+    import unittest
+
+    suite = unittest.TestSuite(tests)
+    for name, function in list(globals().items()):
+        if name.startswith("test_") and inspect.isfunction(function) and function.__module__ == __name__:
+            suite.addTest(unittest.FunctionTestCase(function, description=f"{__name__}.{name}"))
+    return suite

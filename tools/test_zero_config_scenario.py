@@ -12,3 +12,15 @@ def test_runtime_health_is_required_after_playback():
  r=evaluate_zero_config_scenario({'discovery':True,'verifiedCamera':True,'freshPlayback':True});assert r['stage']=='operate' and not r['ok']
 def test_success_is_software_only():
  r=evaluate_zero_config_scenario({'discovery':True,'verifiedCamera':True,'freshPlayback':True,'runtimeHealthy':True});assert r['ok'] is True and r['physicalEvidence'] is False
+
+
+def load_tests(loader, tests, pattern):
+    """Expose this module's pytest-style test functions to unittest (CI and Project Doctor)."""
+    import inspect
+    import unittest
+
+    suite = unittest.TestSuite(tests)
+    for name, function in list(globals().items()):
+        if name.startswith("test_") and inspect.isfunction(function) and function.__module__ == __name__:
+            suite.addTest(unittest.FunctionTestCase(function, description=f"{__name__}.{name}"))
+    return suite

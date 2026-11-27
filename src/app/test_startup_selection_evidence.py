@@ -11,3 +11,15 @@ def test_single_verified_candidate_preserves_evidence():
 def test_ambiguity_fails_closed():
     items=[{'host':f'192.168.1.{n}','verified':True,'evidence':['verified-openipc']} for n in (2,3)]
     assert select_startup_camera(items)['reasonCode']=='camera-selection-ambiguous'
+
+
+def load_tests(loader, tests, pattern):
+    """Expose this module's pytest-style test functions to unittest (CI and Project Doctor)."""
+    import inspect
+    import unittest
+
+    suite = unittest.TestSuite(tests)
+    for name, function in list(globals().items()):
+        if name.startswith("test_") and inspect.isfunction(function) and function.__module__ == __name__:
+            suite.addTest(unittest.FunctionTestCase(function, description=f"{__name__}.{name}"))
+    return suite

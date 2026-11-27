@@ -39,3 +39,15 @@ def test_reconnect_does_not_equal_playback():
 def test_operate_requires_fresh_ready_video():
     result = run({"discovery": {"complete": True}, "camera": {"verified": True, "usable": True}, "video": {"prepared": True, "freshPlayback": True, "health": "ready"}})
     assert result["stage"] == "operate" and result["health"] == "ready"
+
+
+def load_tests(loader, tests, pattern):
+    """Expose this module's pytest-style test functions to unittest (CI and Project Doctor)."""
+    import inspect
+    import unittest
+
+    suite = unittest.TestSuite(tests)
+    for name, function in list(globals().items()):
+        if name.startswith("test_") and inspect.isfunction(function) and function.__module__ == __name__:
+            suite.addTest(unittest.FunctionTestCase(function, description=f"{__name__}.{name}"))
+    return suite
