@@ -26,4 +26,9 @@ class Tests(unittest.TestCase):
    text=updater_engine.human_update_error(action,urllib.error.URLError('socket error at https://example.invalid'))
    self.assertIn(message,text);self.assertNotIn('socket error',text);self.assertNotIn('https://',text)
   self.assertIn('доступ до диска',updater_engine.human_update_error('download',OSError('C:\\\\private\\\\updates')))
+ def test_update_validation_errors_do_not_echo_external_or_raw_details(self):
+  with self.assertRaises(RuntimeError) as caught:updater_engine.vt('https://private.invalid/version')
+  message=updater_engine.human_update_error('check',caught.exception);self.assertIn('некоректну версію',message);self.assertNotIn('private.invalid',message)
+  raw=updater_engine.human_update_error('check',RuntimeError('socket error at C:\\private\\updates'))
+  self.assertIn('Операцію зупинено',raw);self.assertNotIn('socket error',raw);self.assertNotIn('private',raw)
 if __name__=='__main__':unittest.main()

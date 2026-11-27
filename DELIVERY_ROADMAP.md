@@ -74,7 +74,7 @@ Create one presentation boundary for supported cameras, vehicles/flight controll
 ### P0.4 Human Message Layer audit
 Audit QML and backend presentation boundaries for raw exception, socket, RTSP, SSH, transport, traceback and internal reason-code leakage. Every normal failure must show practical impact and recommended action. Technical details remain progressively disclosed.
 
-**Implemented foundation (repository software):** the existing normal QML boundaries for video, pairing and firmware now use human explanations and recovery hints. Video player failures ignore raw backend strings, stall messages allow only known human text, and catalog/download failures hide transport and filesystem details. The remaining telemetry diagnostic surfaces still need a scoped Service Mode review.
+**Implemented foundation (repository software):** the existing normal QML boundaries for video, pairing and firmware now use human explanations and recovery hints. Video player failures ignore raw backend strings, stall messages allow only known human text, firmware/update failures hide transport and filesystem details, and validation messages do not echo untrusted manifest values. The reviewed MAVLink diagnostics screen maps link-health labels and displays observed metrics without binding the runtime exception string; continue reviewing Service Mode messages as those surfaces evolve.
 
 ### P0.5 Timeline integration
 Convert meaningful startup, discovery, configuration, backup, update and recovery events into human-readable chronological entries. Do not make raw logs the normal experience.
