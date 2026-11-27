@@ -34,8 +34,10 @@ class ManualWorker(QThread):
 
 class Devices(LegacyDevices):
     manualChanged=Signal()
+    scanStateChanged=Signal()
     def __init__(self):
         super().__init__();self._manual_busy=False;self._manual_result={};self._manual_error="";self._manual_status="idle";self._manual_message="";self._manual_worker=None;self._manual_requested_host=""
+        self.discoveryChanged.connect(self.scanStateChanged)
         self._init_discovery_history()
     def _init_discovery_history(self):
         with self._connect() as db:db.execute("CREATE TABLE IF NOT EXISTS discovery_history(host TEXT PRIMARY KEY,last_seen INTEGER NOT NULL DEFAULT 0,openipc INTEGER NOT NULL DEFAULT 0)")
@@ -62,13 +64,13 @@ class Devices(LegacyDevices):
     def manualStatus(self):return self._manual_status
     @Property(str,notify=manualChanged)
     def manualMessage(self):return self._manual_message
-    @Property(str,notify=LegacyDevices.discoveryChanged)
+    @Property(str,notify=scanStateChanged)
     def scanStage(self):return self._stage
-    @Property(str,notify=LegacyDevices.discoveryChanged)
+    @Property(str,notify=scanStateChanged)
     def scanStatus(self):return self._status
-    @Property(int,notify=LegacyDevices.discoveryChanged)
+    @Property(int,notify=scanStateChanged)
     def scanDone(self):return self._pd
-    @Property(int,notify=LegacyDevices.discoveryChanged)
+    @Property(int,notify=scanStateChanged)
     def scanTotal(self):return self._pt
     @Slot()
     def discoverOpenIPC(self):

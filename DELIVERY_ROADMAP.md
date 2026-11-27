@@ -17,7 +17,7 @@ Never treat software CI as physical hardware evidence. Never allow a deferred ph
 - E0 real OpenIPC Hardware E2E remains physically incomplete.
 - E8 controller calibration/mapping/profile core exists, but controller discovery, live acquisition, durable persistence and onboarding remain incomplete.
 - The largest product risk is the absence of one evidenced integrated first-run journey that proves the user can launch, understand state, see devices and receive a useful next action without documentation or configuration editing.
-- The latest local first-run report is rejected: only launch evidence is present, restore and later stages are missing, and health is unknown. A full desktop startup run is still required before claiming acceptance.
+- A controlled offscreen full-app run now records all seven first-run stages and is accepted: health evidence appears in 1.34 seconds, with a useful `find-camera` action and no manual configuration or raw UI error. Discovery, updater and MAVLink side effects were stubbed; this is repository-software evidence, not packaged or physical acceptance. A normal desktop and hardware-backed journey remain unverified.
 
 ## Canonical capability status
 These headings are retained as the machine-validated capability contract.
@@ -59,7 +59,7 @@ Acceptance:
 - blocked states provide a human explanation and recovery route;
 - test output provides machine-readable timing and failed stage.
 
-**Repository-software evidence:** startup records launch, restore, automatic discovery start, health, device counts and next action; `main.py --acceptance-report` evaluates the latest run and emits the exact failed stage plus health elapsed time against the 10-second target. Packaged and physical operation evidence remain separate gates.
+**Repository-software evidence:** startup records launch, restore, automatic discovery start, health, device counts and next action; `main.py --acceptance-report` evaluates the latest run and emits the exact failed stage plus health elapsed time against the 10-second target. A controlled offscreen full-app run passed all seven stages with health evidence in 1.34 seconds; discovery, updater and MAVLink side effects were stubbed. Packaged and physical operation evidence remain separate gates.
 
 ### P0.2 Health Dashboard integration
 Use existing health evidence rather than building a parallel health engine. Present ready, attention, problem or unknown; a concise summary; affected device or station area; and one Next Best Action.

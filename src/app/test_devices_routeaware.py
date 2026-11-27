@@ -23,6 +23,15 @@ class Tests(unittest.TestCase):
  def verified(self):return {'host':'192.168.1.50','camera':True,'openipc':True,'identityVerified':True,'identity':{'verified':True,'platform':'ssc30kq','soc':'ssc338q','sensor':'imx335','firmware':'v1','majestic':'','evidence':['observed']},'evidence':['observed'],'streams':[]}
  def test_known_hosts_include_saved_and_last_seen(self):
   d=module.Devices();d.addDevice('Camera','OpenIPC','192.168.1.40',80,'Network','');d._remember_host('192.168.1.50',True);self.assertIn('192.168.1.40',d._known_hosts());self.assertIn('192.168.1.50',d._known_hosts())
+ def test_discovery_properties_have_safe_qt_notify_metadata(self):
+  with patch.object(module.LegacyDevices,'_init',lambda self:None),patch.object(module.LegacyDevices,'_load',lambda self:None),patch.object(module.Devices,'_init_discovery_history',lambda self:None):d=module.Devices()
+  meta=module.Devices.staticMetaObject;properties=[meta.property(i) for i in range(meta.propertyCount())]
+  for prop in properties:
+   self.assertTrue(prop.name() and prop.typeName())
+   if prop.hasNotifySignal():self.assertTrue(prop.notifySignal().methodSignature())
+  d._stage='Пошук камер';d._pd=1;d._pt=2;d._found=0
+  notifications=[];d.scanStateChanged.connect(lambda:notifications.append(True));d.discoveryChanged.emit()
+  self.assertEqual(d.scanStage,'Пошук камер');self.assertEqual(d.scanDone,1);self.assertEqual(notifications,[True])
  def test_manual_completion_clears_busy_and_exposes_verified_state(self):
   d=module.Devices();d._manual_busy=True;d._manual_requested_host='192.168.1.50';d._on_manual_done(self.verified(),'');self.assertFalse(d.manualBusy);self.assertEqual(d.manualStatus,'verified');self.assertEqual(d.manualMessage,'OpenIPC підтверджено');self.assertEqual(d.manualResult['identity']['sensor'],'imx335')
  def test_manual_auth_candidate_has_explicit_state(self):
