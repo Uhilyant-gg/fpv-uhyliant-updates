@@ -78,6 +78,8 @@ Audit QML and backend presentation boundaries for raw exception, socket, RTSP, S
 
 **Additional audit fix (repository software):** backup service outcomes now use Ukrainian, actionable messages and never include raw filesystem exceptions or paths. The current backup panel already uses similarly safe user-facing copy.
 
+**Additional audit fix (repository software):** firmware confirmation now clearly asks permission to update the selected camera, rather than claiming the user accepted an SSH key. The explanation states that unknown connection keys are not accepted; the transport continues to reject untrusted keys.
+
 **Implemented foundation (repository software):** the existing normal QML boundaries for video, pairing and firmware now use human explanations and recovery hints. Video player failures ignore raw backend strings, stall messages allow only known human text, firmware/update failures hide transport and filesystem details, and validation messages do not echo untrusted manifest values. The reviewed MAVLink diagnostics screen maps link-health labels and displays observed metrics without binding the runtime exception string. Service Mode now shows localized status summaries without telemetry-provider, navigation-source or network-transport identifiers, and unknown status values fail closed to a human message.
 
 ### P0.5 Timeline integration

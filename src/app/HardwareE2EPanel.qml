@@ -16,7 +16,7 @@ Item {
   Text{text:mark(ready.checks.executionPlanReady)+" План оновлення прив'язаний до цієї камери";color:"#8fa1b7"}
   Text{text:mark(ready.checks.credentialsPresent)+" Дані доступу введені для цієї сесії";color:"#8fa1b7"}
   Text{text:(ready.artifact&&ready.artifact.sha256)?("Artifact: "+ready.artifact.sha256.substring(0,12)+"… / "+(ready.artifact.build||"build невідомий")):"Artifact: не готовий";color:"#8fa1b7"}
-  CheckBox{text:"SSH host key перевірено та прийнято";checked:hardwareE2ERuntime.hostKeyAccepted;onToggled:hardwareE2ERuntime.setHostKeyAccepted(checked);HoverHint{text:"Підтвердження прив'язане до камери, hardware identity, artifact і execution plan. Будь-яка зміна скидає його."}}
+  CheckBox{text:"Підтверджую оновлення вибраної камери";checked:hardwareE2ERuntime.updateConfirmed;onToggled:hardwareE2ERuntime.confirmDeviceUpdate(checked);HoverHint{text:"Ця позначка дозволяє оновити вибрану камеру. Вона не змушує програму довіряти невідомому пристрою: якщо з'єднання не перевірено, оновлення зупиниться."}}
   Text{text:"E2E evidence";color:"#f4f7fb";font.bold:true}
   RowLayout{Layout.fillWidth:true;Button{text:"Зберегти preflight";enabled:evidenceReady.preflight;onClicked:hardwareE2ERuntime.capture("preflight")}Text{Layout.fillWidth:true;text:captures.preflight||"доступно після готового preflight";color:captures.preflight?"#27d59a":"#8fa1b7";elide:Text.ElideMiddle}}
   RowLayout{Layout.fillWidth:true;Button{text:"Зберегти post-update";enabled:evidenceReady.postUpdate;onClicked:hardwareE2ERuntime.capture("post-update")}Text{Layout.fillWidth:true;text:captures["post-update"]||(evidenceReady.postUpdate?"готово до збереження":"доступно лише після verified update");color:captures["post-update"]?"#27d59a":"#8fa1b7";elide:Text.ElideMiddle}}

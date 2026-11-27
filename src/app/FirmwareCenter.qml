@@ -41,7 +41,7 @@ Item {
      Text{text:"Дані потрібні лише для цього сеансу й не зберігаються.";color:sub;Layout.fillWidth:true;wrapMode:Text.WordWrap}
      TextField{id:usernameField;Layout.fillWidth:true;placeholderText:"Логін (зазвичай root)";text:cameraCredentials.username;enabled:!firmwareExecutor.busy;onEditingFinished:cameraCredentials.username=text}
      TextField{id:passwordField;Layout.fillWidth:true;placeholderText:"Пароль";echoMode:TextInput.Password;inputMethodHints:Qt.ImhSensitiveData|Qt.ImhNoPredictiveText;enabled:!firmwareExecutor.busy;onTextChanged:cameraCredentials.password=text}
-     CheckBox{text:"SSH host key перевірено та прийнято";checked:hardwareE2ERuntime.hostKeyAccepted;enabled:!firmwareExecutor.busy;onToggled:hardwareE2ERuntime.setHostKeyAccepted(checked)}
+     CheckBox{text:"Підтверджую оновлення вибраної камери";checked:hardwareE2ERuntime.updateConfirmed;enabled:!firmwareExecutor.busy;onToggled:hardwareE2ERuntime.confirmDeviceUpdate(checked);HoverHint{text:"Ця позначка дозволяє оновити вибрану камеру. Вона не змушує програму довіряти невідомому пристрою: якщо з'єднання не перевірено, оновлення зупиниться."}}
      Button{text:sessionResult.enabled?"Доступ підтверджено":"Підтвердити доступ";Layout.fillWidth:true;enabled:hardwareReady.ready&&!sessionResult.enabled&&!firmwareExecutor.busy&&cameraCredentials.username!==""&&passwordField.text!=="";onClicked:firmwareUpdateSession.enableAuthenticatedTransport(cameraCredentials,hardwareE2ERuntime)}
     }
    }
