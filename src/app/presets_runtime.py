@@ -72,6 +72,12 @@ class PresetsRuntime(QObject):
     def _active(self) -> dict[str, Any] | None:
         return next((p for p in self._state["presets"] if p["id"] == self._state["active"]), None)
 
+    @Slot()
+    def reload(self):
+        """Re-read presets after an external change such as a backup restore."""
+        self._reload()
+        self.changed.emit()
+
     # -- actions --------------------------------------------------------------
     @Slot(str, result=bool)
     def createPreset(self, name):

@@ -41,10 +41,11 @@ Item {
   message="";restoreConfirmation.open()
  }
  function confirmRestore(){
+  var withPresets=!!restorePlan.presetCount
   restorePlan=({})
   restoreConfirmation.close()
   messageOk=stationBackup.restoreInspected(true)
-  message=messageOk?"Список пристроїв і відеопотоків відновлено.":"Не вдалося відновити копію. Поточні дані не змінено."
+  message=messageOk?(withPresets?"Пристрої, пресети та налаштування відновлено.":"Список пристроїв і відеопотоків відновлено."):"Не вдалося відновити копію повністю. Перевірте список пристроїв і пресети."
  }
  function inspectAutomatic(){
   restorePlan=stationBackup.inspectAutomatic()
@@ -62,7 +63,7 @@ Item {
   anchors.fill:parent
   spacing:12
   Text{text:"РЕЗЕРВНА КОПІЯ";color:root.fg;font.pixelSize:21;font.bold:true}
-  Text{text:"Збережіть пристрої та відеопотоки у зашифрованому файлі.";color:root.sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+  Text{text:"Збережіть пристрої, відеопотоки, пресети та налаштування станції у зашифрованому файлі.";color:root.sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
   Text{text:"Пароль не зберігається. Збережіть його окремо — без нього відновити копію неможливо.";color:root.sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
   Rectangle {
    Layout.fillWidth:true
@@ -123,7 +124,7 @@ Item {
   contentItem:ColumnLayout {
    spacing:12
    Text{text:"Підтвердьте відновлення";color:root.fg;font.pixelSize:18;font.bold:true}
-   Text{text:"У копії пристроїв: "+(root.restorePlan.deviceCount||0)+". Поточний список пристроїв і відеопотоків буде замінено.";color:root.sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
+   Text{text:"У копії пристроїв: "+(root.restorePlan.deviceCount||0)+(root.restorePlan.presetCount?", пресетів: "+root.restorePlan.presetCount:"")+". Поточні "+(root.restorePlan.presetCount?"пристрої, пресети та налаштування":"пристрої та відеопотоки")+" буде замінено.";color:root.sub;wrapMode:Text.WordWrap;Layout.fillWidth:true}
    RowLayout{Layout.fillWidth:true;Item{Layout.fillWidth:true}Button{text:"Скасувати";onClicked:root.cancelRestore()}Button{text:"Відновити";onClicked:root.confirmRestore()}}
   }
   onClosed:if(root.restorePlan.execution){stationBackup.cancelRestore();root.restorePlan=({})}

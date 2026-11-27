@@ -7,8 +7,13 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from PySide6.QtCore import QObject, Property, Signal, Slot
 
+from settings_presets import PresetError, validate_state
+from station_settings import validate_station_settings
+
 SCHEMA = 'fpv-uhyliant-station-backup'
-VERSION = 3
+VERSION = 4
+# Version 3 files (devices only) remain importable; version 4 adds presets and station settings.
+SUPPORTED_VERSIONS = (3, 4)
 KDF = 'scrypt'
 CIPHER = 'aes-256-gcm'
 N = 16384
@@ -56,7 +61,7 @@ def _open(wrapper, password):
     if (
         not isinstance(wrapper, dict)
         or wrapper.get('schema') != SCHEMA
-        or wrapper.get('version') != VERSION
+        or wrapper.get('version') not in SUPPORTED_VERSIONS
         or wrapper.get('kdf') != KDF
         or wrapper.get('cipher') != CIPHER
         or wrapper.get('scrypt') != {'n': N, 'r': R, 'p': P}
@@ -73,11 +78,14 @@ def _open(wrapper, password):
 class StationBackup(QObject):
     changed = Signal()
     automaticFailure = Signal(str)
+    restored = Signal()
 
-    def __init__(self, devices, automatic=None):
+    def __init__(self, devices, automatic=None, station=None, presets=None):
         super().__init__()
         self.devices = devices
         self.automatic = automatic
+        self.station = station
+        self.presets = presets
         self._result = {'ready': False, 'reason': 'Резервну копію ще не створено.', 'manifest': {}}
         self._pending = None
         if automatic is not None:
@@ -94,7 +102,28 @@ class StationBackup(QObject):
         return dict(self._result)
 
     def _payload(self):
-        return {'schema': SCHEMA, 'version': VERSION, 'devices': self.devices.exportSnapshot()}
+        payload = {'schema': SCHEMA, 'version': VERSION, 'devices': self.devices.exportSnapshot()}
+        if self.station is not None:
+            payload['stationSettings'] = self.station.exportSettings()
+        if self.presets is not None:
+            payload['presets'] = self.presets.load()
+        return payload
+
+    def _pending_from(self, payload):
+        """Validate every part of a decrypted payload before anything is restored."""
+        if payload.get('schema') != SCHEMA or payload.get('version') not in SUPPORTED_VERSIONS:
+            return None
+        if not self.devices.validateSnapshot(payload.get('devices')):
+            return None
+        pending = {'devices': payload['devices'], 'settings': None, 'presets': None}
+        try:
+            if 'stationSettings' in payload:
+                pending['settings'] = validate_station_settings(payload['stationSettings'])
+            if 'presets' in payload:
+                pending['presets'] = validate_state(payload['presets'])
+        except (ValueError, PresetError):
+            return None
+        return pending
 
     def _set(self, ready, reason, manifest=None):
         self._result = {'ready': bool(ready), 'reason': reason, 'manifest': dict(manifest or {})}
@@ -118,7 +147,7 @@ class StationBackup(QObject):
                 {'schema': SCHEMA, 'version': VERSION, 'encrypted': True, 'cipher': CIPHER},
             )
             return True
-        except (OSError, TypeError, ValueError):
+        except (OSError, TypeError, ValueError, PresetError):
             self._set(
                 False,
                 'Не вдалося створити резервну копію. Перевірте доступ до вибраної папки та наявність вільного місця.',
@@ -130,21 +159,19 @@ class StationBackup(QObject):
         self._pending = None
         try:
             payload = _open(json.loads(Path(path).read_text(encoding='utf-8')), password)
-            valid = bool(
-                payload.get('schema') == SCHEMA
-                and payload.get('version') == VERSION
-                and self.devices.validateSnapshot(payload.get('devices'))
-            )
-            if not valid:
+            pending = self._pending_from(payload)
+            if pending is None:
                 self._set(False, 'Не вдалося перевірити резервну копію. Перевірте пароль, файл і його сумісність.')
                 return {}
-            self._pending = payload['devices']
+            self._pending = pending
             plan = {
                 'schema': SCHEMA,
-                'version': VERSION,
+                'version': payload['version'],
                 'encrypted': True,
                 'cipher': CIPHER,
-                'deviceCount': len(self._pending['devices']),
+                'deviceCount': len(pending['devices']['devices']),
+                'presetCount': len(pending['presets']['presets']) if pending['presets'] is not None else 0,
+                'includesSettings': pending['settings'] is not None,
                 'execution': 'explicit-confirmation-required',
             }
             self._set(True, 'Копію перевірено. Поточні дані не змінено.', plan)
@@ -164,12 +191,12 @@ class StationBackup(QObject):
             self.automaticFailure.emit(self.automatic.error)
             self._set(False, self.automatic.error)
             return {}
-        self._pending = payload['devices']
+        self._pending = {'devices': payload['devices'], 'settings': None, 'presets': None}
         plan = {
             'schema': SCHEMA,
             'version': VERSION,
             'encrypted': True,
-            'deviceCount': len(self._pending['devices']),
+            'deviceCount': len(payload['devices']['devices']),
             'execution': 'explicit-confirmation-required',
             'automatic': True,
         }
@@ -181,9 +208,9 @@ class StationBackup(QObject):
         if not confirmed or self._pending is None:
             self._set(False, 'Для відновлення підтвердьте перевірену резервну копію.')
             return False
-        snapshot = self._pending
+        pending = self._pending
         self._pending = None
-        if not self.devices.restoreSnapshot(snapshot):
+        if not self.devices.restoreSnapshot(pending['devices']):
             self._set(
                 False,
                 (
@@ -193,7 +220,30 @@ class StationBackup(QObject):
                 ),
             )
             return False
-        self._set(True, 'Пристрої та відеопотоки відновлено.', {'schema': SCHEMA, 'version': VERSION, 'restored': True})
+        try:
+            if pending['presets'] is not None and self.presets is not None:
+                self.presets.replace_state(pending['presets'])
+        except (OSError, PresetError):
+            self._set(False, 'Пристрої відновлено, але не вдалося відновити пресети. Перевірте доступ до папки даних.')
+            self.restored.emit()
+            return False
+        if (
+            pending['settings'] is not None
+            and self.station is not None
+            and not self.station.applySettings(pending['settings'])
+        ):
+            self._set(False, 'Пристрої та пресети відновлено, але не вдалося застосувати налаштування станції.')
+            self.restored.emit()
+            return False
+        restored_presets = pending['presets'] is not None and self.presets is not None
+        self._set(
+            True,
+            'Пристрої, відеопотоки, пресети та налаштування відновлено.'
+            if restored_presets
+            else 'Пристрої та відеопотоки відновлено.',
+            {'schema': SCHEMA, 'version': VERSION, 'restored': True},
+        )
+        self.restored.emit()
         return True
 
     @Slot()

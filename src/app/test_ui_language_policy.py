@@ -89,7 +89,9 @@ class UiLanguagePolicyTests(unittest.TestCase):
             "Відновити",
         ):
             self.assertIn(expected, visible)
-        self.assertIn("Поточний список пристроїв і відеопотоків буде замінено.", source)
+        # The confirmation must warn that current data (devices, and presets when present) will be replaced.
+        self.assertIn('"пристрої та відеопотоки")+" буде замінено."', source)
+        self.assertIn("пристрої, пресети та налаштування", source)
         self.assertNotIn("stationBackup.result.reason", source)
         self.assertIn("stationBackup.restoreInspected(true)", source)
 
