@@ -42,7 +42,7 @@ def test_invalid_addresses(kind, value):
 def test_status_labels_and_fly_rule():
     assert cp.status_entry("available", 12)["label"] == "12 мс"
     assert cp.status_entry("unconfigured")["label"] == "вказати адресу"
-    assert cp.status_entry("unsupported")["label"] == "сервер не налаштовано"
+    assert cp.status_entry("unsupported")["label"] == "немає сервера"
     statuses = {"local": cp.status_entry("available", 5), "static": cp.status_entry("unavailable")}
     assert cp.can_fly("local", statuses)
     assert not cp.can_fly("static", statuses)
@@ -178,3 +178,15 @@ def test_video_runtime_builds_url_from_the_selected_ipv6_address(monkeypatch):
     monkeypatch.setattr(video, "_check_endpoint", lambda: True)
     assert video.prepare("s1")
     assert video.url == "rtsp://[2001:db8::10]:554/stream=0"
+
+
+def test_clear_address_unselects_and_forgets(runtime, tmp_path):
+    runtime.prober.reachable["93.170.12.5"] = 20
+    runtime.setAddress("c1", "static", "93.170.12.5")
+    runtime.select("c1", "static")
+    assert runtime.canFly("c1")
+    runtime.clearAddress("c1", "static")
+    assert runtime.selected == {}
+    assert runtime.statuses["c1"]["static"]["state"] == "unconfigured"
+    assert json.loads((tmp_path / "c.json").read_text()) == {}
+    runtime.clearAddress("c1", "starlink")  # nothing saved: no error

@@ -53,7 +53,7 @@ def status_entry(state: str, latency_ms: int | None = None) -> dict[str, Any]:
         "unavailable": "недоступно",
         "checking": "перевірка…",
         "unconfigured": "вказати адресу",
-        "unsupported": "сервер не налаштовано",
+        "unsupported": "немає сервера",
     }
     return {"state": state, "latencyMs": latency_ms, "label": labels[state]}
 

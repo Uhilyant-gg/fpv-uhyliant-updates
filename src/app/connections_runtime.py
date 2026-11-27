@@ -105,6 +105,18 @@ class ConnectionsRuntime(QObject):
         self._probe(device_id, kind)
         return True
 
+    @Slot(str, str)
+    def clearAddress(self, device_id, kind):
+        addresses = self._addresses.get(device_id, {})
+        if kind in addresses:
+            del addresses[kind]
+            if not addresses:
+                self._addresses.pop(device_id, None)
+            self._store.save(self._addresses)
+            if self._selected.get(device_id) == kind:
+                self._selected.pop(device_id)
+            self._rebuild()
+
     @Slot(str, result=bool)
     def canFly(self, device_id):
         return cp.can_fly(self._selected.get(device_id, ""), self._statuses.get(device_id, {}))

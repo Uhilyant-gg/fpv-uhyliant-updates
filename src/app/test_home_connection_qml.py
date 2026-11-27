@@ -22,7 +22,9 @@ c.execute('INSERT INTO devices VALUES(?,?,?,?,?,?,?,?,?,?)', ('c1', 'Квадр�
 c.execute('INSERT INTO streams VALUES(?,?,?,?,?,?,?,?)', ('s1', 'c1', 'Основний', 'main', 554, '/stream=0', 'rtsp', 1))
 c.commit(); c.close()
 
-import backend, updater_engine, connections_runtime
+import backend, updater_engine, connections_runtime, station_backup, traceback
+# Changing a camera first makes an automatic backup, which needs the Windows secret store.
+station_backup.StationBackup._protect_change = lambda self: True
 original_station = backend.Station
 backend.Station = lambda: original_station(QSettings(str(root / 'settings.ini'), QSettings.IniFormat))
 updater_engine.Updater.check = lambda self: None
@@ -56,6 +58,12 @@ def single_shot(delay, callback):
     if name != 'show_home':
         return original_single_shot(delay, callback)
     def verify():
+        try:
+            check()
+        except Exception:
+            traceback.print_exc()
+            QGuiApplication.instance().exit(1)
+    def check():
         callback()
         app = QGuiApplication.instance()
         window = next(w for w in app.topLevelWindows() if w.property('simulation') is not None)
@@ -79,21 +87,37 @@ def single_shot(delay, callback):
 
         one(window, 'connection-starlink').clicked.emit()
         app.processEvents()
-        popup = window.findChild(QObject, 'connectionAddressPopup')
-        assert popup.property('visible'), 'an address is asked for first'
-        field = window.findChild(QObject, 'connectionAddressField')
+        dialog = window.findChild(QObject, 'cameraSettingsDialog')
+        assert dialog.property('visible'), 'an address is asked for first, in the camera settings'
+        field = window.findChild(QObject, 'cameraStarlinkField')
         field.setProperty('text', 'not an address')
-        window.findChild(QObject, 'connectionAddressSave').clicked.emit()
+        window.findChild(QObject, 'cameraSettingsSave').clicked.emit()
         app.processEvents()
-        assert popup.property('visible')
-        assert window.findChild(QObject, 'connectionAddressError').property('text') != ''
+        assert dialog.property('visible')
+        assert window.findChild(QObject, 'cameraSettingsError').property('text') != ''
         field.setProperty('text', '2001:db8::10')
-        window.findChild(QObject, 'connectionAddressSave').clicked.emit()
+        window.findChild(QObject, 'cameraNameField').setProperty('text', 'Квадрик 7')
+        window.findChild(QObject, 'cameraSettingsSave').clicked.emit()
         app.processEvents()
-        assert not popup.property('visible')
-        assert runtime.selected == {'c1': 'starlink'}
-        assert fly.property('enabled')
+        assert not dialog.property('visible')
         assert json.loads((root / 'FPV-Uhyliant' / 'connections.json').read_text()) == {'c1': {'starlink': '2001:db8::10'}}
+        names = [d['name'] for d in runtime._devices.items]
+        assert names == ['Квадрик 7'], names
+        assert runtime.statuses['c1']['starlink']['state'] == 'available'
+        one(window, 'connection-starlink').clicked.emit()
+        app.processEvents()
+        assert runtime.selected == {'c1': 'starlink'}
+        assert one(window, 'cameraFly').property('enabled'), 'the renamed card is rebuilt; look it up again'
+
+        one(window, 'cameraSettings').clicked.emit()
+        app.processEvents()
+        assert dialog.property('visible')
+        window.findChild(QObject, 'cameraRemove').clicked.emit()
+        app.processEvents()
+        window.findChild(QObject, 'cameraRemoveConfirm').clicked.emit()
+        app.processEvents()
+        assert runtime._devices.items == [], 'camera removed'
+        assert find_all(window.contentItem(), 'cameraCard', []) == []
         (root / 'home-connection-tested').write_text('ok')
         app.quit()
     return original_single_shot(delay, verify)

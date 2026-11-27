@@ -15,6 +15,7 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
             set(self.qml),
             {
                 "BackupPanel.qml",
+                "CameraSettingsDialog.qml",
                 "ControllerPanel.qml",
                 "DevicesPanel.qml",
                 "DiagnosticsPanel.qml",
