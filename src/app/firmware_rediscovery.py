@@ -57,20 +57,21 @@ class FirmwareRediscovery:
      for pending in futures:
       if pending is not future:pending.cancel()
      pool.shutdown(wait=False,cancel_futures=True);detached=True
-     return candidate,identity
+     streams=result.get('streams',[]) if isinstance(result,dict) and isinstance(result.get('streams'),list) else []
+     return candidate,identity,streams
   finally:
    if not detached:pool.shutdown(wait=True,cancel_futures=True)
-  return None,None
+  return None,None,[]
  def wait(self,host,attempts=30,interval=2.0,expected_identity=None):
   attempts=max(1,min(int(attempts),120));interval=max(0.0,min(float(interval),10.0));expected=expected_identity if isinstance(expected_identity,dict) else {};platform=str(expected.get('platform','')).strip().lower();sensor=str(expected.get('sensor','')).strip().lower();original=str(host).strip()
   if not _private_candidate(original) or not platform or not sensor:return {'rediscovered':False,'attempts':0,'host':'','identity':normalize_openipc_identity()}
   hosts=self._hosts(original)
   for index in range(attempts):
    direct=self._probe_one(original);identity=self._matches(original,direct,original,platform,sensor)
-   if identity is not None:return {'rediscovered':True,'attempts':index+1,'host':original,'identity':identity}
+   if identity is not None:return {'rediscovered':True,'attempts':index+1,'host':original,'identity':identity,'streams':direct.get('streams',[]) if isinstance(direct.get('streams'),list) else []}
    candidates=[candidate for candidate in hosts if candidate!=original]
    if candidates:
-    candidate,identity=self._probe_candidates(candidates,original,platform,sensor)
-    if identity is not None:return {'rediscovered':True,'attempts':index+1,'host':candidate,'identity':identity}
+    candidate,identity,streams=self._probe_candidates(candidates,original,platform,sensor)
+    if identity is not None:return {'rediscovered':True,'attempts':index+1,'host':candidate,'identity':identity,'streams':streams}
    if index+1<attempts:self.sleep(interval)
-  return {'rediscovered':False,'attempts':attempts,'host':'','identity':normalize_openipc_identity()}
+  return {'rediscovered':False,'attempts':attempts,'host':'','identity':normalize_openipc_identity(),'streams':[]}

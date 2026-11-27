@@ -37,7 +37,7 @@ def _version(value):
 class MavlinkWorker(QThread):
  telemetry=Signal(object);failed=Signal(str)
  def __init__(self,endpoint,baud,target_system=0,target_component=0):
-  super().__init__();self.endpoint=endpoint;self.baud=baud;self.target_system=target_system;self.target_component=target_component;self._stop=threading.Event();self._master=None;self._data={};self._seen={};self._home=None;self._position=None;self._last_heartbeat=0.0;self._started=time.monotonic();self._received=0;self._bad=0;self._lost=0;self._last_seq={};self._types=Counter();self._window=deque();self._last_packet=0.0;self._vehicle=None
+  super().__init__();self.endpoint=endpoint;self.baud=baud;self.target_system=target_system;self.target_component=target_component;self._stop=threading.Event();self._master=None;self._data={};self._seen={};self._field_seen={};self._home=None;self._position=None;self._last_heartbeat=0.0;self._started=time.monotonic();self._received=0;self._bad=0;self._lost=0;self._last_seq={};self._types=Counter();self._window=deque();self._last_packet=0.0;self._vehicle=None
  def stop(self):
   self._stop.set()
   if self._master is not None:
@@ -49,15 +49,19 @@ class MavlinkWorker(QThread):
   total=self._received+self._lost;loss=(100.0*self._lost/total) if total else 0.0
   return {"messagesReceived":self._received,"packetsLost":self._lost,"packetLossPercent":loss,"badData":self._bad,"messageRate":len(self._window)/5.0,"lastPacketAge":None if not self._last_packet else now-self._last_packet,"uptime":now-self._started,"messageTypes":dict(self._types.most_common(12)),"rxErrors":self._data.get("rxErrors"),"fixedErrors":self._data.get("fixedErrors"),"txBuffer":self._data.get("txBuffer"),"localNoise":self._data.get("localNoise"),"remoteNoise":self._data.get("remoteNoise"),"remoteRssi":self._data.get("remoteRssi")}
  def _snapshot(self):
-  now=time.monotonic();out=dict(self._data);ages={}
+  now=time.monotonic();out=dict(self._data);ages={};freshness={}
   for group,limit in STALE_AFTER.items():
    seen=self._seen.get(group);age=None if seen is None else max(0.0,now-seen);ages[group]=age;fresh=age is not None and age<limit;out[group+"Fresh"]=fresh
-   if not fresh:
-    for field in GROUP_FIELDS[group]:out[field]=None
-  connected=self._last_heartbeat>0 and now-self._last_heartbeat<HEARTBEAT_TIMEOUT;out["connected"]=connected;out["heartbeat"]=connected;out["ages"]=ages;out["link"]=self._link(now);out["health"]="connected" if connected else ("traffic-no-heartbeat" if self._last_packet and now-self._last_packet<3 else "disconnected")
+   for field in GROUP_FIELDS[group]:
+    field_seen=self._field_seen.get(field);field_fresh=field_seen is not None and now-field_seen<limit;freshness[field]=field_fresh if field_seen is not None else None
+    if not field_fresh:out[field]=None
+  connected=self._last_heartbeat>0 and now-self._last_heartbeat<HEARTBEAT_TIMEOUT;out["connected"]=connected;out["heartbeat"]=connected;out["ages"]=ages;out["freshness"]=freshness;out["link"]=self._link(now);out["health"]="connected" if connected else ("traffic-no-heartbeat" if self._last_packet and now-self._last_packet<3 else "disconnected")
   return out
  def _emit(self,group=None,**values):
-  if group:self._touch(group)
+  if group:
+   self._touch(group)
+   for field in GROUP_FIELDS[group]:
+    if field in values:self._field_seen[field]=self._seen[group]
   self._data.update(values);self.telemetry.emit(self._snapshot())
  def _candidate(self,msg):
   sysid,compid=msg.get_srcSystem(),msg.get_srcComponent()
@@ -89,7 +93,9 @@ class MavlinkWorker(QThread):
   if kind=="AUTOPILOT_VERSION":self._emit(flightSoftwareVersion=_version(getattr(msg,"flight_sw_version",0)),middlewareVersion=_version(getattr(msg,"middleware_sw_version",0)),osVersion=_version(getattr(msg,"os_sw_version",0)),boardVersion=int(getattr(msg,"board_version",0)),vendorId=int(getattr(msg,"vendor_id",0)),productId=int(getattr(msg,"product_id",0)),vehicleUid=str(int(getattr(msg,"uid",0))) if getattr(msg,"uid",0) else "",capabilities=int(getattr(msg,"capabilities",0)))
   elif kind=="SYS_STATUS":self._emit("battery",batteryVoltage=_num(msg.voltage_battery,1000.0,65535),current=_num(msg.current_battery,100.0,-1),batteryRemaining=_num(msg.battery_remaining,1.0,-1),controllerLoad=_num(getattr(msg,"load",None),10.0,65535),communicationErrors=int(getattr(msg,"errors_comm",0)))
   elif kind=="BATTERY_STATUS":
-   cells=getattr(msg,"voltages",None) or [];valid=[v for v in cells if 0<v<65535];voltage=sum(valid)/1000.0 if valid else self._data.get("batteryVoltage");self._emit("battery",batteryVoltage=voltage,current=_num(getattr(msg,"current_battery",None),100.0,-1),batteryRemaining=_num(getattr(msg,"battery_remaining",None),1.0,-1))
+   cells=getattr(msg,"voltages",None) or [];valid=[v for v in cells if 0<v<65535];values={"current":_num(getattr(msg,"current_battery",None),100.0,-1),"batteryRemaining":_num(getattr(msg,"battery_remaining",None),1.0,-1)}
+   if valid:values["batteryVoltage"]=sum(valid)/1000.0
+   self._emit("battery",**values)
   elif kind=="GPS_RAW_INT":
    sats=int(getattr(msg,"satellites_visible",0));eph=getattr(msg,"eph",65535);self._emit("gps",gpsFix=int(getattr(msg,"fix_type",0)),satellites=None if sats==255 else sats,hdop=None if eph==65535 else eph/100.0)
   elif kind=="GLOBAL_POSITION_INT":
@@ -168,8 +174,8 @@ class MavlinkRuntime(QObject):
   self._telemetry=dict(values);self.changed.emit()
  def _on_error(self,generation,error):
   if generation!=self._generation:return
-  self._error=error;self.changed.emit()
+  self._error=error;self._telemetry={"connected":False,"heartbeat":False,"health":"disconnected","link":{}};self.changed.emit()
  def _on_finished(self,generation,worker):
-  if generation==self._generation and worker is self._worker:self._worker=None
+  if generation==self._generation and worker is self._worker:self._worker=None;self._telemetry={"connected":False,"heartbeat":False,"health":"disconnected","link":{}}
   worker.deleteLater();self.changed.emit()
  def shutdown(self):self.stop()

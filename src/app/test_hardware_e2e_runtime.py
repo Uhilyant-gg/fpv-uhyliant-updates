@@ -23,7 +23,7 @@ class Session(Obj):
 class Tests(unittest.TestCase):
  def make(self):
   d=Devices();diag=Diagnostics();cred=Credentials();fw=Firmware();session=Session();runtime=HardwareE2ERuntime(d,diag,cred,fw,session);return runtime,diag,session,fw
- def ready(self,r):r.setHostKeyAccepted(True);self.assertTrue(r.readiness['ready'])
+ def ready(self,r):r.confirmDeviceUpdate(True);self.assertTrue(r.readiness['ready'])
  def preflight(self,r):self.ready(r);self.assertEqual(r.capture('preflight'),'hardware-e2e-preflight.json')
  def transaction(self,r,**extra):
   keys=('deviceId','host','platform','sensor','artifactSha256','artifactSize','approvalToken');tx=dict(zip(keys,r._evidence_binding[:7]));tx.update(extra);return tx
@@ -41,6 +41,6 @@ class Tests(unittest.TestCase):
   r,_,s,_=self.make();self.preflight(r);tx=self.transaction(r);s.result={'state':'reboot-pending','observedFirmware':'','verification':{},'transaction':tx};s.changed.emit();self.assertFalse(r.evidenceReadiness['failure']);s.result={'state':'error','observedFirmware':'','verification':{},'transaction':tx};s.changed.emit();self.assertTrue(r.evidenceReadiness['failure'])
  def test_mismatched_session_transaction_cannot_capture_terminal_evidence(self):
   r,diag,s,_=self.make();self.preflight(r);s.result={'state':'error','observedFirmware':'','verification':{},'transaction':self.transaction(r,artifactSha256='b'*64)};s.changed.emit();self.assertFalse(r.evidenceReadiness['failure']);self.assertEqual(r.capture('failure'),'');self.assertEqual(diag.exports,['hardware-e2e-preflight'])
- def test_transaction_change_before_execution_invalidates_staged_evidence(self):
-  r,diag,s,fw=self.make();self.preflight(r);fw.executionPlan['approvalToken']='different';fw.changed.emit();self.assertEqual(r.captures,{});s.result={'state':'error','observedFirmware':'','verification':{},'transaction':{}};s.changed.emit();self.assertFalse(r.evidenceReadiness['failure']);self.assertEqual(r.capture('failure'),'');self.assertEqual(diag.exports,['hardware-e2e-preflight'])
+ def test_transaction_change_before_execution_invalidates_confirmation_and_staged_evidence(self):
+  r,diag,s,fw=self.make();self.preflight(r);self.assertTrue(r.updateConfirmed);fw.executionPlan['approvalToken']='different';fw.changed.emit();self.assertFalse(r.updateConfirmed);self.assertFalse(r.readiness['ready']);self.assertEqual(r.captures,{});s.result={'state':'error','observedFirmware':'','verification':{},'transaction':{}};s.changed.emit();self.assertFalse(r.evidenceReadiness['failure']);self.assertEqual(r.capture('failure'),'');self.assertEqual(diag.exports,['hardware-e2e-preflight'])
 if __name__=='__main__':unittest.main()

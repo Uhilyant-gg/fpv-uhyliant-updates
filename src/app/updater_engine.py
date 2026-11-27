@@ -93,6 +93,7 @@ class W(QThread):
      while True:
       b=r.read(524288)
       if not b:break
+      if self.isInterruptionRequested():raise RuntimeError('Завантаження скасовано')
       f.write(b);n+=len(b);self.progress.emit(int(n*100/total) if total else 0,f'{n//1048576} МБ')
     digest=sha(part).lower()
     if digest!=pkg['sha256'].lower():raise RuntimeError('SHA-256 пакета не збігається')
@@ -102,7 +103,7 @@ class W(QThread):
   except Exception as e:self.done.emit(False,human_update_error(self.a,e))
 class Updater(QObject):
  changed=Signal();progressChanged=Signal()
- def __init__(self,root=None,guard=None):super().__init__();self.root=validate_install_root(root);self.guard=guard or (lambda:(True,''));self.url=DEFAULT;self.state='idle';self.status='Готово';self.available='';self.notes=[];self.p=0;self.m={};self.w=None
+ def __init__(self,root=None,guard=None,network=True):super().__init__();self.network=network;self.root=validate_install_root(root);self.guard=guard or (lambda:(True,''));self.url=DEFAULT;self.state='idle';self.status='Готово';self.available='';self.notes=[];self.p=0;self.m={};self.w=None
  @Property(str,constant=True)
  def currentVersion(self):return VERSION
  @Property(str,notify=changed)
@@ -122,7 +123,18 @@ class Updater(QObject):
  @Property(bool,notify=changed)
  def installReady(self):return self.state=='ready' and self.root is not None
  @Slot()
- def check(self):self._start('check',{'url':self.url},'Перевірка підписаного маніфесту')
+ def check(self):
+  if not self.network:self.state='idle';self.status='Перевірку оновлень вимкнено в цьому режимі';self.changed.emit();return
+  self._start('check',{'url':self.url},'Перевірка підписаного маніфесту')
+ def shutdown(self,timeout_ms=3000):
+  """Stop a running check/download before the application exits.
+
+  A QThread destroyed while still running aborts the whole process, so the
+  worker is asked to stop and given a bounded time to finish.
+  """
+  w=self.w
+  if w is None or not w.isRunning():return True
+  w.requestInterruption();return w.wait(timeout_ms)
  @Slot()
  def download(self):
   if self.m:self._start('download',{'m':self.m},'Завантаження пакета')

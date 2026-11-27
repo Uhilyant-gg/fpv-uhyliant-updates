@@ -6,6 +6,8 @@ Item {
  id: root
  signal closeRequested()
  signal openDiagnostics()
+ signal openOsdSettings()
+ signal openSimulation()
  property string cameraName: ""
  property var video: ({})
  property var telemetry: ({})
@@ -14,7 +16,7 @@ Item {
  property var nextAction: ({})
  property bool osdEnabled: true
  property color foreground: "#f4f7fb"
- property color secondary: "#8fa1b7"
+ property color secondary: "#b7c8da"
  property color line: "#273d55"
  property color green: "#27d59a"
  property color amber: "#ffb84d"
@@ -74,7 +76,7 @@ Item {
   {label: "GPS-дані польотника", state: gpsState(), detail: gpsDetail()},
   {label: "Мережа", state: network.state || "unavailable", detail: network.transport || "З’єднання не підтверджене"},
   {label: "Зовнішня навігація", state: navigation.state || "unavailable", detail: navigation.source || "Джерело не підтверджене"},
-  {label: "OSD станції", state: osdEnabled ? "ready" : "unavailable", detail: osdEnabled ? "Увімкнено; вхідне відео не змінюється" : "Вимкнено"},
+  {label: "OSD станції", state: osdEnabled ? "ready" : "unavailable", detail: osdEnabled ? "Додається поверх відео; зображення камери не змінюється" : "Не додається; OSD камери залишається частиною відео"},
   {label: "Керування польотом", state: "not-integrated", detail: "Канал керування не інтегрований"}
  ]
 
@@ -160,6 +162,8 @@ Item {
     Layout.fillWidth: true
    }
    Button { text: "Діагностика"; onClicked: root.openDiagnostics() }
+   Button { text: "Налаштувати OSD"; onClicked: root.openOsdSettings() }
+   Button { text: "Симуляція"; onClicked: root.openSimulation() }
   }
  }
 }

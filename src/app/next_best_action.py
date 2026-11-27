@@ -24,6 +24,7 @@ ACTION_PRIORITY = {
     "identify-camera": 30,
     "refresh-identity": 40,
     "verify-camera": 50,
+    "review-firmware": 55,
     "connect-camera": 60,
     "show-video": 70,
     "connect-controller": 80,

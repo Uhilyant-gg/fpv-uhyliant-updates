@@ -21,31 +21,43 @@ def _open(wrapper,password):
  plain=AESGCM(_derive(password,salt)).decrypt(nonce,cipher,_aad(header));return json.loads(plain.decode('utf-8'))
 
 class StationBackup(QObject):
- changed=Signal()
- def __init__(self,devices):super().__init__();self.devices=devices;self._result={'ready':False,'reason':'Backup operation not started','manifest':{}};self._pending=None
+ changed=Signal();automaticFailure=Signal(str)
+ def __init__(self,devices,automatic=None):
+  super().__init__();self.devices=devices;self.automatic=automatic;self._result={'ready':False,'reason':'Резервну копію ще не створено.','manifest':{}};self._pending=None
+  if automatic is not None:devices.setBackupGuard(self._protect_change)
+ def _protect_change(self):
+  if self.automatic.create():return True
+  self.automaticFailure.emit(self.automatic.error);return False
  @Property('QVariantMap',notify=changed)
  def result(self):return dict(self._result)
  def _payload(self):return {'schema':SCHEMA,'version':VERSION,'devices':self.devices.exportSnapshot()}
  def _set(self,ready,reason,manifest=None):self._result={'ready':bool(ready),'reason':reason,'manifest':dict(manifest or {})};self.changed.emit()
  @Slot(str,str,result=bool)
  def exportEncrypted(self,path,password):
-  if len(password)<8:self._set(False,'Backup password must contain at least 8 characters');return False
+  if len(password)<8:self._set(False,'Пароль має містити щонайменше 8 символів.');return False
   try:
-   target=Path(path);target.parent.mkdir(parents=True,exist_ok=True);wrapper=_seal(self._payload(),password);temp=target.with_suffix(target.suffix+'.tmp');temp.write_text(json.dumps(wrapper,ensure_ascii=False,indent=2),encoding='utf-8');os.replace(temp,target);self._set(True,'Encrypted backup exported',{'schema':SCHEMA,'version':VERSION,'encrypted':True,'cipher':CIPHER});return True
-  except (OSError,TypeError,ValueError) as exc:self._set(False,'Backup export failed: '+str(exc));return False
+   target=Path(path);target.parent.mkdir(parents=True,exist_ok=True);wrapper=_seal(self._payload(),password);temp=target.with_suffix(target.suffix+'.tmp');temp.write_text(json.dumps(wrapper,ensure_ascii=False,indent=2),encoding='utf-8');os.replace(temp,target);self._set(True,'Створено зашифровану резервну копію.',{'schema':SCHEMA,'version':VERSION,'encrypted':True,'cipher':CIPHER});return True
+  except (OSError,TypeError,ValueError):self._set(False,'Не вдалося створити резервну копію. Перевірте доступ до вибраної папки та наявність вільного місця.');return False
  @Slot(str,str,result='QVariantMap')
  def inspectEncryptedImport(self,path,password):
   self._pending=None
   try:
    payload=_open(json.loads(Path(path).read_text(encoding='utf-8')),password);valid=bool(payload.get('schema')==SCHEMA and payload.get('version')==VERSION and self.devices.validateSnapshot(payload.get('devices')))
-   if not valid:self._set(False,'Backup payload is invalid or incompatible');return {}
-   self._pending=payload['devices'];plan={'schema':SCHEMA,'version':VERSION,'encrypted':True,'cipher':CIPHER,'deviceCount':len(self._pending['devices']),'execution':'explicit-confirmation-required'};self._set(True,'Restore plan verified; live data unchanged',plan);return dict(plan)
-  except (OSError,TypeError,ValueError,KeyError,json.JSONDecodeError,InvalidTag):self._set(False,'Backup authentication, compatibility, or read verification failed');return {}
+   if not valid:self._set(False,'Не вдалося перевірити резервну копію. Перевірте пароль, файл і його сумісність.');return {}
+   self._pending=payload['devices'];plan={'schema':SCHEMA,'version':VERSION,'encrypted':True,'cipher':CIPHER,'deviceCount':len(self._pending['devices']),'execution':'explicit-confirmation-required'};self._set(True,'Копію перевірено. Поточні дані не змінено.',plan);return dict(plan)
+  except (OSError,TypeError,ValueError,KeyError,json.JSONDecodeError,InvalidTag):self._set(False,'Не вдалося перевірити резервну копію. Перевірте пароль, файл і його сумісність.');return {}
+ @Slot(result='QVariantMap')
+ def inspectAutomatic(self):
+  self._pending=None
+  if self.automatic is None:self._set(False,'Автоматичні резервні копії недоступні.');return {}
+  payload=self.automatic.latest()
+  if payload is None:self.automaticFailure.emit(self.automatic.error);self._set(False,self.automatic.error);return {}
+  self._pending=payload['devices'];plan={'schema':SCHEMA,'version':VERSION,'encrypted':True,'deviceCount':len(self._pending['devices']),'execution':'explicit-confirmation-required','automatic':True};self._set(True,'Копію перевірено. Поточні дані не змінено.',plan);return dict(plan)
  @Slot(bool,result=bool)
  def restoreInspected(self,confirmed):
-  if not confirmed or self._pending is None:self._set(False,'Restore requires explicit confirmation and a verified import plan');return False
+  if not confirmed or self._pending is None:self._set(False,'Для відновлення підтвердьте перевірену резервну копію.');return False
   snapshot=self._pending;self._pending=None
-  if not self.devices.restoreSnapshot(snapshot):self._set(False,'Transactional restore failed; live state preserved');return False
-  self._set(True,'Transactional restore completed',{'schema':SCHEMA,'version':VERSION,'restored':True});return True
+  if not self.devices.restoreSnapshot(snapshot):self._set(False,(self.automatic.error if self.automatic and self.automatic.error else 'Не вдалося відновити копію. Поточні дані не змінено.'));return False
+  self._set(True,'Пристрої та відеопотоки відновлено.',{'schema':SCHEMA,'version':VERSION,'restored':True});return True
  @Slot()
- def cancelRestore(self):self._pending=None;self._set(False,'Restore plan cleared')
+ def cancelRestore(self):self._pending=None;self._set(False,'Відновлення скасовано.')

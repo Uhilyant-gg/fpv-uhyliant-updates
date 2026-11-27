@@ -26,7 +26,7 @@ def test_verified_card_and_add_require_current_verified_host():
 def test_successful_add_has_visible_feedback():
     source=Path(__file__).with_name("DevicesPanel.qml").read_text(encoding="utf-8")
     assert 'devicesModel.manualStatus === "added"' in source
-    assert "додано до Моїх камер" in source
+    assert "додано на головний екран" in source
 
 
 def test_add_discovered_normalizes_and_revalidates_host():

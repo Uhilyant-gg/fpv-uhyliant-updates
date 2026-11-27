@@ -1,7 +1,15 @@
 import threading,unittest
 from unittest.mock import patch
-from route_discovery import _http_url,fingerprint,plan_targets,route_is_sweepable
+from route_discovery import _http_url,_rtsp_describe,fingerprint,plan_targets,route_is_sweepable
 class RouteDiscoveryTests(unittest.TestCase):
+ class RtspSocket:
+  def __init__(self,response):self.response=response;self.request=b''
+  def __enter__(self):return self
+  def __exit__(self,*args):return False
+  def sendall(self,value):self.request=value
+  def settimeout(self,value):pass
+  def recv(self,size):
+   response=self.response;self.response=b'';return response
  def test_routed_camera_regression(self):
   targets=plan_targets([{"name":"Wi-Fi","network":"192.168.0.0/24"}],[{"name":"192.168.0.1","network":"192.168.1.0/24"}]);self.assertIn("192.168.1.50",targets);self.assertIn("192.168.0.12",targets)
  def test_unsafe_and_large_routes_are_not_swept(self):
@@ -16,6 +24,14 @@ class RouteDiscoveryTests(unittest.TestCase):
  def test_endpoint_builder_rejects_non_private_reconnect_hosts(self):
   for host in ("8.8.8.8","100.64.1.2","127.0.0.1","169.254.2.3","224.0.0.1"):
    with self.assertRaises(ValueError,msg=host):_http_url(host,"/cgi-bin/status.cgi")
+ def test_rtsp_readiness_requires_successful_video_sdp(self):
+  response=b"RTSP/1.0 200 OK\r\nContent-Type: application/sdp\r\nContent-Length: 28\r\n\r\nv=0\r\nm=video 0 RTP/AVP 96\r\n"
+  connection=self.RtspSocket(response)
+  with patch("route_discovery.socket.create_connection",return_value=connection):self.assertTrue(_rtsp_describe("192.168.1.50",554,threading.Event()))
+  self.assertIn(b"DESCRIBE rtsp://192.168.1.50:554/",connection.request)
+  for response in (b"RTSP/1.0 401 Unauthorized\r\n\r\n",b"RTSP/1.0 200 OK\r\n\r\nv=0\r\nm=audio 0 RTP/AVP 96\r\n"):
+   connection=self.RtspSocket(response)
+   with patch("route_discovery.socket.create_connection",return_value=connection):self.assertFalse(_rtsp_describe("192.168.1.50",554,threading.Event()))
  @patch("route_discovery._tcp_open",return_value=False)
  @patch("route_discovery._fetch")
  def test_generic_onvif_or_reachable_host_is_not_openipc(self,fetch,tcp_open):
@@ -28,6 +44,15 @@ class RouteDiscoveryTests(unittest.TestCase):
  @patch("route_discovery._fetch")
  def test_config_does_not_invent_stream_urls(self,fetch,tcp_open):
   fetch.side_effect=[(b'{"video0":{"codec":"h264"},"system":{"platform":"ssc30kq"}}',200),(None,0)];r=fingerprint("192.168.1.50",threading.Event());self.assertTrue(r["openipc"]);self.assertEqual(r["streams"],[])
+ @patch("route_discovery._rtsp_describe",return_value=True)
+ @patch("route_discovery._tcp_open",side_effect=lambda host,port,cancel:port==554)
+ @patch("route_discovery._fetch")
+ def test_openipc_video_stream_is_added_only_after_rtsp_describe(self,fetch,tcp_open,describe):
+  fetch.side_effect=[(b'{"system":{"platform":"ssc30kq","sensor":"imx335","version":"v1"}}',200),(None,0)]
+  result=fingerprint("192.168.1.50",threading.Event())
+  self.assertEqual(result["streams"],[{"name":"Основний","port":554,"path":"/","protocol":"rtsp"}])
+  describe.assert_called_once()
+  self.assertEqual(describe.call_args.args[:2],("192.168.1.50",554))
  @patch("route_discovery._tcp_open",return_value=False)
  @patch("route_discovery._fetch")
  def test_nested_generic_version_is_not_majestic_version(self,fetch,tcp_open):

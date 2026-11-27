@@ -5,7 +5,7 @@ NORMALIZED_FIELDS = (
     "connected", "armed", "flightMode", "batteryVoltage", "current",
     "batteryRemaining", "gpsFix", "satellites", "hdop", "altitude",
     "groundSpeed", "heading", "homeDistance", "roll", "pitch", "yaw",
-    "rssi", "health", "ages", "link",
+    "rssi", "health", "ages", "freshness", "link",
 )
 
 def unavailable_telemetry(provider=""):

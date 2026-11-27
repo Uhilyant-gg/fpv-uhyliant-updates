@@ -22,4 +22,11 @@ class Tests(unittest.TestCase):
     d=Devices();b=StationBackup(d);p=Path(t)/(field+'.fub');b.exportEncrypted(str(p),'correct horse');raw=json.loads(p.read_text());raw[field]=(raw[field][:-4]+'AAAA') if value is None else value;p.write_text(json.dumps(raw));self.assertEqual(b.inspectEncryptedImport(str(p),'correct horse'),{})
  def test_weak_password_is_rejected(self):
   with tempfile.TemporaryDirectory() as t:self.assertFalse(StationBackup(Devices()).exportEncrypted(str(Path(t)/'x.fub'),'short'))
+ def test_export_failure_is_human_and_hides_filesystem_error(self):
+  with tempfile.TemporaryDirectory() as t:
+   blocked=Path(t)/'not-a-folder';blocked.write_text('file',encoding='utf-8');backup=StationBackup(Devices())
+   self.assertFalse(backup.exportEncrypted(str(blocked/'backup.fub'),'correct horse'))
+   self.assertIn('Перевірте доступ',backup.result['reason'])
+   self.assertNotIn(str(blocked),backup.result['reason'])
+   self.assertNotIn('Backup export failed',backup.result['reason'])
 if __name__=='__main__':unittest.main()

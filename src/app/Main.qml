@@ -5,16 +5,26 @@ import QtQuick.Window
 import QtMultimedia
 ApplicationWindow {
  id:w;visible:true;visibility:Window.Maximized;minimumWidth:1024;minimumHeight:640;color:"#050a12";title:appWindowTitle
- property color fg:"#f4f7fb";property color sub:"#8fa1b7";property color line:"#273d55";property color green:"#27d59a";property color blue:"#2387ff";property color amber:"#ffb84d";property color red:"#ff6678"
+ property color fg:"#f4f7fb";property color sub:"#b7c8da";property color line:"#4a6078";property color green:"#27d59a";property color blue:"#2387ff";property color amber:"#ffb84d";property color red:"#ff6678"
+ font.family: "Segoe UI"
+ font.pixelSize: 14
+ palette.window: "#0d1725"; palette.windowText: "#f4f7fb"; palette.text: "#f4f7fb"; palette.buttonText: "#f4f7fb"; palette.button: "#253b52"; palette.base: "#152638"; palette.highlight: "#2679d9"; palette.highlightedText: "white"; palette.placeholderText: "#b7c8da"
+ property bool simulation: false
+ property int simulationTick: 0
+ property var simulatedTelemetry: ({connected:true, provider:"MAVLink", armed:false, flightMode:"STABILIZE", batteryVoltage:15.8 + 0.1 * Math.sin(simulationTick / 12), batteryRemaining:82, gpsFix:3, satellites:12, altitude:124 + Math.round(4 * Math.sin(simulationTick / 5)), groundSpeed:12.4 + Math.sin(simulationTick / 4), heading:(348 + simulationTick) % 360, roll:12 * Math.sin(simulationTick / 7), pitch:7 * Math.sin(simulationTick / 9), yaw:(348 + simulationTick) % 360, homeDistance:86 + Math.round(10 * Math.sin(simulationTick / 8))})
+ property var simulatedVideo: ({streamId:"simulation",state:"playing"})
+ Timer { interval: 1000; repeat: true; running: w.simulation; onTriggered: w.simulationTick++ }
  property bool connected:devicesModel.activeName!=="";property bool serviceMode:false;property bool primaryDetached:false;property bool secondaryDetached:false;property int selectedDisplayIndex:0;property string displayMoveMessage:"";property string displayFallbackNotice:"";property string selectedStreamId:streamWorkspace.state.primaryId||"";property string secondaryStreamId:streamWorkspace.state.secondaryId||"";readonly property bool pipEnabled:videoWorkspaceRuntime.pipEnabled;property var t:telemetryRuntime.telemetry;property var vd:videoRuntime.diagnostics;property var sd:secondaryVideoRuntime.diagnostics;property var ext:linkDiagnostics.externalNavigation;property var net:linkDiagnostics.network;property int videoRecoveryCount:0;property int secondaryRecoveryCount:0
  function val(v,suffix,digits){return v===undefined||v===null?"--":Number(v).toFixed(digits===undefined?0:digits)+(suffix||"")}
  function stateUa(value){if(value===undefined||value===null||value==="")return "недоступно";var states={"idle":"очікування","stopped":"зупинено","checking":"перевірка","ready":"готово","playing":"відтворення","reconnecting":"перепідключення","stalled":"зупинка потоку","error":"помилка","blocked":"заблоковано","executing":"виконання","installing":"встановлення","reboot-pending":"очікується перезапуск","verified":"перевірено","hardware-validation-pending":"очікується перевірка на обладнанні","applied-pending-verification":"застосовано, очікується перевірка","unavailable":"недоступно","unknown":"ще не визначено","connected":"підключено","disconnected":"відключено","stale":"дані давно не оновлювалися","degraded":"працює нестабільно","attention":"потребує уваги","traffic-no-heartbeat":"є передавання без підтвердження зв’язку","ok":"справно"};return states[value]||"потрібна перевірка"}
  function stopPrimary(){videoRecovery.stop();player.stop();player.source="";videoRuntime.stop();videoRecoveryCount=0}
  function stopSecondary(){secondaryRecovery.stop();secondaryPlayer.stop();secondaryPlayer.source="";secondaryVideoRuntime.stop();secondaryRecoveryCount=0}
  function setPip(enabled){var requested=enabled&&streamWorkspace.state.pipAvailable;videoWorkspaceRuntime.setPipEnabled(requested);if(!requested)stopSecondary();else startSecondary()}
- function connectDevice(id){serviceMode=false;stopPrimary();setPip(false);devicesModel.setActive(id);timelineRuntime.recordEvent("camera-selected");streamWorkspace.autoSelect();if(devicesModel.activeName!==""&&streamWorkspace.state.primaryId!=="")startSelected()}
+ function connectDevice(id){var item=null;for(var i=0;i<devicesModel.items.length;i++){if(devicesModel.items[i].id===id){item=devicesModel.items[i];break}}if(!item||item.onboardingState!=="ready")return;serviceMode=false;stopPrimary();setPip(false);devicesModel.setActive(id);timelineRuntime.recordEvent("camera-selected");streamWorkspace.autoSelect();if(devicesModel.activeName!==""&&streamWorkspace.state.primaryId!=="")startSelected()}
  function disconnectDevice(){serviceMode=false;primaryDetached=false;secondaryDetached=false;stopPrimary();setPip(false);videoWorkspaceRuntime.stopAll();devicesModel.clearActive();streamWorkspace.autoSelect()}
  function enterServiceMode(){serviceMode=true;stopPrimary();setPip(false)}
+ function openFirmwareFor(deviceId){devices.close();firmwarePopup.open();Qt.callLater(function(){if(firmwarePanelLoader.item)firmwarePanelLoader.item.selectDevice(deviceId)})}
+ function openOsdSettings(){if(!osdSettingsLoader.active){osdSettingsLoader.active=true;Qt.callLater(openOsdSettings);return}osdSettingsLoader.item.editingAllowed=w.simulation||t.armed!==true;osdSettingsPopup.open()}
  function startSelected(){stopPrimary();if(connected&&selectedStreamId!==""&&videoWorkspaceRuntime.preparePrimary(selectedStreamId)){player.source=videoRuntime.url;player.play()}if(pipEnabled)startSecondary()}
  function startSecondary(){stopSecondary();if(pipEnabled&&connected&&secondaryStreamId!==""&&videoWorkspaceRuntime.prepareSecondary(secondaryStreamId)){secondaryPlayer.source=secondaryVideoRuntime.url;secondaryPlayer.play()}}
  function rebuildPlayback(){var wasPlaying=player.playbackState===MediaPlayer.PlayingState||videoRuntime.streamId!=="";var keepPip=pipEnabled&&streamWorkspace.state.pipAvailable;stopPrimary();stopSecondary();if(wasPlaying)startSelected();if(keepPip&&streamWorkspace.state.pipAvailable){videoWorkspaceRuntime.setPipEnabled(true);startSecondary()}}
@@ -23,11 +33,13 @@ ApplicationWindow {
  onPipEnabledChanged:if(!pipEnabled){secondaryDetached=false;secondaryRecovery.stop();secondaryPlayer.stop();secondaryPlayer.source="";secondaryRecoveryCount=0}
  MediaPlayer{id:player;videoOutput:primaryDetached?detachedPrimaryVideoOut:videoOut;onPlayingChanged:{timelineRuntime.observe("primary-video",playing?"playing":"stopped");if(playing){videoRecovery.stop();videoRecoveryCount=0;videoRuntime.markPlaying()}else if(videoRuntime.state==="playing"){videoRuntime.markStalled("Основний відеопотік несподівано зупинився.");videoRecovery.restart()}}onErrorOccurred:function(error,errorString){videoRuntime.playbackError(errorString);if(videoRuntime.streamId!=="")videoRecovery.restart()}}
  MediaPlayer{id:secondaryPlayer;videoOutput:secondaryDetached?detachedSecondaryVideoOut:secondaryVideoOut;onPlayingChanged:{timelineRuntime.observe("secondary-video",playing?"playing":"stopped");if(playing){secondaryRecovery.stop();secondaryRecoveryCount=0;secondaryVideoRuntime.markPlaying()}else if(pipEnabled&&secondaryVideoRuntime.state==="playing"){secondaryVideoRuntime.markStalled("Додатковий відеопотік несподівано зупинився.");secondaryRecovery.restart()}}onErrorOccurred:function(error,errorString){secondaryVideoRuntime.playbackError(errorString);if(pipEnabled&&secondaryVideoRuntime.streamId!=="")secondaryRecovery.restart()}}
- Connections{target:telemetryRuntime;function onChanged(){timelineRuntime.observe("telemetry",t.connected===true?"connected":(t.connected===false?"lost":"unknown"))}}
+ Connections{target:telemetryRuntime;function onChanged(){timelineRuntime.observe("telemetry",t.connected===true?"connected":(t.connected===false?"lost":"unknown"));if(osdSettingsPopup.visible&&!w.simulation&&osdSettingsLoader.item)osdSettingsLoader.item.editingAllowed=t.armed!==true}}
  Connections{target:devicesModel;function onDiscoveryChanged(){timelineRuntime.observe("discovery",devicesModel.scanning?"scanning":(devicesModel.discoveryStage==="Готово"?"completed":(devicesModel.discoveryStage==="Скасовано"?"cancelled":(devicesModel.discoveryStage==="Помилка"?"failed":"unknown"))))}}
- Connections{target:devicesModel;function onDeviceAdded(){timelineRuntime.recordEvent("device-added")}function onDeviceUpdated(){timelineRuntime.recordEvent("device-updated")}function onDeviceRemoved(){timelineRuntime.recordEvent("device-removed")}function onDeviceListRestored(){timelineRuntime.recordEvent("device-list-restored")}}
+ Connections{target:devicesModel;function onDeviceAdded(){timelineRuntime.recordEvent("device-added")}function onDeviceUpdated(){timelineRuntime.recordEvent("device-updated")}function onDeviceRemoved(){timelineRuntime.recordEvent("device-removed")}function onDeviceListRestored(){timelineRuntime.recordEvent("device-list-restored")}function onFirmwarePreparationRequested(deviceId){w.openFirmwareFor(deviceId)}}
  Connections{target:station;function onOsdSettingsSaved(){osdSettingsTimelineTimer.restart()}}
+ Connections{target:stationBackup;function onAutomaticFailure(message){backupFailureText.text=message;backupFailurePopup.open()}}
  Connections{target:updater;function onChanged(){timelineRuntime.observe("update",updater.updateState)}}
+ Connections{target:firmwareUpdateSession;function onChanged(){var result=firmwareUpdateSession.result;timelineRuntime.observe("camera-firmware",result.state);if(result.state==="verified"&&result.transaction.deviceId&&result.verification.ok===true)devicesModel.completeFirmwareOnboarding(result.transaction.deviceId,result.verification)}}
  Connections{target:linkDiagnostics;function onChanged(){timelineRuntime.observe("network",net.state==="ready"?"ready":(net.state==="degraded"?"degraded":(net.state==="error"||net.state==="stale"?"lost":"unknown")));timelineRuntime.observe("navigation",ext.state==="ready"?"ready":(ext.state==="degraded"?"degraded":(ext.state==="error"||ext.state==="stale"?"lost":"unknown")))}}
  Connections{target:displayRuntime;function onChanged(){if(w.selectedDisplayIndex>=displayRuntime.displays.length)w.selectedDisplayIndex=0}function onWindowReturnedToWorkspace(window){if(window===primaryStreamWindow||window===secondaryStreamWindow){if(window===primaryStreamWindow)w.primaryDetached=false;else w.secondaryDetached=false;w.displayFallbackNotice="Екран від’єднано. Відеопотік повернуто до основного робочого простору.";displayFallbackTimer.restart()}}}
  Timer{id:displayFallbackTimer;interval:6000;repeat:false;onTriggered:w.displayFallbackNotice=""}
@@ -35,31 +47,308 @@ ApplicationWindow {
  Timer{id:videoRecovery;interval:2000;repeat:false;onTriggered:recoverPrimary()} Timer{id:secondaryRecovery;interval:2000;repeat:false;onTriggered:recoverSecondary()}
  Window{id:primaryStreamWindow;visible:connected&&!serviceMode&&primaryDetached;x:w.x+40;y:w.y+40;width:Math.min(960,w.width);height:Math.min(540,w.height);title:"Основний відеопотік · "+devicesModel.activeName;color:"black";onClosing:primaryDetached=false;onVisibleChanged:if(visible)displayRuntime.trackWindow(primaryStreamWindow)
   VideoOutput{id:detachedPrimaryVideoOut;anchors.fill:parent;fillMode:VideoOutput.PreserveAspectFit}
-  OsdOverlay{anchors.left:station.osdPosition.endsWith("left")?parent.left:undefined;anchors.right:station.osdPosition.endsWith("right")?parent.right:undefined;anchors.top:station.osdPosition.startsWith("top")?parent.top:undefined;anchors.bottom:station.osdPosition.startsWith("bottom")?parent.bottom:undefined;anchors.margins:12;width:Math.min(620,parent.width-24);visible:station.osdEnabled;opacityValue:station.osdOpacity;scaleFactor:station.osdScale;telemetry:t;video:vd}
+  OsdOverlay{anchors.fill:parent;anchors.margins:12;visible:station.osdEnabled;positions:station.osdElements;enabledElements:station.osdEnabledElements;corner:station.osdPosition;opacityValue:station.osdOpacity;scaleFactor:station.osdScale;telemetry:t;video:vd}
  }
  Window{id:secondaryStreamWindow;visible:connected&&!serviceMode&&secondaryDetached;x:w.x+80;y:w.y+80;width:Math.min(960,w.width);height:Math.min(540,w.height);title:"Додатковий відеопотік · "+devicesModel.activeName;color:"black";onClosing:secondaryDetached=false;onVisibleChanged:if(visible)displayRuntime.trackWindow(secondaryStreamWindow)
   VideoOutput{id:detachedSecondaryVideoOut;anchors.fill:parent;fillMode:VideoOutput.PreserveAspectFit}
-  OsdOverlay{anchors.left:station.osdPosition.endsWith("left")?parent.left:undefined;anchors.right:station.osdPosition.endsWith("right")?parent.right:undefined;anchors.top:station.osdPosition.startsWith("top")?parent.top:undefined;anchors.bottom:station.osdPosition.startsWith("bottom")?parent.bottom:undefined;anchors.margins:12;width:Math.min(620,parent.width-24);visible:station.osdEnabled;opacityValue:station.osdOpacity;scaleFactor:station.osdScale;telemetry:t;video:sd}
+  OsdOverlay{anchors.fill:parent;anchors.margins:12;visible:station.osdEnabled;positions:station.osdElements;enabledElements:station.osdEnabledElements;corner:station.osdPosition;opacityValue:station.osdOpacity;scaleFactor:station.osdScale;telemetry:t;video:sd}
  }
- Shortcut{sequence:"F2";enabled:connected&&!serviceMode;onActivated:startSelected()} Shortcut{sequence:"F11";onActivated:w.visibility=w.visibility===Window.FullScreen?Window.Maximized:Window.FullScreen}
- StackLayout{id:pages;currentIndex:!connected?0:(serviceMode?2:1);anchors.fill:parent
-  HomePanel{onOpenDevices:devices.open();onOpenFirmware:firmwarePopup.open();onOpenUpdate:updatePopup.open();onOpenDiagnostics:diagnostics.open();onOpenPreflight:preflightPopup.open();onOpenTimeline:timelinePopup.open();onOpenOsdSettings:osdSettingsPopup.open();onOpenBackup:backupPopup.open();onConnectDevice:function(deviceId){connectDevice(deviceId)};onRunNextAction:function(action){if(action==="diagnose"){diagnostics.open()}else if(action==="show-video"||action==="connect-camera"){var activeId="";for(var i=0;i<devicesModel.items.length;i++){if(devicesModel.items[i].active){activeId=devicesModel.items[i].id;break}}if(activeId===""){activeId=devicesModel.count>0?devicesModel.items[0].id:""}if(activeId!=="")connectDevice(activeId);else devices.open()}else{devices.open()}}}
-  Item{Rectangle{anchors.fill:parent;color:"black"}VideoOutput{id:videoOut;anchors.fill:parent;fillMode:VideoOutput.PreserveAspectFit}Rectangle{visible:w.displayFallbackNotice!=="";z:20;anchors.top:parent.top;anchors.horizontalCenter:parent.horizontalCenter;anchors.topMargin:16;width:Math.min(parent.width-32,620);height:48;radius:10;color:"#e60b1522";border.color:amber;Text{anchors.fill:parent;anchors.margins:10;text:w.displayFallbackNotice;color:fg;horizontalAlignment:Text.AlignHCenter;verticalAlignment:Text.AlignVCenter;wrapMode:Text.WordWrap}}Column{visible:player.playbackState!==MediaPlayer.PlayingState&&!primaryDetached;anchors.centerIn:parent;spacing:8;Text{text:stateUa(videoRuntime.state);color:fg;font.pixelSize:20;font.bold:true}Text{text:videoRuntime.error;color:red;visible:text!==""}Button{text:"Запустити відео";enabled:selectedStreamId!=="";onClicked:startSelected()}}Column{visible:primaryDetached;anchors.centerIn:parent;spacing:8;Text{text:"Основний потік відкрито в окремому вікні";color:fg;font.pixelSize:18}Button{text:"Повернути до основного екрана";onClicked:primaryDetached=false}}
-   Rectangle{visible:pipEnabled&&streamWorkspace.state.pipAvailable&&!secondaryDetached;z:5;width:Math.min(parent.width*0.32,480);height:width*9/16;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:12;color:"black";border.color:secondaryVideoRuntime.state==="playing"?green:amber;border.width:2;radius:8;clip:true;VideoOutput{id:secondaryVideoOut;anchors.fill:parent;fillMode:VideoOutput.PreserveAspectFit}Text{anchors.centerIn:parent;visible:secondaryPlayer.playbackState!==MediaPlayer.PlayingState;text:stateUa(secondaryVideoRuntime.state);color:fg;font.bold:true}}
-   OsdOverlay{anchors.left:station.osdPosition.endsWith("left")?parent.left:undefined;anchors.right:station.osdPosition.endsWith("right")?parent.right:undefined;anchors.top:station.osdPosition.startsWith("top")?parent.top:undefined;anchors.bottom:station.osdPosition.startsWith("bottom")?parent.bottom:undefined;anchors.margins:12;width:Math.min(620,parent.width-24);visible:station.osdEnabled&&!primaryDetached;opacityValue:station.osdOpacity;scaleFactor:station.osdScale;telemetry:t;video:vd}
-   Button{anchors.right:parent.right;anchors.bottom:parent.bottom;anchors.margins:10;text:"☰";onClicked:flightMenu.open()}
+ Shortcut{sequence:"F2";enabled:connected&&!serviceMode&&!simulation;onActivated:startSelected()} Shortcut{sequence:"F11";onActivated:w.visibility=w.visibility===Window.FullScreen?Window.Maximized:Window.FullScreen}
+ StackLayout{id:pages;objectName:"mainPages";currentIndex:simulation?1:(!connected?0:(serviceMode?2:1));anchors.fill:parent
+  HomePanel{onOpenSimulation:simulation=true;onOpenDevices:devices.open();onOpenFirmware:firmwarePopup.open();onOpenUpdate:updatePopup.open();onOpenDiagnostics:diagnostics.open();onOpenPreflight:preflightPopup.open();onOpenTimeline:timelinePopup.open();onOpenOsdSettings:openOsdSettings();onOpenBackup:backupPopup.open();onConnectDevice:function(deviceId){connectDevice(deviceId)};onRunNextAction:function(action){if(action==="diagnose"){diagnostics.open()}else if(action==="review-firmware"){firmwarePopup.open()}else if(action==="find-camera"){devices.open()}else if(action==="show-video"||action==="connect-camera"){var activeId="";for(var i=0;i<devicesModel.items.length;i++){if(devicesModel.items[i].active&&devicesModel.items[i].onboardingState==="ready"){activeId=devicesModel.items[i].id;break}}if(activeId===""){activeId=devicesModel.homeItems.length>0?devicesModel.homeItems[0].id:""}if(activeId!=="")connectDevice(activeId);else devices.open()}else{devices.open()}}}
+  Item {
+   Rectangle { anchors.fill: parent; visible: !w.simulation; color: "black" }
+   VideoOutput { id:videoOut; objectName:"mainFlightVideoOutput"; anchors.fill:parent; visible:!w.simulation; fillMode:VideoOutput.PreserveAspectFit }
+   Item {
+    id: simulationWorld
+    objectName: "simulationWorld"
+    anchors.fill: parent
+    visible: w.simulation
+    clip: true
+    Rectangle { anchors.fill: parent; color: "#4b8db8" }
+    Item {
+     width: parent.width * 1.7
+     height: parent.height * 2
+     x: (parent.width - width) / 2
+     y: (parent.height - height) / 2 + w.simulatedTelemetry.pitch * 2.4
+     rotation: -w.simulatedTelemetry.roll
+     Rectangle { anchors.left:parent.left; anchors.right:parent.right; anchors.top:parent.top; height:parent.height/2; color:"#4b8db8" }
+     Rectangle { anchors.left:parent.left; anchors.right:parent.right; anchors.bottom:parent.bottom; height:parent.height/2; color:"#526a4a" }
+     Rectangle { anchors.left:parent.left; anchors.right:parent.right; anchors.verticalCenter:parent.verticalCenter; height:3; color:"#b9c9b0" }
+     Repeater {
+      model: 10
+      Rectangle {
+       required property int index
+       width: simulationWorld.width * 0.13
+       height: simulationWorld.height * 0.025
+       radius: height / 2
+       color: "#657b4c"
+       x: ((index * simulationWorld.width * 0.21 + w.simulationTick * 7) % (simulationWorld.width * 1.8)) - width
+       y: height + simulationWorld.height * (0.62 + (index % 4) * 0.09)
+      }
+     }
+    }
+   }
+   Rectangle { visible:w.displayFallbackNotice!==""&&!w.simulation; z:20; anchors.top:parent.top; anchors.horizontalCenter:parent.horizontalCenter; anchors.topMargin:16; width:Math.min(parent.width-32,620); height:48; radius:10; color:"#e60b1522"; border.color:amber; Text{anchors.fill:parent;anchors.margins:10;text:w.displayFallbackNotice;color:fg;horizontalAlignment:Text.AlignHCenter;verticalAlignment:Text.AlignVCenter;wrapMode:Text.WordWrap} }
+   Column { visible:!w.simulation&&player.playbackState!==MediaPlayer.PlayingState&&!primaryDetached; anchors.centerIn:parent; spacing:8; Text{text:stateUa(videoRuntime.state);color:fg;font.pixelSize:20;font.bold:true} Text{text:videoRuntime.error;color:red;visible:text!==""} Button{text:"Запустити відео";enabled:selectedStreamId!=="";onClicked:startSelected()} }
+   Column { visible:!w.simulation&&primaryDetached; anchors.centerIn:parent; spacing:8; Text{text:"Основний потік відкрито в окремому вікні";color:fg;font.pixelSize:18} Button{text:"Повернути до основного екрана";onClicked:primaryDetached=false} }
+   Rectangle { visible:!w.simulation&&pipEnabled&&streamWorkspace.state.pipAvailable&&!secondaryDetached; z:5; width:Math.min(parent.width*0.32,480); height:width*9/16; anchors.right:parent.right; anchors.top:parent.top; anchors.margins:12; color:"black"; border.color:secondaryVideoRuntime.state==="playing"?green:amber; border.width:2; radius:8; clip:true; VideoOutput{id:secondaryVideoOut;anchors.fill:parent;fillMode:VideoOutput.PreserveAspectFit} Text{anchors.centerIn:parent;visible:secondaryPlayer.playbackState!==MediaPlayer.PlayingState;text:stateUa(secondaryVideoRuntime.state);color:fg;font.bold:true} }
+   OsdOverlay {
+    objectName: "flightOsdOverlay"
+    anchors.fill:parent; anchors.margins:12
+    visible:station.osdEnabled&&(w.simulation||!primaryDetached)
+    positions:station.osdElements; enabledElements:station.osdEnabledElements; corner:station.osdPosition
+    opacityValue:station.osdOpacity; scaleFactor:station.osdScale
+    telemetry:w.simulation?w.simulatedTelemetry:t
+    video:w.simulation?w.simulatedVideo:vd
+   }
+   Rectangle {
+    visible: w.simulation
+    z: 20
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.topMargin: 14
+    width: simulationStatus.implicitWidth + 18
+    height: 42
+    radius: 10
+    color: "#e60b1522"
+    border.color: amber
+    RowLayout {
+     id: simulationStatus
+     anchors.centerIn: parent
+     spacing: 10
+     Text { text:"СИМУЛЯЦІЯ ДРОНА · штучні дані"; color:fg; font.bold:true }
+     Button { objectName:"exitSimulation"; text:"Вийти"; onClicked:w.simulation=false }
+    }
+   }
+   Button { objectName:"flightMenuToggle"; anchors.right:parent.right; anchors.bottom:parent.bottom; anchors.margins:10; text:"☰"; onClicked:flightMenu.open() }
   }
-  Item{ColumnLayout{anchors.fill:parent;anchors.margins:20;spacing:10;RowLayout{Layout.fillWidth:true;ColumnLayout{Text{text:"СЕРВІСНИЙ РЕЖИМ";color:fg;font.pixelSize:24;font.bold:true}Text{text:devicesModel.activeName;color:sub}}Item{Layout.fillWidth:true}Button{text:"Налаштувати OSD";onClicked:osdSettingsPopup.open()}Button{text:"FPV";enabled:selectedStreamId!=="";onClicked:{serviceMode=false;startSelected()}}}Rectangle{Layout.fillWidth:true;Layout.fillHeight:true;radius:12;color:"#0b1420";border.color:line;ColumnLayout{anchors.fill:parent;anchors.margins:14;Text{text:"Поточний стан системи";color:fg;font.bold:true}Text{text:"Дані польоту: "+stateUa(t.health);color:sub}Text{text:"Зовнішня навігація: "+stateUa(ext.state);color:sub}Text{text:"Мережеве з’єднання: "+stateUa(net.state);color:sub}Item{Layout.fillHeight:true}}}Button{text:"Відключити пристрій";onClicked:disconnectDevice()}}}
+  Item{ColumnLayout{anchors.fill:parent;anchors.margins:20;spacing:10;RowLayout{Layout.fillWidth:true;ColumnLayout{Text{text:"СЕРВІСНИЙ РЕЖИМ";color:fg;font.pixelSize:24;font.bold:true}Text{text:devicesModel.activeName;color:sub}}Item{Layout.fillWidth:true}Button{text:"Налаштувати OSD";onClicked:openOsdSettings()}Button{text:"FPV";enabled:selectedStreamId!=="";onClicked:{serviceMode=false;startSelected()}}}Rectangle{Layout.fillWidth:true;Layout.fillHeight:true;radius:12;color:"#0b1420";border.color:line;ColumnLayout{anchors.fill:parent;anchors.margins:14;Text{text:"Поточний стан системи";color:fg;font.bold:true}Text{text:"Дані польоту: "+stateUa(t.health);color:sub}Text{text:"Зовнішня навігація: "+stateUa(ext.state);color:sub}Text{text:"Мережеве з’єднання: "+stateUa(net.state);color:sub}Item{Layout.fillHeight:true}}}Button{text:"Відключити пристрій";onClicked:disconnectDevice()}}}
  }
- Popup{id:flightMenu;x:w.width-width-12;y:12;width:320;height:Math.min(560,w.height-24);background:Rectangle{color:"#f70b1522";border.color:line;radius:12}contentItem:ColumnLayout{anchors.fill:parent;anchors.margins:12;spacing:6;Text{text:devicesModel.activeName;color:fg;font.pixelSize:18;font.bold:true}Button{text:"Перевірити підготовку";onClicked:{flightMenu.close();preflightPopup.open()}}Button{text:"Події сесії";onClicked:{flightMenu.close();timelinePopup.open()}}Switch{text:"Додати OSD станції";checked:station.osdEnabled;onToggled:station.setOSDEnabled(checked)}Text{text:"OSD у вхідному відео залишається без змін.";color:sub;wrapMode:Text.WordWrap;Layout.fillWidth:true;font.pixelSize:11}Button{text:primaryDetached?"Повернути основний потік":"Відкрити основний потік в окремому вікні";enabled:primaryDetached||player.playbackState===MediaPlayer.PlayingState;onClicked:{primaryDetached=!primaryDetached;flightMenu.close()}}Button{text:secondaryDetached?"Повернути додатковий потік":"Відкрити додатковий потік в окремому вікні";enabled:secondaryDetached||secondaryPlayer.playbackState===MediaPlayer.PlayingState;onClicked:{secondaryDetached=!secondaryDetached;flightMenu.close()}}Text{text:"Перетягніть вікно на потрібний екран. Потік не перепідключається.";color:sub;wrapMode:Text.WordWrap;Layout.fillWidth:true;font.pixelSize:10}Button{text:"Потоки / PiP";onClicked:{flightMenu.close();streamsPopup.open()}}Button{text:"Сервісний режим";onClicked:{flightMenu.close();enterServiceMode()}}Button{text:"Прошивка";onClicked:{flightMenu.close();firmwarePopup.open()}}Button{text:"Hardware E2E";onClicked:{flightMenu.close();hardwareE2EPopup.open()}}Button{text:"Оновлення";onClicked:{flightMenu.close();updatePopup.open()}}Button{text:"Діагностика";onClicked:{flightMenu.close();diagnostics.open()}}Button{text:"Пристрої";onClicked:{flightMenu.close();devices.open()}}Item{Layout.fillHeight:true}Button{text:"Відключитися";onClicked:{flightMenu.close();disconnectDevice()}}}}
- Popup{id:streamsPopup;modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(700,w.width-40);height:Math.min(520,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}contentItem:ColumnLayout{anchors.fill:parent;anchors.margins:16;Text{text:"ВІДЕО";color:fg;font.pixelSize:20;font.bold:true}Text{text:"Основний: "+(streamWorkspace.state.primaryKind||"--")+" · Додатковий: "+(streamWorkspace.state.secondaryKind||"--");color:sub}Switch{text:"PiP";checked:pipEnabled;enabled:streamWorkspace.state.pipAvailable;onToggled:setPip(checked)}RowLayout{Layout.fillWidth:true;Text{text:"Екран";color:sub}ComboBox{Layout.fillWidth:true;model:displayRuntime.displays;textRole:"label";currentIndex:w.selectedDisplayIndex;onActivated:function(index){w.selectedDisplayIndex=index}}Button{text:"Перемістити основний";enabled:primaryDetached;onClicked:w.displayMoveMessage=displayRuntime.moveWindow(primaryStreamWindow,w.selectedDisplayIndex)?"":"Не вдалося перемістити відеопотік."}Button{text:"Перемістити додатковий";enabled:secondaryDetached;onClicked:w.displayMoveMessage=displayRuntime.moveWindow(secondaryStreamWindow,w.selectedDisplayIndex)?"":"Не вдалося перемістити відеопотік."}}Text{visible:w.displayMoveMessage!=="";text:w.displayMoveMessage;color:red;Layout.fillWidth:true}Text{text:"При від’єднанні екрана потік повернеться на основний.";color:sub;font.pixelSize:10}ListView{Layout.fillWidth:true;Layout.fillHeight:true;model:devicesModel.activeStreams;delegate:RowLayout{required property var modelData;width:ListView.view.width;Text{text:modelData.name+" · "+modelData.kind;color:fg;Layout.fillWidth:true}Button{text:"Основний";onClicked:{streamWorkspace.selectPrimary(modelData.id);rebuildPlayback()}}Button{text:"Додатковий";enabled:modelData.id!==streamWorkspace.state.primaryId;onClicked:{streamWorkspace.selectSecondary(modelData.id);if(pipEnabled)startSecondary()}}}}RowLayout{Button{text:"Поміняти місцями";enabled:streamWorkspace.state.pipAvailable;onClicked:{streamWorkspace.swap();rebuildPlayback()}}Item{Layout.fillWidth:true}Button{text:"Закрити";onClicked:streamsPopup.close()}}}}
- Popup{id:timelinePopup;modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(760,w.width-40);height:Math.min(560,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}contentItem:TimelinePanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:timelinePopup.close()}}
- Popup{id:backupPopup;modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(700,w.width-40);height:Math.min(600,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}contentItem:BackupPanel{id:backupPanel;anchors.fill:parent;anchors.margins:16;onCloseRequested:backupPopup.close()}onClosed:backupPanel.clearSensitiveFields()}
- Popup{id:osdSettingsPopup;modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(820,w.width-40);height:Math.min(600,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}contentItem:OsdSettingsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:osdSettingsPopup.close()}}
- Popup{id:preflightPopup;modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#0d1725";border.color:amber;radius:14}contentItem:PreflightPanel{anchors.fill:parent;anchors.margins:16;cameraName:devicesModel.activeName;video:vd;telemetry:t;network:net;navigation:ext;nextAction:homeDashboard.nextAction;osdEnabled:station.osdEnabled;onCloseRequested:preflightPopup.close();onOpenDiagnostics:function(){preflightPopup.close();diagnostics.open()}}}
- Popup{id:diagnostics;modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#0d1725";border.color:green;radius:14}contentItem:DiagnosticsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:diagnostics.close()}}
- Popup{id:firmwarePopup;modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(900,w.width-40);height:Math.min(700,w.height-48);background:Rectangle{color:"#0d1725";border.color:amber;radius:14}contentItem:FirmwareCenter{anchors.fill:parent;anchors.margins:18;onCloseRequested:firmwarePopup.close()}}
- Popup{id:hardwareE2EPopup;modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(760,w.width-40);height:Math.min(600,w.height-48);onOpened:hardwareE2ERuntime.reset();background:Rectangle{color:"#0d1725";border.color:amber;radius:14}contentItem:HardwareE2EPanel{anchors.fill:parent;anchors.margins:18;onCloseRequested:hardwareE2EPopup.close()}}
- Popup{id:updatePopup;modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(740,w.width-40);height:Math.min(580,w.height-48);background:Rectangle{color:"#0d1725";border.color:green;radius:14}contentItem:UpdatePanel{anchors.fill:parent;anchors.margins:18;onCloseRequested:updatePopup.close()}}
- Popup{id:devices;modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(960,w.width-40);height:Math.min(660,w.height-60);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}contentItem:DevicesPanel{anchors.fill:parent;anchors.margins:18;onCloseRequested:devices.close();onActivateDevice:function(deviceId){devices.close();connectDevice(deviceId)}}}
+ Popup {
+  id: flightMenu
+  objectName: "flightMenu"
+  x: w.width - width - 12
+  y: 12
+  width: Math.min(360, w.width - 24)
+  height: Math.min(640, w.height - 24)
+  padding: 0
+  background: Rectangle { color: "#f20a1420"; border.color: "#71879c"; radius: 12 }
+  contentItem: ScrollView {
+   clip: true
+   ColumnLayout {
+    width: parent.width
+    spacing: 5
+    Text {
+     text: w.simulation ? "СИМУЛЯЦІЯ ДРОНА" : (devicesModel.activeName || "МЕНЮ ПОЛЬОТНОГО ЕКРАНА")
+     color: fg
+     font.pixelSize: 17
+     font.bold: true
+     Layout.fillWidth: true
+     Layout.leftMargin: 14
+     Layout.rightMargin: 14
+     Layout.topMargin: 14
+     Layout.bottomMargin: 4
+     elide: Text.ElideRight
+    }
+    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
+    Text {
+     text: "ВІДЕО ТА OSD"
+     color: sub
+     font.pixelSize: 12
+     font.bold: true
+     Layout.fillWidth: true
+     Layout.leftMargin: 14
+     Layout.topMargin: 5
+    }
+    Button {
+     text: "Перевірити підготовку"
+     enabled: !w.simulation
+     font.pixelSize: 15
+     Layout.fillWidth: true
+     Layout.preferredHeight: 48
+     onClicked: { flightMenu.close(); preflightPopup.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Switch {
+     text: "Додавати OSD станції поверх відео"
+     font.pixelSize: 15
+     Layout.fillWidth: true
+     Layout.leftMargin: 8
+     checked: station.osdEnabled
+     onToggled: station.setOSDEnabled(checked)
+    }
+    Text {
+     text: "Відео камери залишається без змін. Якщо її OSD вбудоване в зображення, прибрати його тут неможливо."
+     color: sub
+     wrapMode: Text.WordWrap
+     Layout.fillWidth: true
+     Layout.leftMargin: 14
+     Layout.rightMargin: 14
+     font.pixelSize: 12
+    }
+    Button {
+     text: "Налаштувати розташування OSD"
+     objectName: "flightMenuOsdSettings"
+     font.pixelSize: 14
+     Layout.fillWidth: true
+     Layout.preferredHeight: 44
+     onClicked: { flightMenu.close(); openOsdSettings() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
+    Text {
+     text: "ВІКНА ТА ПОТОКИ"
+     color: sub
+     font.pixelSize: 12
+     font.bold: true
+     Layout.fillWidth: true
+     Layout.leftMargin: 14
+     Layout.topMargin: 5
+    }
+    Button {
+     text: primaryDetached ? "Повернути основне відео" : "Відкрити основне відео окремо"
+     font.pixelSize: 14
+     Layout.fillWidth: true
+     Layout.preferredHeight: 46
+     enabled: !w.simulation && (primaryDetached || player.playbackState === MediaPlayer.PlayingState)
+     onClicked: { primaryDetached = !primaryDetached; flightMenu.close() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Button {
+     text: secondaryDetached ? "Повернути додаткове відео" : "Відкрити додаткове відео окремо"
+     font.pixelSize: 14
+     Layout.fillWidth: true
+     Layout.preferredHeight: 46
+     enabled: !w.simulation && (secondaryDetached || secondaryPlayer.playbackState === MediaPlayer.PlayingState)
+     onClicked: { secondaryDetached = !secondaryDetached; flightMenu.close() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Button {
+     text: "Вибрати відеопотоки"
+     enabled: !w.simulation
+     font.pixelSize: 14
+     Layout.fillWidth: true
+     Layout.preferredHeight: 46
+     onClicked: { flightMenu.close(); streamsPopup.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Text {
+     text: "Від’єднання екрана поверне відео сюди."
+     color: sub
+     wrapMode: Text.WordWrap
+     Layout.fillWidth: true
+     Layout.leftMargin: 14
+     Layout.rightMargin: 14
+     font.pixelSize: 12
+    }
+    Text {
+     visible: w.simulation
+     text: "Симуляція не підключається до реального обладнання. Інструменти пристроїв і оновлення недоступні."
+     color: amber
+     wrapMode: Text.WordWrap
+     Layout.fillWidth: true
+     Layout.leftMargin: 14
+     Layout.rightMargin: 14
+     font.pixelSize: 12
+    }
+    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
+    Text {
+     text: "ІНСТРУМЕНТИ СТАНЦІЇ"
+     color: sub
+     font.pixelSize: 12
+     font.bold: true
+     Layout.fillWidth: true
+     Layout.leftMargin: 14
+     Layout.topMargin: 5
+    }
+    Button {
+     text: "Події сесії"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
+     onClicked: { flightMenu.close(); timelinePopup.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Button {
+     text: "Пристрої"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
+     objectName: "flightMenuDevices"
+     enabled: !w.simulation
+     onClicked: { flightMenu.close(); devices.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Button {
+     text: "Діагностика"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
+     enabled: !w.simulation
+     onClicked: { flightMenu.close(); diagnostics.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Button {
+     text: "Прошивка камери"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
+     enabled: !w.simulation
+     onClicked: { flightMenu.close(); firmwarePopup.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Button {
+     text: "Оновлення програми"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
+     enabled: !w.simulation
+     onClicked: { flightMenu.close(); updatePopup.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Button {
+     text: "Перейти до сервісного режиму"; font.pixelSize: 14; Layout.fillWidth: true; Layout.preferredHeight: 46
+     enabled: !w.simulation
+     onClicked: { flightMenu.close(); enterServiceMode() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Button {
+     text: "Hardware E2E"; font.pixelSize: 14; Layout.fillWidth: true; Layout.preferredHeight: 46
+     enabled: !w.simulation
+     onClicked: { flightMenu.close(); hardwareE2EPopup.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
+    Button {
+     text: "Відключити камеру"
+     font.pixelSize: 15
+     Layout.fillWidth: true
+     Layout.preferredHeight: 48
+     enabled: !w.simulation
+     onClicked: { flightMenu.close(); disconnectDevice() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#663c2d35" : "#382b1c25"; border.color: "#a56878" }
+    }
+    Item { Layout.preferredHeight: 8 }
+   }
+  }
+ }
+ Popup{
+  id:streamsPopup;objectName:"streamsPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(700,w.width-40);height:Math.min(520,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}
+  onAboutToShow:streamsContent.active=true
+  contentItem:Loader{
+   id:streamsContent;objectName:"streamsContent";anchors.fill:parent;active:false
+   sourceComponent:Component{ColumnLayout{
+    anchors.fill:parent;anchors.margins:16
+    Text{text:"ВІДЕО";color:fg;font.pixelSize:20;font.bold:true}
+    Text{text:"Основний: "+(streamWorkspace.state.primaryKind||"--")+" · Додатковий: "+(streamWorkspace.state.secondaryKind||"--");color:sub}
+    Switch{text:"PiP";checked:pipEnabled;enabled:streamWorkspace.state.pipAvailable;onToggled:setPip(checked)}
+    RowLayout{Layout.fillWidth:true
+     Text{text:"Екран";color:sub}
+     ComboBox{Layout.fillWidth:true;model:displayRuntime.displays;textRole:"label";currentIndex:w.selectedDisplayIndex;onActivated:function(index){w.selectedDisplayIndex=index}}
+     Button{text:"Перемістити основний";enabled:primaryDetached;onClicked:w.displayMoveMessage=displayRuntime.moveWindow(primaryStreamWindow,w.selectedDisplayIndex)?"":"Не вдалося перемістити відеопотік."}
+     Button{text:"Перемістити додатковий";enabled:secondaryDetached;onClicked:w.displayMoveMessage=displayRuntime.moveWindow(secondaryStreamWindow,w.selectedDisplayIndex)?"":"Не вдалося перемістити відеопотік."}
+    }
+    Text{visible:w.displayMoveMessage!=="";text:w.displayMoveMessage;color:red;Layout.fillWidth:true}
+    Text{text:"При від’єднанні екрана потік повернеться на основний.";color:sub;font.pixelSize:10}
+    ListView{Layout.fillWidth:true;Layout.fillHeight:true;model:devicesModel.activeStreams;delegate:RowLayout{required property var modelData;width:ListView.view.width;Text{text:modelData.name+" · "+modelData.kind;color:fg;Layout.fillWidth:true}Button{text:"Основний";onClicked:{streamWorkspace.selectPrimary(modelData.id);rebuildPlayback()}}Button{text:"Додатковий";enabled:modelData.id!==streamWorkspace.state.primaryId;onClicked:{streamWorkspace.selectSecondary(modelData.id);if(pipEnabled)startSecondary()}}}}
+    RowLayout{Button{text:"Поміняти місцями";enabled:streamWorkspace.state.pipAvailable;onClicked:{streamWorkspace.swap();rebuildPlayback()}}Item{Layout.fillWidth:true}Button{text:"Закрити";onClicked:streamsPopup.close()}}
+   }}
+  }
+ }
+ Popup{id:timelinePopup;objectName:"timelinePopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(760,w.width-40);height:Math.min(560,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:timelineContent.active=true;contentItem:Loader{id:timelineContent;objectName:"timelineContent";anchors.fill:parent;active:false;sourceComponent:Component{TimelinePanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:timelinePopup.close()}}}}
+ Popup{id:backupPopup;objectName:"backupPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(700,w.width-40);height:Math.min(600,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:backupContent.active=true;onClosed:if(backupContent.item)backupContent.item.clearSensitiveFields();contentItem:Loader{id:backupContent;objectName:"backupContent";anchors.fill:parent;active:false;sourceComponent:Component{BackupPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:backupPopup.close()}}}}
+ Popup{id:osdSettingsPopup;objectName:"osdSettingsPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(1000,w.width-40);height:Math.min(680,w.height-48);background:Rectangle{color:"#f00d1725";border.color:blue;radius:14}onAboutToShow:osdSettingsLoader.active=true;contentItem:Loader{id:osdSettingsLoader;objectName:"osdSettingsLoader";anchors.fill:parent;active:false;sourceComponent:Component{OsdSettingsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:osdSettingsPopup.close()}}}}
+ Popup{id:preflightPopup;objectName:"preflightPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#f00d1725";border.color:amber;radius:14}onAboutToShow:preflightContent.active=true;contentItem:Loader{id:preflightContent;objectName:"preflightContent";anchors.fill:parent;active:false;sourceComponent:Component{PreflightPanel{anchors.fill:parent;anchors.margins:16;cameraName:devicesModel.activeName;video:vd;telemetry:t;network:net;navigation:ext;nextAction:homeDashboard.nextAction;osdEnabled:station.osdEnabled;onCloseRequested:preflightPopup.close();onOpenOsdSettings:function(){preflightPopup.close();openOsdSettings()}onOpenSimulation:function(){preflightPopup.close();simulation=true}onOpenDiagnostics:function(){preflightPopup.close();diagnostics.open()}}}}}
+ Popup{id:diagnostics;objectName:"diagnostics";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#0d1725";border.color:green;radius:14}onAboutToShow:diagnosticsContent.active=true;contentItem:Loader{id:diagnosticsContent;objectName:"diagnosticsContent";anchors.fill:parent;active:false;sourceComponent:Component{DiagnosticsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:diagnostics.close()}}}}
+ Popup{id:firmwarePopup;objectName:"firmwarePopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(900,w.width-40);height:Math.min(700,w.height-48);onAboutToShow:firmwarePanelLoader.active=true;onOpened:if(firmwarePanelLoader.item)firmwarePanelLoader.item.activeDevice();background:Rectangle{color:"#0d1725";border.color:amber;radius:14}contentItem:Loader{id:firmwarePanelLoader;objectName:"firmwarePanelLoader";anchors.fill:parent;active:false;sourceComponent:Component{FirmwareCenter{anchors.fill:parent;anchors.margins:18;onCloseRequested:firmwarePopup.close()}}}}
+ Popup{id:hardwareE2EPopup;objectName:"hardwareE2EPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(760,w.width-40);height:Math.min(600,w.height-48);onOpened:hardwareE2ERuntime.reset();onAboutToShow:hardwareE2EContent.active=true;background:Rectangle{color:"#0d1725";border.color:amber;radius:14}contentItem:Loader{id:hardwareE2EContent;objectName:"hardwareE2EContent";anchors.fill:parent;active:false;sourceComponent:Component{HardwareE2EPanel{anchors.fill:parent;anchors.margins:18;onCloseRequested:hardwareE2EPopup.close()}}}}
+ Popup{id:updatePopup;objectName:"updatePopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(740,w.width-40);height:Math.min(580,w.height-48);background:Rectangle{color:"#0d1725";border.color:green;radius:14}onAboutToShow:updateContent.active=true;contentItem:Loader{id:updateContent;objectName:"updateContent";anchors.fill:parent;active:false;sourceComponent:Component{UpdatePanel{anchors.fill:parent;anchors.margins:18;onCloseRequested:updatePopup.close()}}}}
+ Popup{id:devices;objectName:"devices";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(960,w.width-40);height:Math.min(660,w.height-60);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:devicesContent.active=true;contentItem:Loader{id:devicesContent;objectName:"devicesContent";anchors.fill:parent;active:false;sourceComponent:Component{DevicesPanel{anchors.fill:parent;anchors.margins:18;onCloseRequested:devices.close();onActivateDevice:function(deviceId){devices.close();connectDevice(deviceId)}}}}}
+ Popup{id:backupFailurePopup;modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(500,w.width-40);padding:18;background:Rectangle{color:"#0d1725";border.color:red;radius:12}contentItem:ColumnLayout{spacing:12;Text{id:backupFailureText;color:fg;wrapMode:Text.WordWrap;Layout.fillWidth:true}Button{text:"Зрозуміло";onClicked:backupFailurePopup.close()}}}
 }

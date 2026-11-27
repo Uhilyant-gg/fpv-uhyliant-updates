@@ -5,7 +5,8 @@ class Tests(unittest.TestCase):
  def make_zip(self,root,entries):
   p=root/'p.zip'
   with zipfile.ZipFile(p,'w') as z:
-   for name,data in entries:z.writestr(name,data)
+   for name,data in entries:
+    info=zipfile.ZipInfo(name);info.filename=name;z.writestr(info,data)
   return p
  def digest(self,p):return hashlib.sha256(p.read_bytes()).hexdigest()
  def test_verified_zip_extracts(self):

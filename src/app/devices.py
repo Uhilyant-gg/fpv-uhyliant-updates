@@ -1,6 +1,8 @@
 import json,os,sqlite3,uuid
+from contextlib import closing,contextmanager
 from pathlib import Path
 from PySide6.QtCore import QObject,Property,Signal,Slot
+from device_center import device_center_fields
 DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';DB=DATA/'station.db'
 def valid_host(v):
  import ipaddress
@@ -18,27 +20,39 @@ def interfaces():
 class Devices(QObject):
  changed=Signal();streamsChanged=Signal();discoveryChanged=Signal();deviceAdded=Signal();deviceUpdated=Signal();deviceRemoved=Signal();deviceListRestored=Signal()
  def __init__(self):
-  super().__init__();DATA.mkdir(parents=True,exist_ok=True);self._items=[];self._streams=[];self._active='';self._discovered=[];self._scanning=False;self._stage='';self._status='';self._pd=0;self._pt=0;self._found=0;self._worker=None;self._init();self._load()
- def _connect(self):return sqlite3.connect(DB)
+  super().__init__();DATA.mkdir(parents=True,exist_ok=True);self._items=[];self._streams=[];self._active='';self._discovered=[];self._scanning=False;self._stage='';self._status='';self._pd=0;self._pt=0;self._found=0;self._worker=None;self._before_critical_change=None;self._init();self._load()
+ def setBackupGuard(self,guard):self._before_critical_change=guard
+ def _protect_change(self):return self._before_critical_change is None or self._before_critical_change()
+ @contextmanager
+ def _connect(self):
+  with closing(sqlite3.connect(DB)) as connection:
+   with connection:yield connection
  def _init(self):
   with self._connect() as d:
-   d.execute('CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT NOT NULL,host TEXT NOT NULL,port INTEGER NOT NULL,connection TEXT NOT NULL,notes TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 0,identity_json TEXT NOT NULL DEFAULT "{}")')
+   d.execute('CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT NOT NULL,host TEXT NOT NULL,port INTEGER NOT NULL,connection TEXT NOT NULL,notes TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 0,identity_json TEXT NOT NULL DEFAULT "{}",last_observed_at INTEGER NOT NULL DEFAULT 0)')
    cols={row[1] for row in d.execute('PRAGMA table_info(devices)')}
    if 'active' not in cols:d.execute('ALTER TABLE devices ADD COLUMN active INTEGER NOT NULL DEFAULT 0')
    if 'identity_json' not in cols:d.execute('ALTER TABLE devices ADD COLUMN identity_json TEXT NOT NULL DEFAULT "{}"')
+   if 'last_observed_at' not in cols:d.execute('ALTER TABLE devices ADD COLUMN last_observed_at INTEGER NOT NULL DEFAULT 0')
    d.execute('CREATE TABLE IF NOT EXISTS streams(id TEXT PRIMARY KEY,device_id TEXT NOT NULL,name TEXT NOT NULL,kind TEXT NOT NULL,port INTEGER NOT NULL,path TEXT NOT NULL,protocol TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 1)')
  def _load(self):
   with self._connect() as d:
-   rows=d.execute('SELECT id,name,type,host,port,connection,notes,active,identity_json FROM devices ORDER BY name').fetchall();srows=d.execute('SELECT id,device_id,name,kind,port,path,protocol,enabled FROM streams ORDER BY name').fetchall()
+   rows=d.execute('SELECT id,name,type,host,port,connection,notes,active,identity_json,last_observed_at FROM devices ORDER BY name').fetchall();srows=d.execute('SELECT id,device_id,name,kind,port,path,protocol,enabled FROM streams ORDER BY name').fetchall()
   self._items=[];self._active=''
   for r in rows:
    try:identity=json.loads(r[8]) if r[8] else {}
    except ValueError:identity={}
-   item={'id':r[0],'name':r[1],'type':r[2],'host':r[3],'port':r[4],'connection':r[5],'notes':r[6],'active':bool(r[7]),'openipcIdentity':identity};self._items.append(item)
+   onboarding_state=str(identity.get('onboardingState') or 'ready')
+   item={'id':r[0],'name':r[1],'type':r[2],'host':r[3],'port':r[4],'connection':r[5],'notes':r[6],'active':bool(r[7]),'openipcIdentity':identity,'onboardingState':onboarding_state,'lastObservedAt':r[9]};item.update(device_center_fields(item));self._items.append(item)
    if item['active']:self._active=item['id']
+  self._items.sort(key=lambda item:(item['deviceGroup'],item['name'].casefold()))
   self._streams=[{'id':r[0],'device_id':r[1],'name':r[2],'kind':r[3],'port':r[4],'path':r[5],'protocol':r[6],'enabled':bool(r[7])} for r in srows]
  @Property('QVariantList',notify=changed)
  def items(self):return self._items
+ @Property('QVariantList',notify=changed)
+ def homeItems(self):return [item for item in self._items if item.get('onboardingState')=='ready']
+ @Property(int,notify=changed)
+ def pendingCount(self):return sum(item.get('onboardingState')!='ready' for item in self._items)
  @Property('QVariantList',notify=streamsChanged)
  def streams(self):return self._streams
  @Property('QVariantList',notify=streamsChanged)
@@ -72,12 +86,13 @@ class Devices(QObject):
  @Slot(str)
  def removeDevice(self,did):
   existed=any(x.get('id')==did for x in self._items)
+  if not existed or not self._protect_change():return
   with self._connect() as d:d.execute('DELETE FROM streams WHERE device_id=?',(did,));d.execute('DELETE FROM devices WHERE id=?',(did,))
   self._load();self.changed.emit();self.streamsChanged.emit()
   if existed:self.deviceRemoved.emit()
  @Slot(str)
  def setActive(self,did):
-  if not any(x['id']==did for x in self._items):return
+  if not any(x['id']==did and x.get('onboardingState')=='ready' for x in self._items):return
   with self._connect() as d:d.execute('UPDATE devices SET active=0');d.execute('UPDATE devices SET active=1 WHERE id=?',(did,))
   self._load();self.changed.emit();self.streamsChanged.emit()
  @Slot()
@@ -86,6 +101,38 @@ class Devices(QObject):
   self._load();self.changed.emit();self.streamsChanged.emit()
  def _save_identity(self,did,identity):
   with self._connect() as d:d.execute('UPDATE devices SET identity_json=? WHERE id=?',(json.dumps(identity,ensure_ascii=False),did))
+ def saveDiscoveredCamera(self,name,host,identity,streams,onboarding_state,existing_id=''):
+  if onboarding_state not in ('ready','pending-firmware','pending-video') or not isinstance(identity,dict):return ''
+  did=''
+  identity=dict(identity);identity['onboardingState']=onboarding_state
+  with self._connect() as d:
+   row=d.execute('SELECT id FROM devices WHERE id=?',(existing_id,)).fetchone() if existing_id else None
+   if row:
+    did=row[0]
+    d.execute("UPDATE devices SET name=?,type=?,host=?,port=80,connection=?,active=CASE WHEN ?='ready' THEN active ELSE 0 END,identity_json=?,last_observed_at=strftime('%s','now') WHERE id=?",(name,'OpenIPC',host,'Network',onboarding_state,json.dumps(identity,ensure_ascii=False),did))
+   else:
+    did=uuid.uuid4().hex
+    d.execute("INSERT INTO devices(id,name,type,host,port,connection,notes,active,identity_json,last_observed_at) VALUES(?,?,?,?,?,?,?,?,?,strftime('%s','now'))",(did,name,'OpenIPC',host,80,'Network','',0,json.dumps(identity,ensure_ascii=False)))
+   for stream in (streams if isinstance(streams,(list,tuple)) else ()):
+    if not isinstance(stream,dict):continue
+    path=str(stream.get('path') or '')
+    protocol=str(stream.get('protocol') or '').lower()
+    port=stream.get('port')
+    if protocol!='rtsp' or not path.startswith('/') or not isinstance(port,int) or isinstance(port,bool) or not 1<=port<=65535:continue
+    exists=d.execute('SELECT 1 FROM streams WHERE device_id=? AND port=? AND path=? AND protocol=?',(did,port,path,protocol)).fetchone()
+    if not exists:
+     d.execute('INSERT INTO streams(id,device_id,name,kind,port,path,protocol,enabled) VALUES(?,?,?,?,?,?,?,1)',(uuid.uuid4().hex,did,str(stream.get('name') or 'Відео'),'main',port,path,protocol))
+  self._load();self.changed.emit();self.streamsChanged.emit()
+  if row:self.deviceUpdated.emit()
+  else:self.deviceAdded.emit()
+  return did
+ @Slot(str,result=bool)
+ def markObserved(self,host):
+  address=str(host or '').strip()
+  if not address:return False
+  with self._connect() as d:changed=d.execute("UPDATE devices SET last_observed_at=strftime('%s','now') WHERE host=?",(address,)).rowcount
+  if changed:self._load();self.changed.emit()
+  return changed>0
  @Slot(str,str,str,int,str,str,result=str)
  def addStream(self,did,name,kind,port,path,protocol):
   if not any(x['id']==did for x in self._items):return ''
@@ -94,6 +141,7 @@ class Devices(QObject):
   self._load();self.streamsChanged.emit();return sid
  @Slot(str)
  def removeStream(self,sid):
+  if not any(x.get('id')==sid for x in self._streams) or not self._protect_change():return
   with self._connect() as d:d.execute('DELETE FROM streams WHERE id=?',(sid,))
   self._load();self.streamsChanged.emit()
  @Slot(str,bool)
@@ -123,6 +171,7 @@ class Devices(QObject):
  @Slot('QVariantMap',result=bool)
  def restoreSnapshot(self,value):
   if not self.validateSnapshot(value):return False
+  if not self._protect_change():return False
   try:
    with self._connect() as d:
     d.execute('BEGIN IMMEDIATE');d.execute('DELETE FROM streams');d.execute('DELETE FROM devices')

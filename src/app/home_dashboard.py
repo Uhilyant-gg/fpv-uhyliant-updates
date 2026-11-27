@@ -24,6 +24,8 @@ def _human_summary(reason_code: str) -> str:
         "device-identity-unknown": "Ідентичність камери ще не перевірена.",
         "openipc-not-verified": "Камеру знайдено, але її тип ще не підтверджено.",
         "hardware-identity-incomplete": "Камеру OpenIPC підтверджено, але даних про платформу або сенсор бракує.",
+        "camera-firmware-required": "Камеру знайдено. Підтвердіть сумісну прошивку — після перевірки відеопотоку вона з’явиться на головному екрані.",
+        "camera-video-unverified": "Прошивку камери підтверджено. Повторно знайдіть її, щоб перевірити відеопотік.",
         "camera-connection-problem": "Не вдалося підключитися до камери. Перевірте з’єднання.",
         "camera-connection-needed": "Камера доступна, але ще не підключена.",
         "camera-video-ready": "Камера підключена, відеопотік доступний.",
@@ -35,11 +37,19 @@ def home_dashboard(
     devices: Iterable[Mapping[str, Any]] | None,
     streams: Iterable[Mapping[str, Any]] | None,
 ) -> dict[str, Any]:
-    items = tuple(device for device in (devices or ()) if isinstance(device, Mapping))
+    all_items = tuple(device for device in (devices or ()) if isinstance(device, Mapping))
+    pending = tuple(
+        device for device in all_items
+        if device.get("onboardingState") in ("pending-firmware", "pending-video")
+    )
+    items = tuple(
+        device for device in all_items
+        if device.get("onboardingState") not in ("pending-firmware", "pending-video")
+    )
     available_streams = tuple(stream for stream in (streams or ()) if isinstance(stream, Mapping))
 
     if not items:
-        camera = device_health(None)
+        camera = device_health(pending[0]) if pending else device_health(None)
     else:
         active = next((device for device in items if device.get("active") is True), items[0])
         active_streams = [
@@ -62,7 +72,7 @@ def home_dashboard(
         if isinstance(device.get("openipcIdentity"), Mapping)
         and device["openipcIdentity"].get("verified") is True
     )
-    warning_count = sum(
+    warning_count = len(pending) + sum(
         1
         for device in items
         if not isinstance(device.get("openipcIdentity"), Mapping)
@@ -74,6 +84,7 @@ def home_dashboard(
         "title": _human_state(combined.health),
         "summary": _human_summary(camera.reasonCode),
         "deviceCount": len(items),
+        "pendingCount": len(pending),
         "verifiedCount": verified,
         "warningCount": warning_count,
         "nextAction": next_action,

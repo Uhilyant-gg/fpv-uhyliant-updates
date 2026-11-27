@@ -1,3 +1,4 @@
+import unittest
 from controller_restore import controller_restore
 
 
@@ -35,3 +36,16 @@ def test_fresh_match_with_valid_inputs_restores():
 def test_restore_needs_controller_bound_profile():
  r=controller_restore({'id':'x','profile':{**PROFILE,'controllerId':'other'}},{'id':'x','connected':True,'channels':[1500]*4})
  assert r['restored'] is False and r['reasonCode']=='controller-profile-unavailable'
+
+
+class ControllerRestoreTests(unittest.TestCase):
+    """Run the module-level checks under ``python -m unittest`` (used by CI)."""
+
+
+for _name, _check in list(globals().items()):
+    if _name.startswith('test_') and callable(_check):
+        setattr(ControllerRestoreTests, _name, lambda self, _check=_check: _check())
+
+
+if __name__ == '__main__':
+    unittest.main()

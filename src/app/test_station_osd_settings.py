@@ -56,6 +56,9 @@ class StationOsdSettingsTests(unittest.TestCase):
         station = Station(settings)
 
         self.assertTrue(station.setOSDStyle(0.7, 1.2))
+        self.assertTrue(station.setOSDStyle(0, 1.2))
+        self.assertEqual(station.osdOpacity, 0)
+        self.assertTrue(station.setOSDStyle(0.7, 1.2))
         self.assertTrue(station.setOSDPosition("bottom-right"))
 
         restored = Station(settings)
@@ -83,12 +86,12 @@ class StationOsdSettingsTests(unittest.TestCase):
         })
         station = Station(settings)
 
-        self.assertEqual(station.osdOpacity, 0.8)
+        self.assertEqual(station.osdOpacity, 1)
         self.assertEqual(station.osdScale, 0.85)
         self.assertEqual(station.osdPosition, "top-left")
-        self.assertFalse(station.setOSDStyle(0.9, 1.0))
+        self.assertFalse(station.setOSDStyle(1.1, 1.0))
         self.assertFalse(station.setOSDPosition("center"))
-        self.assertEqual(station.osdOpacity, 0.8)
+        self.assertEqual(station.osdOpacity, 1)
         self.assertEqual(station.osdPosition, "top-left")
 
     def test_osd_style_can_be_reset_to_defaults(self):
@@ -115,6 +118,55 @@ class StationOsdSettingsTests(unittest.TestCase):
         self.assertFalse(station.setOSDStyle(0.7, 1.2))
         self.assertIn("Не вдалося зберегти налаштування OSD", station.osdSettingsError)
         self.assertEqual(changes, [])
+
+    def test_individual_positions_persist_validate_and_reset(self):
+        settings = Settings()
+        station = Station(settings)
+        self.assertTrue(station.setOSDElementPosition("battery", 75, 35))
+        self.assertFalse(station.setOSDElementPosition("unknown", 10, 10))
+        self.assertFalse(station.setOSDElementPosition("battery", 101, 10))
+        restored = Station(settings)
+        self.assertEqual(restored.osdElements, {"battery": [75, 35]})
+        restored.resetOSDStyle()
+        self.assertEqual(Station(settings).osdElements, {})
+
+    def test_individual_elements_default_toggle_persist_and_reset(self):
+        settings = Settings()
+        station = Station(settings)
+
+        self.assertTrue(station.osdEnabledElements["battery"])
+        self.assertFalse(station.osdEnabledElements["reticle"])
+        self.assertFalse(station.osdEnabledElements["horizon"])
+        self.assertTrue(station.setOSDElementEnabled("reticle", True))
+        self.assertTrue(station.setOSDElementEnabled("horizon", True))
+        self.assertTrue(station.setOSDElementEnabled("battery", False))
+        self.assertFalse(station.setOSDElementEnabled("unknown", True))
+
+        restored = Station(settings)
+        self.assertTrue(restored.osdEnabledElements["reticle"])
+        self.assertTrue(restored.osdEnabledElements["horizon"])
+        self.assertFalse(restored.osdEnabledElements["battery"])
+
+        restored.resetOSDStyle()
+        defaults = Station(settings).osdEnabledElements
+        self.assertFalse(defaults["reticle"])
+        self.assertFalse(defaults["horizon"])
+        self.assertTrue(defaults["battery"])
+
+    def test_corrupt_element_visibility_keeps_safe_defaults(self):
+        settings = Settings({
+            Station.OSD_ELEMENT_VISIBILITY_KEY: '{"battery":false,"reticle":true,"horizon":"yes","unknown":true}'
+        })
+        station = Station(settings)
+        self.assertFalse(station.osdEnabledElements["battery"])
+        self.assertTrue(station.osdEnabledElements["reticle"])
+        self.assertFalse(station.osdEnabledElements["horizon"])
+
+    def test_corrupt_element_positions_are_ignored(self):
+        settings = Settings({Station.OSD_ELEMENTS_KEY: '{"battery":[3, 5], "speed":[200, 0], "gps":[true, 0], "other":[1, 1]}'})
+        self.assertEqual(Station(settings).osdElements, {"battery": [3, 5]})
+        settings.values[Station.OSD_ELEMENTS_KEY] = "not json"
+        self.assertEqual(Station(settings).osdElements, {})
 
 
 if __name__ == "__main__":

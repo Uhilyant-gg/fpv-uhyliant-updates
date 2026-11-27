@@ -17,4 +17,6 @@ jobs:
         run: python hardware_simulator_ci.py
       - name: Run scenario CI regression tests
         working-directory: tools
-        run: python -m unittest -v test_hardware_simulator_ci.py
+        run: |
+          pip install "pytest>=8,<10"
+          python -m pytest -v -p no:cacheprovider test_hardware_simulator_ci.py

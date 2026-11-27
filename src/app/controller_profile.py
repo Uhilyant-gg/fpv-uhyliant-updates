@@ -89,6 +89,48 @@ def calibrate_controller(
     }
 
 
+def validate_controller_profile(profile: Any) -> dict[str, Any]:
+    """Return a validated copy of a stored profile or raise ``controller-profile-invalid``."""
+    if not isinstance(profile, Mapping) or set(profile) != {"schemaVersion", "controllerId", "channelCount", "calibration", "mapping"}:
+        raise ValueError("controller-profile-invalid")
+    if profile.get("schemaVersion") != _PROFILE_SCHEMA_VERSION:
+        raise ValueError("controller-profile-invalid")
+    controller_id = profile.get("controllerId")
+    if not isinstance(controller_id, str) or not controller_id.strip() or controller_id != controller_id.strip():
+        raise ValueError("controller-profile-invalid")
+    channel_count = profile.get("channelCount")
+    calibration = profile.get("calibration")
+    if isinstance(channel_count, bool) or not isinstance(channel_count, int) or channel_count < len(CONTROL_AXES):
+        raise ValueError("controller-profile-invalid")
+    if not isinstance(calibration, (list, tuple)) or len(calibration) != channel_count:
+        raise ValueError("controller-profile-invalid")
+    validated_calibration = []
+    for bounds in calibration:
+        if not isinstance(bounds, Mapping) or set(bounds) != {"minimum", "center", "maximum"}:
+            raise ValueError("controller-profile-invalid")
+        minimum, center, maximum = bounds["minimum"], bounds["center"], bounds["maximum"]
+        if not all(_finite_number(item) for item in (minimum, center, maximum)) or not minimum <= center <= maximum:
+            raise ValueError("controller-profile-invalid")
+        validated_calibration.append({"minimum": minimum, "center": center, "maximum": maximum})
+    try:
+        mapping = _validated_mapping(profile.get("mapping"), channel_count)
+    except ValueError:
+        raise ValueError("controller-profile-invalid") from None
+    for axis in CONTROL_AXES:
+        bounds = validated_calibration[mapping[axis]["channel"]]
+        if bounds["minimum"] >= bounds["maximum"]:
+            raise ValueError("controller-profile-invalid")
+        if axis != "throttle" and not bounds["minimum"] < bounds["center"] < bounds["maximum"]:
+            raise ValueError("controller-profile-invalid")
+    return {
+        "schemaVersion": _PROFILE_SCHEMA_VERSION,
+        "controllerId": controller_id,
+        "channelCount": channel_count,
+        "calibration": validated_calibration,
+        "mapping": mapping,
+    }
+
+
 def apply_controller_profile(profile: Mapping[str, Any], channels: Sequence[int | float]) -> dict[str, float]:
     """Normalize one fresh input frame; reject stale, malformed, or out-of-range data."""
     if not isinstance(profile, Mapping) or profile.get("schemaVersion") != _PROFILE_SCHEMA_VERSION:

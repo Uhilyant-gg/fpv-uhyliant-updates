@@ -37,6 +37,27 @@ class HomeDashboardTests(unittest.TestCase):
         self.assertEqual(result["nextAction"]["action"], "verify-camera")
         self.assertIn("не підтверджено", result["summary"])
 
+    def test_pending_firmware_is_hidden_from_home_and_opens_firmware_center(self):
+        result = home_dashboard([{
+            "id": "candidate",
+            "onboardingState": "pending-firmware",
+            "openipcIdentity": {"verified": True, "platform": "ssc30kq", "sensor": "imx335"},
+        }], [])
+        self.assertEqual(result["deviceCount"], 0)
+        self.assertEqual(result["pendingCount"], 1)
+        self.assertEqual(result["nextAction"]["action"], "review-firmware")
+        self.assertIn("прошивку", result["summary"])
+
+    def test_pending_video_recommends_another_camera_check(self):
+        result = home_dashboard([{
+            "id": "candidate",
+            "onboardingState": "pending-video",
+            "openipcIdentity": {"verified": True, "platform": "ssc30kq", "sensor": "imx335", "firmware": "v1"},
+        }], [])
+        self.assertEqual(result["deviceCount"], 0)
+        self.assertEqual(result["nextAction"]["action"], "find-camera")
+        self.assertIn("відеопотік", result["summary"])
+
 
 if __name__ == "__main__":
     unittest.main()

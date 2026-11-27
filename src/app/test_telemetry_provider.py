@@ -12,6 +12,9 @@ class Settings:
 class TelemetryProviderTests(unittest.TestCase):
  def test_normalizes_without_inventing_values(self):
   p=MavlinkProvider(Runtime({'connected':True,'batteryVoltage':12.3}));t=p.telemetry;self.assertTrue(t['connected']);self.assertEqual(t['batteryVoltage'],12.3);self.assertIsNone(t['armed']);self.assertIsNone(t['gpsFix'])
+ def test_preserves_field_freshness_for_overlay_presentation(self):
+  t=MspProvider(Runtime({'connected':True,'altitude':12.0,'freshness':{'altitude':False}})).telemetry
+  self.assertFalse(t['freshness']['altitude'])
  def test_missing_values_remain_unavailable_not_false_or_zero(self):
   t=MspProvider(Runtime()).telemetry
   for key in NORMALIZED_FIELDS:self.assertIsNone(t[key])

@@ -52,6 +52,42 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
                 with self.subTest(file=name, phrase=phrase):
                     self.assertNotIn(phrase, visible)
 
+    def test_osd_distinguishes_stale_fields_from_unavailable_values(self):
+        source = self.qml["OsdOverlay.qml"]
+        self.assertIn("telemetry.freshness", source)
+        self.assertIn('"застаріло"', source)
+        self.assertIn("optionalTelemetryText", source)
+
+    def test_osd_preview_can_check_common_aspect_ratios_and_explains_layout_issues(self):
+        source = self.qml["OsdSettingsPanel.qml"]
+        for label in ("Широкий 16:9", "Класичний 4:3", "Квадрат 1:1", "Вертикальний 9:16"):
+            self.assertIn(label, source)
+        self.assertIn("previewHost.height * aspectRatio", source)
+        self.assertIn("previewHost.width / aspectRatio", source)
+        self.assertIn("Перетягніть позначені елементи по сітці", source)
+        self.assertIn("Розташування не змінюється автоматично", source)
+
+    def test_osd_controls_explain_camera_pixels_cannot_be_removed(self):
+        copy = "\n".join(
+            self.visible_literals(self.qml[name])
+            for name in ("Main.qml", "OsdSettingsPanel.qml", "PreflightPanel.qml")
+        )
+        self.assertIn("вбудоване в зображення", copy)
+        self.assertIn("прибрати його тут неможливо", copy)
+        self.assertIn("Додавати OSD станції поверх відео", copy)
+        self.assertNotIn("Вимкнути OSD камери", copy)
+
+    def test_osd_layout_editing_locks_when_telemetry_reports_armed(self):
+        main = self.qml["Main.qml"]
+        panel = self.qml["OsdSettingsPanel.qml"]
+        main = re.sub(r"\s+", "", main)
+        self.assertIn("functionopenOsdSettings(){if(!osdSettingsLoader.active){osdSettingsLoader.active=true;Qt.callLater(openOsdSettings);return}osdSettingsLoader.item.editingAllowed=w.simulation||t.armed!==true;osdSettingsPopup.open()}", main)
+        self.assertIn("if(osdSettingsPopup.visible&&!w.simulation&&osdSettingsLoader.item)osdSettingsLoader.item.editingAllowed=t.armed!==true", main)
+        self.assertNotIn("editingAllowed:w.simulation||t.armed!==true", main)
+        self.assertIn("enabled: root.editingAllowed", panel)
+        self.assertIn("editing: root.editingAllowed", panel)
+        self.assertIn("Телеметрія показує ARM", panel)
+
     def test_shared_hover_hint_contract_is_five_seconds(self):
         hint = self.qml["HoverHint.qml"]
         self.assertIn("property int delay:5000", hint)

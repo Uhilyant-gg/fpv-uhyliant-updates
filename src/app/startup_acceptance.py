@@ -81,6 +81,15 @@ def startup_acceptance_report(
     action_details = action_event.get("detail", {}) if action_event else {}
     primary_action = action_details.get("action") if isinstance(action_details, Mapping) else None
     health_summary = health_details.get("summary", "") if isinstance(health_details, Mapping) else ""
+    discovery = by_stage.get("discovery")
+    discovery_details = discovery.get("detail", {}) if discovery else {}
+    discovery_mode = discovery_details.get("mode") if isinstance(discovery_details, Mapping) else None
+    if discovery_mode == "network-free-packaged-first-run-fixture":
+        evidence_mode = "network-free-packaged-first-run-fixture"
+    elif isinstance(discovery_details, Mapping) and discovery_details.get("started") is True:
+        evidence_mode = "live-discovery-started"
+    else:
+        evidence_mode = "unclassified"
 
     snapshot = {
         "stage": "next-action",
@@ -105,6 +114,7 @@ def startup_acceptance_report(
         healthElapsedMs=health_ms if isinstance(health_ms, int) else None,
         latestStageElapsedMs=elapsed_ms,
         startupStages=stages,
+        evidenceMode=evidence_mode,
         physicalOperationEvidence="not-collected",
     )
     return result

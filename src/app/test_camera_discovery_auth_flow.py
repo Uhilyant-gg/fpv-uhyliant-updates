@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 
@@ -12,7 +13,7 @@ def test_credentials_are_requested_only_for_add():
     source=Path(__file__).with_name("DevicesPanel.qml").read_text(encoding="utf-8")
     assert "Потрібен логін" in source
     assert "authenticateAndAdd" in source
-    assert "echoMode:TextInput.Password" in source
+    assert re.search(r"echoMode\s*:\s*TextInput\.Password", source)
 
 
 def test_authenticated_add_is_fail_closed():

@@ -2,6 +2,7 @@ import ipaddress
 import threading
 from PySide6.QtCore import Property, QThread, Signal, Slot
 from devices import Devices as LegacyDevices, interfaces
+from camera_onboarding import camera_onboarding
 from openipc_device import normalize_openipc_identity
 from route_discovery import discover_targets, fingerprint, plan_targets, system_routes
 
@@ -32,9 +33,13 @@ class ManualWorker(QThread):
         try:self.done.emit(fingerprint(self.host,self.cancel),"")
         except Exception:self.done.emit({},"inspection-failed")
 
-class Devices(LegacyDevices):
+class RouteAwareDevices(LegacyDevices):
+    # Must not reuse the base class name: PySide6 then silently drops this
+    # subclass's signals, properties and slots from the Qt meta-object, so QML
+    # cannot see them even though Python calls still work.
     manualChanged=Signal()
     scanStateChanged=Signal()
+    firmwarePreparationRequested=Signal(str)
     def __init__(self):
         super().__init__();self._manual_busy=False;self._manual_result={};self._manual_error="";self._manual_status="idle";self._manual_message="";self._manual_worker=None;self._manual_requested_host=""
         self.discoveryChanged.connect(self.scanStateChanged)
@@ -84,13 +89,24 @@ class Devices(LegacyDevices):
     def _on_progress(self,stage,done,total,found):self._stage=stage;self._pd=done;self._pt=total;self._found=found;self.discoveryChanged.emit()
     def _on_live(self,items):self._discovered=items;self._found=len(items);self.discoveryChanged.emit()
     def _on_done(self,items,cancelled,error):
-        for item in items:self._remember_host(item.get("host",""),item.get("openipc",False))
+        firmware_device=""
+        for item in items:
+            self._remember_host(item.get("host",""),item.get("openipc",False))
+            if item.get("camera") is True:self.markObserved(item.get("host",""))
+            if item.get("openipc") and item.get("identityVerified"):
+                identity=normalize_openipc_identity(item.get("identity",{}),item.get("evidence",[]));item["identity"]=identity
+                readiness=camera_onboarding({**item,"identity":identity})
+                existing=next((device for device in self._items if device.get("host")==item.get("host") and device.get("deviceGroup")=="01"),None)
+                if readiness["stageable"] and (readiness["ready"] or not (existing and existing.get("onboardingState")=="ready")):
+                    did=self.saveDiscoveredCamera(item.get("name") or "OpenIPC "+item.get("host",""),item["host"],identity,item.get("streams",[]),readiness["state"],existing.get("id","") if existing else "")
+                    if did and readiness["state"]=="pending-firmware" and not firmware_device:firmware_device=did
         self._discovered=items;self._scanning=False;self._worker=None;self._stage="Скасовано" if cancelled else ("Помилка" if error else "Готово");self._status=DISCOVERY_ERROR_MESSAGE if error else ("Пошук скасовано" if cancelled else "Пошук завершено");self._pd=self._pt;self._found=len(items);self.discoveryChanged.emit()
+        if not cancelled and not error and firmware_device:self.firmwarePreparationRequested.emit(firmware_device)
     @Slot(str)
     def invalidateManualIp(self,value):
         address=_safe_private_host(value)
         current=_safe_private_host(self._manual_result.get("host","")) if self._manual_result else ""
-        if self._manual_status in ("verified","added","candidate","auth-required","error") and (not address or address!=current):
+        if self._manual_status in ("verified","added","staged","candidate","auth-required","error") and (not address or address!=current):
             self._manual_result={};self._manual_requested_host="";self._set_manual("idle","","")
     @Slot(str)
     def inspectManualIp(self,value):
@@ -108,6 +124,7 @@ class Devices(LegacyDevices):
         if not requested or result_host!=requested:self._manual_result={};self._set_manual("error","","Результат перевірки не відповідає поточній адресі");return
         if not result.get("camera"):self._manual_result={};self._set_manual("error","","На цій адресі не знайдено доступної камери");return
         self._manual_result=result;self._remember_host(result_host,result.get("openipc",False))
+        self.markObserved(result_host)
         if result.get("openipc") and result.get("identityVerified"):
             identity=normalize_openipc_identity(result.get("identity",{}),result.get("evidence",[]));self._manual_result["identity"]=identity;self._set_manual("verified","OpenIPC підтверджено")
         elif result.get("authRequired"):self._set_manual("auth-required","Камера доступна. Для підтвердження OpenIPC потрібен логін.")
@@ -124,8 +141,6 @@ class Devices(LegacyDevices):
             if item.get("host")==address:self._discovered[index]=result;break
         else:self._discovered.append(result)
         self.discoveryChanged.emit();did=self.addDiscovered(address,name,True)
-        if did:self._set_manual("added","Камеру додано")
-        else:self._set_manual("error","","Не вдалося додати підтверджену камеру")
         return did
     @Slot(str,str,bool,result=str)
     def addDiscovered(self,host,name,verified):
@@ -136,19 +151,70 @@ class Devices(LegacyDevices):
         identity=normalize_openipc_identity(candidate.get("identity",{}),candidate.get("evidence",[])) if candidate else normalize_openipc_identity()
         if not candidate or not candidate.get("openipc") or not candidate.get("identityVerified") or not identity.get("verified"):
             self._set_manual("error","","OpenIPC identity недостатньо підтверджена для додавання");return ""
-        self._remember_host(address,True);existing=next((x for x in self._items if _safe_private_host(x.get("host",""))==address),None)
-        if existing:self._manual_result=candidate;self._set_manual("added","Камера вже додана");return existing["id"]
-        did=self.addDevice(name or "OpenIPC "+address,"OpenIPC",address,80,"Network","")
+        assessed=camera_onboarding({**candidate,"identity":identity});        existing=next((x for x in self._items if _safe_private_host(x.get("host",""))==address and x.get("deviceGroup")=="01"),None)
+        if not assessed["stageable"]:
+            self._set_manual("error","",assessed["reason"]);return ""
+        if existing and existing.get("onboardingState")=="ready" and not assessed["ready"]:
+            self.markObserved(address);self._manual_result=candidate;self._set_manual("added","Камера вже додана");return existing["id"]
+        if existing and existing.get("onboardingState")==assessed["state"] and assessed["state"]!="ready":
+            self.markObserved(address);self._manual_result=candidate;self._set_manual("staged",assessed["reason"]);return existing["id"]
+        self._remember_host(address,True)
+        did=self.saveDiscoveredCamera(name or "OpenIPC "+address,address,identity,candidate.get("streams",[]),assessed["state"],existing.get("id","") if existing else "")
         if not did:self._set_manual("error","","Не вдалося зберегти камеру");return ""
-        self._save_identity(did,identity)
-        for stream in candidate.get("streams",[]):self.addStream(did,stream.get("name","Відео"),stream.get("name","main"),int(stream.get("port",554)),stream.get("path","/"),stream.get("protocol","rtsp"))
-        self._load();self.changed.emit();self._manual_result=candidate;self._set_manual("added","Камеру додано");return did
+        self._manual_result=candidate
+        if assessed["state"]=="ready":self._set_manual("added","Камеру додано до головного екрана")
+        else:
+            self._set_manual("staged",assessed["reason"])
+            if assessed["state"]=="pending-firmware":self.firmwarePreparationRequested.emit(did)
+        return did
+    @Slot(str,result="QVariantMap")
+    def onboardingReadiness(self,host):
+        address=_safe_private_host(host)
+        candidate=next((item for item in self._discovered if _safe_private_host(item.get("host",""))==address),None)
+        if not candidate and _safe_private_host(self._manual_result.get("host",""))==address:candidate=self._manual_result
+        if not candidate:return camera_onboarding(None)
+        identity=normalize_openipc_identity(candidate.get("identity",{}),candidate.get("evidence",[]))
+        return camera_onboarding({**candidate,"identity":identity})
+    @Slot(str)
+    def stageDiscovered(self,host):
+        address=_safe_private_host(host)
+        candidate=next((item for item in self._discovered if _safe_private_host(item.get("host",""))==address),None)
+        if not candidate and _safe_private_host(self._manual_result.get("host",""))==address:candidate=self._manual_result
+        if not candidate:return
+        identity=normalize_openipc_identity(candidate.get("identity",{}),candidate.get("evidence",[]))
+        assessed=camera_onboarding({**candidate,"identity":identity})
+        if not assessed["stageable"] or assessed["ready"]:return
+        existing=next((device for device in self._items if device.get("host")==address and device.get("deviceGroup")=="01"),None)
+        did=self.saveDiscoveredCamera(candidate.get("name") or "OpenIPC "+address,address,identity,candidate.get("streams",[]),assessed["state"],existing.get("id","") if existing else "")
+        if did and assessed["state"]=="pending-firmware":self.firmwarePreparationRequested.emit(did)
+    @Slot(str,"QVariantMap",result=bool)
+    def completeFirmwareOnboarding(self,device_id,verification):
+        if not isinstance(verification,dict) or verification.get("ok") is not True:return False
+        existing=next((device for device in self._items if device.get("id")==device_id),None)
+        identity=verification.get("identity")
+        if not existing or not isinstance(identity,dict):return False
+        before=existing.get("openipcIdentity") or {}
+        observed=normalize_openipc_identity(identity,identity.get("evidence",[]))
+        if (observed.get("verified") is not True
+                or str(observed.get("platform") or "").strip().lower()!=str(before.get("platform") or "").strip().lower()
+                or str(observed.get("sensor") or "").strip().lower()!=str(before.get("sensor") or "").strip().lower()
+                or not observed.get("firmware")):return False
+        rediscovered_host=_safe_private_host(verification.get("rediscoveredHost") or existing.get("host"))
+        if not rediscovered_host:return False
+        streams=verification.get("streams") if isinstance(verification.get("streams"),list) else []
+        assessed=camera_onboarding({"openipc":True,"identity":observed,"streams":streams})
+        state=assessed["state"] if assessed["ready"] else "pending-video"
+        return bool(self.saveDiscoveredCamera(existing.get("name") or "OpenIPC "+rediscovered_host,rediscovered_host,observed,streams,state,device_id))
     @Slot(str,str,str,int,str,result=bool)
     def updateDevice(self,did,name,host,port,notes):
         name=name.strip();host=host.strip();from devices import valid_host
         if not name or not valid_host(host):return False
+        if not any(x['id']==did for x in self._items) or not self._protect_change():return False
         try:
-            with self._connect() as db:changed=db.execute("UPDATE devices SET name=?,host=?,port=?,notes=? WHERE id=?",(name,host,max(1,min(int(port),65535)),notes.strip(),did)).rowcount>0
+            with self._connect() as db:changed=db.execute("UPDATE devices SET name=?,host=?,port=?,notes=?,last_observed_at=CASE WHEN host<>? THEN 0 ELSE last_observed_at END WHERE id=?",(name,host,max(1,min(int(port),65535)),notes.strip(),host,did)).rowcount>0
         except Exception:return False
         if not changed:return False
         self._remember_host(host,False);self._load();self.changed.emit();self.deviceUpdated.emit();return True
+
+
+Devices = RouteAwareDevices

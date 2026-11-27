@@ -24,8 +24,9 @@ class Tests(unittest.TestCase):
  def make(self,probe,candidates=None):
   td=tempfile.TemporaryDirectory();image=Path(td.name)/'fw.bin';image.write_bytes(b'x');devices=Devices();center=FirmwareCenter(devices);center.verifyImage(str(image),hashlib.sha256(b'x').hexdigest());center.precheck('cam','ssc30kq-imx335','upgrade',True,True);center.prepareExecution('cam','ssc30kq-imx335','upgrade');executor=FirmwareExecutor(center);executor.register_adapter(Adapter());self.assertTrue(executor.execute('cam','ssc30kq-imx335','upgrade'));return td,executor,FirmwareUpdateLifecycle(executor,FirmwareRediscovery(probe,sleep=lambda _:None,candidates=candidates))
  def test_fresh_verified_openipc_completes_with_observed_firmware(self):
-  td,x,l=self.make(lambda host:{'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':['OpenIPC status.cgi']})
-  try:self.assertTrue(l.verify_after_reboot(1,0));self.assertEqual(x.status['state'],'verified')
+  streams=[{'name':'Основний','port':554,'path':'/','protocol':'rtsp'}]
+  td,x,l=self.make(lambda host:{'openipc':True,'identity':{'platform':'ssc30kq','sensor':'imx335','firmware':'new'},'evidence':['OpenIPC status.cgi'],'streams':streams})
+  try:self.assertTrue(l.verify_after_reboot(1,0));self.assertEqual(x.status['state'],'verified');self.assertEqual(x.status['verification']['streams'],streams)
   finally:td.cleanup()
  def test_dhcp_changed_host_completes_only_after_identity_match(self):
   def probe(host):

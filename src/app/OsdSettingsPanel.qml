@@ -5,15 +5,38 @@ import QtQuick.Layouts
 Item {
  id: root
  signal closeRequested()
+ property bool editingAllowed: true
+ property var elementOptions: [
+  {name:"link", label:"Стан зв’язку"},
+  {name:"arm", label:"Стан ARM"},
+  {name:"mode", label:"Режим польоту"},
+  {name:"battery", label:"Акумулятор"},
+  {name:"gps", label:"GPS і супутники"},
+  {name:"altitude", label:"Висота"},
+  {name:"speed", label:"Швидкість"},
+  {name:"heading", label:"Напрямок"},
+  {name:"video", label:"Стан відео"},
+  {name:"homeDistance", label:"Відстань до точки повернення"},
+  {name:"reticle", label:"Приціл"},
+  {name:"horizon", label:"Штучний горизонт"}
+ ]
+ property var aspectRatios: [16 / 9, 4 / 3, 1, 9 / 16]
 
- function positionIndex(position) {
-  var positions = ["top-left", "top-right", "bottom-left", "bottom-right"]
-  return Math.max(0, positions.indexOf(position))
+ function elementLabel(name) {
+  for (var i = 0; i < elementOptions.length; i++) {
+   if (elementOptions[i].name === name) return elementOptions[i].label
+  }
+  return name
+ }
+
+ function layoutIssueText(issue) {
+  if (issue.kind === "safe-area") return elementLabel(issue.name) + " виходить за безпечну область"
+  return elementLabel(issue.first) + " перекриває " + elementLabel(issue.second)
  }
 
  Rectangle {
   anchors.fill: parent
-  color: "#0d1725"
+  color: "transparent"
  }
 
  ColumnLayout {
@@ -44,72 +67,156 @@ Item {
    Layout.fillHeight: true
    spacing: 18
 
-   ColumnLayout {
-    Layout.preferredWidth: 250
+   ScrollView {
+    enabled: root.editingAllowed
+    Layout.preferredWidth: 300
     Layout.fillHeight: true
-    spacing: 10
+    contentWidth: availableWidth
+    clip: true
+    ColumnLayout {
+     width: parent.width
+     spacing: 10
 
-    Text { text: "Розташування"; color: "#dce6f2"; font.bold: true }
-    ComboBox {
-     id: positionSelector
-     Layout.fillWidth: true
-     model: ["Згори ліворуч", "Згори праворуч", "Знизу ліворуч", "Знизу праворуч"]
-     currentIndex: root.positionIndex(station.osdPosition)
-     onActivated: station.setOSDPosition(["top-left", "top-right", "bottom-left", "bottom-right"][currentIndex])
-    }
+     Switch { text: "Додавати OSD станції поверх відео"; checked: station.osdEnabled; onToggled: station.setOSDEnabled(checked) }
+     Text {
+      text: "Відео з камери не змінюється. Якщо її OSD вбудоване в зображення, приховати його тут неможливо."
+      color: "#b7c8da"
+      wrapMode: Text.WordWrap
+      Layout.fillWidth: true
+     }
+     Text { text: "Оберіть потрібні елементи. Перетягування прилипає до сітки з кроком 5%."; color: "#dce6f2"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
 
-    Text { text: "Прозорість фону"; color: "#dce6f2"; font.bold: true }
-    Slider {
-     id: opacitySlider
-     Layout.fillWidth: true
-     from: 0.25
-     to: 0.8
-     stepSize: 0.05
-     value: station.osdOpacity
-     onMoved: station.setOSDStyle(value, scaleSlider.value)
-    }
+     Text { text: "Прозорість підкладки: " + Math.round((1 - station.osdOpacity) * 100) + "%"; color: "#dce6f2"; font.bold: true }
+     Slider {
+      id: opacitySlider
+      objectName: "osdTransparencySlider"
+      Layout.fillWidth: true
+      from: 0
+      to: 1
+      stepSize: 0.05
+      value: 1 - station.osdOpacity
+      onMoved: station.setOSDStyle(1 - value, scaleSlider.value)
+     }
 
-    Text { text: "Розмір тексту"; color: "#dce6f2"; font.bold: true }
-    Slider {
-     id: scaleSlider
-     Layout.fillWidth: true
-     from: 0.85
-     to: 1.3
-     stepSize: 0.05
-     value: station.osdScale
-     onMoved: station.setOSDStyle(opacitySlider.value, value)
+     Text { text: "Розмір тексту: " + Math.round(station.osdScale * 100) + "%"; color: "#dce6f2"; font.bold: true }
+     Slider {
+      id: scaleSlider
+      Layout.fillWidth: true
+      from: 0.85
+      to: 1.3
+      stepSize: 0.05
+      value: station.osdScale
+      onMoved: station.setOSDStyle(1 - opacitySlider.value, value)
+     }
+
+     Text { text: "Елементи"; color: "#dce6f2"; font.bold: true; font.pixelSize: 15 }
+     Repeater {
+      model: root.elementOptions
+      CheckBox {
+       required property var modelData
+       objectName: "osd-toggle-" + modelData.name
+       Layout.fillWidth: true
+       text: modelData.label
+       checked: station.osdEnabledElements[modelData.name] === true
+       onToggled: station.setOSDElementEnabled(modelData.name, checked)
+      }
+     }
+     Button {
+      text: "Стандартні налаштування"
+      Layout.fillWidth: true
+      onClicked: station.resetOSDStyle()
+     }
     }
-    Button {
-     text: "Стандартні налаштування"
-     Layout.fillWidth: true
-     onClicked: station.resetOSDStyle()
-    }
-    Item { Layout.fillHeight: true }
    }
 
    ColumnLayout {
     Layout.fillWidth: true
     Layout.fillHeight: true
     spacing: 6
-    Text { text: "Приклад розміщення без телеметрії"; color: "#dce6f2"; font.bold: true }
-    Rectangle {
+    Text {
+     objectName: "osd-editing-locked"
+     visible: !root.editingAllowed
+     text: "Телеметрія показує ARM. Редагування OSD заблоковане до завершення польоту."
+     color: "#ffcf70"
+     wrapMode: Text.WordWrap
      Layout.fillWidth: true
-     Layout.fillHeight: true
-     Layout.minimumHeight: 150
-     color: "#050a12"
-     border.color: "#273d55"
-     clip: true
-     OsdOverlay {
-      width: Math.min(620, parent.width - 24)
-      height: implicitHeight
-      anchors.left: station.osdPosition.endsWith("left") ? parent.left : undefined
-      anchors.right: station.osdPosition.endsWith("right") ? parent.right : undefined
-      anchors.top: station.osdPosition.startsWith("top") ? parent.top : undefined
-      anchors.bottom: station.osdPosition.startsWith("bottom") ? parent.bottom : undefined
-      anchors.margins: 12
-      opacityValue: station.osdOpacity
-      scaleFactor: station.osdScale
+    }
+    Text { text: "Попередній перегляд · екран польоту"; color: "#dce6f2"; font.bold: true }
+     RowLayout {
+     Layout.fillWidth: true
+      Text { text: "Формат перевірки"; color: "#dce6f2" }
+      ComboBox {
+       id: aspectSelector
+       objectName: "osdPreviewAspectSelector"
+       model: ["Широкий 16:9", "Класичний 4:3", "Квадрат 1:1", "Вертикальний 9:16"]
      }
+      Item { Layout.fillWidth: true }
+     }
+     Item {
+      id: previewHost
+      objectName: "osdPreviewHost"
+      Layout.fillWidth: true
+      Layout.fillHeight: true
+      Layout.minimumHeight: 150
+
+      Rectangle {
+       id: preview
+       objectName: "osdPreviewViewport"
+       property real aspectRatio: root.aspectRatios[aspectSelector.currentIndex]
+       width: Math.min(previewHost.width, previewHost.height * aspectRatio)
+       height: Math.min(previewHost.height, previewHost.width / aspectRatio)
+       anchors.centerIn: parent
+       gradient: Gradient {
+        GradientStop { position: 0; color: "#355d78" }
+        GradientStop { position: 0.55; color: "#9db4b1" }
+        GradientStop { position: 0.56; color: "#465c45" }
+        GradientStop { position: 1; color: "#182b23" }
+       }
+       border.color: "#273d55"
+       clip: true
+       Repeater {
+        model: 19
+        Rectangle { required property int index; x: preview.width * (index + 1) / 20; height: preview.height; width: 1; color: "#55ffffff" }
+       }
+       Repeater {
+        model: 19
+        Rectangle { required property int index; y: preview.height * (index + 1) / 20; width: preview.width; height: 1; color: "#55ffffff" }
+       }
+       Rectangle {
+        anchors.fill: parent
+        anchors.margins: Math.min(preview.width * 0.04, 24 * station.osdScale)
+        color: "transparent"
+        border.color: "#a9e3f2"
+        border.width: 1
+        z: 1
+       }
+       OsdOverlay {
+        id: previewOsd
+        objectName: "osdPreviewOverlay"
+        anchors.fill: parent
+        editing: root.editingAllowed
+        positions: station.osdElements
+        enabledElements: station.osdEnabledElements
+        corner: station.osdPosition
+        telemetry: ({connected:true, provider:"MAVLink", armed:false, flightMode:"STABILIZE", batteryVoltage:15.8, batteryRemaining:82, gpsFix:3, satellites:12, altitude:124, groundSpeed:12.4, heading:348, roll:7, pitch:-3, yaw:348, homeDistance:86})
+        video: ({streamId:"simulation", state:"playing"})
+        opacityValue: station.osdOpacity
+        scaleFactor: station.osdScale
+        onPositionChanged: function(name, x, y) { station.setOSDElementPosition(name, x, y) }
+       }
+     }
+     }
+     Text {
+      objectName: "osd-layout-warning"
+      visible: previewOsd.layoutIssues.length > 0
+      text: {
+       var messages = []
+       for (var i = 0; i < previewOsd.layoutIssues.length; i++) messages.push(root.layoutIssueText(previewOsd.layoutIssues[i]))
+       return messages.join(" · ") + ". Перетягніть позначені елементи по сітці. Розташування не змінюється автоматично."
+      }
+      color: "#ffcf70"
+      wrapMode: Text.WordWrap
+      Layout.fillWidth: true
     }
    }
   }
@@ -123,9 +230,9 @@ Item {
   }
 
   Text {
-   text: "Зміни зберігаються автоматично. Налаштовуйте OSD до початку роботи."
-   color: "#8799ad"
-   font.pixelSize: 11
+   text: "Попередній перегляд використовує штучні дані. Зміни зберігаються автоматично й не впливають на реальний політ."
+   color: "#b7c8da"
+   font.pixelSize: 13
    Layout.fillWidth: true
   }
  }

@@ -14,6 +14,11 @@ class NextActionDispatchTests(unittest.TestCase):
         self.assertTrue(result.accepted)
         self.assertEqual(result.target, "fpv")
 
+    def test_firmware_review_is_navigation_only(self):
+        result = dispatch_intent({"action": "review-firmware", "reasonCode": "safe-action-selected", "source": "camera"})
+        self.assertTrue(result.accepted)
+        self.assertEqual(result.target, "firmware")
+
     def test_action_without_safe_selection_proof_is_rejected(self):
         result = dispatch_intent({"action": "diagnose", "reasonCode": "no-safe-action"})
         self.assertFalse(result.accepted)
