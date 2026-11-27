@@ -27,7 +27,9 @@ def single_shot(delay, callback):
         callback()
         app = QGuiApplication.instance()
         window = next(w for w in app.topLevelWindows() if w.property('simulation') is not None)
-        before = window.property('t')
+        def value_map(value):
+            return value.toVariant() if hasattr(value, 'toVariant') else value
+        before = value_map(window.property('t'))
         menu_toggle = window.findChild(QObject, 'mainMenuToggle')
         assert menu_toggle is not None
         menu_toggle.clicked.emit()
@@ -48,12 +50,12 @@ def single_shot(delay, callback):
         app.processEvents()
         assert window.property('simulation') is True
         assert window.findChild(QObject, 'mainPages').property('currentIndex') == 3
-        first = window.property('simulatedTelemetry').toVariant()
+        first = value_map(window.property('simulatedTelemetry'))
         window.setProperty('simulationTick', 10)
         app.processEvents()
-        second = window.property('simulatedTelemetry').toVariant()
+        second = value_map(window.property('simulatedTelemetry'))
         assert first['heading'] != second['heading']
-        assert window.property('t') == before
+        assert value_map(window.property('t')) == before
         edit = window.findChild(QObject, 'openSimulationOsd')
         assert edit is not None
         edit.clicked.emit()
@@ -67,7 +69,7 @@ def single_shot(delay, callback):
         close.clicked.emit()
         app.processEvents()
         assert window.property('simulation') is False
-        assert window.property('t') == before
+        assert value_map(window.property('t')) == before
         (test_root / 'simulation-tested').write_text('ok')
     return original_single_shot(delay, verify)
 QTimer.singleShot = single_shot
