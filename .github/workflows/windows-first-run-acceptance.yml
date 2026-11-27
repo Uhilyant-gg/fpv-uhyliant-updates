@@ -63,7 +63,7 @@ jobs:
           }
           if ($process.ExitCode -ne 0) { throw "Packaged first-run window exited with code $($process.ExitCode)" }
           $output = & .\.venv\Scripts\python src\app\main.py --acceptance-report --startup-marker $marker
-          if ($LASTEXITCODE -ne 0) { Write-Output $output; throw 'Packaged first-run acceptance contract rejected startup' }
+          if ($LASTEXITCODE -ne 0) { Write-Output $output; Write-Output '--- startup stage timeline ---'; Get-Content $marker | ForEach-Object { $e = $_ | ConvertFrom-Json; Write-Output ("{0,7} ms  {1}  {2}" -f $e.elapsedMs, $e.stage, $e.status) }; throw 'Packaged first-run acceptance contract rejected startup' }
           $report = $output | ConvertFrom-Json
           if ($report.evidenceMode -ne 'network-free-packaged-first-run-fixture') { throw "Unexpected evidence mode: $($report.evidenceMode)" }
           if ($report.physicalOperationEvidence -ne 'not-collected') { throw 'Software smoke must not claim physical evidence' }
