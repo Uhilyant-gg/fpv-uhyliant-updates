@@ -1,0 +1,41 @@
+name: Cleanup merged branches
+# Manually started. Deletes only branches whose pull request was merged and whose
+# tip is still exactly the merged PR head (nothing pushed after the merge).
+# Branches with open PRs, unmerged work, no PR, or the default branch are kept.
+# Run with dry_run=true first to see the list; every deleted branch can be
+# restored with "Restore branch" on its pull request page.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only list branches, do not delete'
+        type: boolean
+        default: true
+permissions:
+  contents: write
+  pull-requests: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        with:
+          script: |
+            const dryRun = process.env.DRY_RUN !== 'false';
+            const { owner, repo } = context.repo;
+            const { data: repoInfo } = await github.rest.repos.get({ owner, repo });
+            const protectedNames = new Set([repoInfo.default_branch]);
+            const pulls = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'all', per_page: 100 });
+            const openHeads = new Set(pulls.filter(p => p.state === 'open' && p.head.repo && p.head.repo.full_name === `${owner}/${repo}`).map(p => p.head.ref));
+            const mergedHeadShas = new Set(pulls.filter(p => p.merged_at && p.head.repo && p.head.repo.full_name === `${owner}/${repo}`).map(p => p.head.sha));
+            const branches = await github.paginate(github.rest.repos.listBranches, { owner, repo, per_page: 100 });
+            const candidates = branches.filter(b => !protectedNames.has(b.name) && !b.protected && !openHeads.has(b.name) && mergedHeadShas.has(b.commit.sha));
+            core.info(`${branches.length} branches, ${candidates.length} merged and unchanged since merge.`);
+            for (const b of candidates) {
+              if (dryRun) { core.info(`would delete ${b.name}`); continue; }
+              await github.rest.git.deleteRef({ owner, repo, ref: `heads/${b.name}` });
+              core.info(`deleted ${b.name}`);
+            }
+            await core.summary.addHeading(dryRun ? 'Dry run: branches that would be deleted' : 'Deleted branches').addList(candidates.map(b => b.name)).write();
