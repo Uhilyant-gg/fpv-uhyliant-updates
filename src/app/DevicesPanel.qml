@@ -19,6 +19,7 @@ Item {
  property string authHost: ""
  property string authName: ""
  function value(v) { return v === undefined || v === null || v === "" ? "Не визначено" : v }
+ function lastActivity(timestamp) { return !timestamp ? "Ще не спостерігалася" : Qt.formatDateTime(new Date(Number(timestamp) * 1000), "dd.MM.yyyy hh:mm") }
  function selectFound(item) { selectedFound = item }
 
  Rectangle { anchors.fill: parent; color: "#08111b" }
@@ -28,7 +29,7 @@ Item {
   spacing: 14
   RowLayout {
    Layout.fillWidth: true
-   ColumnLayout { spacing: 3; Text { text: "Камери"; color: fg; font.pixelSize: 26; font.bold: true } Text { text: "Знайдіть і підключіть камеру без ручних мережевих налаштувань"; color: muted; font.pixelSize: 13 } }
+   ColumnLayout { spacing: 3; Text { text: "Пристрої"; color: fg; font.pixelSize: 26; font.bold: true } Text { text: "Перегляньте збережені камери або знайдіть нову автоматично"; color: muted; font.pixelSize: 13 } }
    Item { Layout.fillWidth: true }
    Button { text: "Закрити"; flat: true; onClicked: root.closeRequested(); HoverHint { text: "Повернутися до попереднього екрана." } }
   }
@@ -48,16 +49,18 @@ Item {
     SplitView.preferredWidth: 310; SplitView.minimumWidth: 250; color: surface; radius: 16
     ColumnLayout {
      anchors.fill: parent; anchors.margins: 12; spacing: 10
-     RowLayout { Layout.fillWidth: true; Text { text: "МОЇ КАМЕРИ"; color: muted; font.bold: true; font.pixelSize: 11 } Item { Layout.fillWidth: true } Text { text: devicesModel.count; color: muted } }
+     RowLayout { Layout.fillWidth: true; Text { text: "МОЇ ПРИСТРОЇ"; color: muted; font.bold: true; font.pixelSize: 11 } Item { Layout.fillWidth: true } Text { text: devicesModel.count; color: muted } }
      ListView {
       id: savedList; Layout.fillWidth: true; Layout.fillHeight: true; spacing: 7; clip: true; model: devicesModel.items
+      section.property: "deviceGroupLabel"; section.criteria: ViewSection.FullString
+      section.delegate: Text { required property string section; width: savedList.width; height: 24; verticalAlignment: Text.AlignVCenter; text: section; color: muted; font.bold: true; font.pixelSize: 11 }
       delegate: Rectangle {
        required property var modelData
-       width: savedList.width; height: 72; radius: 12
+       width: savedList.width; height: 98; radius: 12
        color: selectedSaved && selectedSaved.id === modelData.id ? raised : "transparent"
        border.color: modelData.active ? accent : "transparent"
        MouseArea { anchors.fill: parent; onClicked: selectedSaved = modelData }
-       Column { anchors.fill: parent; anchors.margins: 10; spacing: 4; Text { text: modelData.name; color: fg; font.bold: true } Text { text: modelData.host; color: muted; font.pixelSize: 12 } Text { text: modelData.openipcIdentity.verified ? "● OpenIPC підтверджено" : "○ Ідентичність не підтверджена"; color: modelData.openipcIdentity.verified ? accent : muted; font.pixelSize: 11 } }
+       Column { anchors.fill: parent; anchors.margins: 8; spacing: 2; Text { text: modelData.name; color: fg; font.bold: true; elide: Text.ElideRight; width: parent.width } Text { text: modelData.deviceTypeLabel + " · " + modelData.host; color: muted; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width } Text { text: modelData.healthLabel; color: modelData.health === "ready" ? accent : (modelData.health === "problem" ? danger : muted); font.pixelSize: 11; elide: Text.ElideRight; width: parent.width } Text { text: "Версія: " + modelData.versionLabel; color: muted; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width } Text { text: "Останній зв’язок: " + lastActivity(modelData.lastObservedAt); color: muted; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width } }
       }
      }
      RowLayout { Layout.fillWidth: true; Button { text: "Зробити активною"; Layout.fillWidth: true; enabled: selectedSaved !== null; onClicked: root.activateDevice(selectedSaved.id); HoverHint { text: "Вибрати цю камеру як активну для FPV та сервісних функцій." } } Button { text: "⋯"; enabled: selectedSaved !== null; onClicked: savedDetails.open(); HoverHint { text: "Показати збережені відомості про камеру." } } }

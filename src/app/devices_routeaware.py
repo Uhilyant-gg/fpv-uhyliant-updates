@@ -84,7 +84,9 @@ class Devices(LegacyDevices):
     def _on_progress(self,stage,done,total,found):self._stage=stage;self._pd=done;self._pt=total;self._found=found;self.discoveryChanged.emit()
     def _on_live(self,items):self._discovered=items;self._found=len(items);self.discoveryChanged.emit()
     def _on_done(self,items,cancelled,error):
-        for item in items:self._remember_host(item.get("host",""),item.get("openipc",False))
+        for item in items:
+            self._remember_host(item.get("host",""),item.get("openipc",False))
+            if item.get("camera") is True:self.markObserved(item.get("host",""))
         self._discovered=items;self._scanning=False;self._worker=None;self._stage="Скасовано" if cancelled else ("Помилка" if error else "Готово");self._status=DISCOVERY_ERROR_MESSAGE if error else ("Пошук скасовано" if cancelled else "Пошук завершено");self._pd=self._pt;self._found=len(items);self.discoveryChanged.emit()
     @Slot(str)
     def invalidateManualIp(self,value):
@@ -108,6 +110,7 @@ class Devices(LegacyDevices):
         if not requested or result_host!=requested:self._manual_result={};self._set_manual("error","","Результат перевірки не відповідає поточній адресі");return
         if not result.get("camera"):self._manual_result={};self._set_manual("error","","На цій адресі не знайдено доступної камери");return
         self._manual_result=result;self._remember_host(result_host,result.get("openipc",False))
+        self.markObserved(result_host)
         if result.get("openipc") and result.get("identityVerified"):
             identity=normalize_openipc_identity(result.get("identity",{}),result.get("evidence",[]));self._manual_result["identity"]=identity;self._set_manual("verified","OpenIPC підтверджено")
         elif result.get("authRequired"):self._set_manual("auth-required","Камера доступна. Для підтвердження OpenIPC потрібен логін.")
@@ -137,18 +140,18 @@ class Devices(LegacyDevices):
         if not candidate or not candidate.get("openipc") or not candidate.get("identityVerified") or not identity.get("verified"):
             self._set_manual("error","","OpenIPC identity недостатньо підтверджена для додавання");return ""
         self._remember_host(address,True);existing=next((x for x in self._items if _safe_private_host(x.get("host",""))==address),None)
-        if existing:self._manual_result=candidate;self._set_manual("added","Камера вже додана");return existing["id"]
+        if existing:self.markObserved(address);self._manual_result=candidate;self._set_manual("added","Камера вже додана");return existing["id"]
         did=self.addDevice(name or "OpenIPC "+address,"OpenIPC",address,80,"Network","")
         if not did:self._set_manual("error","","Не вдалося зберегти камеру");return ""
         self._save_identity(did,identity)
         for stream in candidate.get("streams",[]):self.addStream(did,stream.get("name","Відео"),stream.get("name","main"),int(stream.get("port",554)),stream.get("path","/"),stream.get("protocol","rtsp"))
-        self._load();self.changed.emit();self._manual_result=candidate;self._set_manual("added","Камеру додано");return did
+        self.markObserved(address);self._load();self.changed.emit();self._manual_result=candidate;self._set_manual("added","Камеру додано");return did
     @Slot(str,str,str,int,str,result=bool)
     def updateDevice(self,did,name,host,port,notes):
         name=name.strip();host=host.strip();from devices import valid_host
         if not name or not valid_host(host):return False
         try:
-            with self._connect() as db:changed=db.execute("UPDATE devices SET name=?,host=?,port=?,notes=? WHERE id=?",(name,host,max(1,min(int(port),65535)),notes.strip(),did)).rowcount>0
+            with self._connect() as db:changed=db.execute("UPDATE devices SET name=?,host=?,port=?,notes=?,last_observed_at=CASE WHEN host<>? THEN 0 ELSE last_observed_at END WHERE id=?",(name,host,max(1,min(int(port),65535)),notes.strip(),host,did)).rowcount>0
         except Exception:return False
         if not changed:return False
         self._remember_host(host,False);self._load();self.changed.emit();self.deviceUpdated.emit();return True

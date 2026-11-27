@@ -71,6 +71,8 @@ A numeric health percentage is optional and must not be guessed. Add it only wit
 ### P0.3 Device Center integration
 Create one presentation boundary for supported cameras, vehicles/flight controllers and operator controllers while preserving separate physical identities. Show name, type, observed version, health and last observed activity. Group automatically.
 
+**Implemented foundation (repository software):** the saved-device view now groups records by device category and shows the observed identity health, firmware version and time of the last successful camera observation. A missing version or observation remains explicitly unknown; editing or manually entering an address does not count as activity. Current discovery and saved-device integrations remain camera-focused; controller/vehicle discovery, durable identity integration and their onboarding remain incomplete.
+
 ### P0.4 Human Message Layer audit
 Audit QML and backend presentation boundaries for raw exception, socket, RTSP, SSH, transport, traceback and internal reason-code leakage. Every normal failure must show practical impact and recommended action. Technical details remain progressively disclosed.
 

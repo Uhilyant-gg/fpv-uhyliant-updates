@@ -32,6 +32,8 @@ AI consumes sanitized structured diagnostic/evidence data only. AI may explain e
 ## Discovery safety
 Camera discovery is route-aware but not an Internet scanner. Expand only bounded RFC1918 networks with specific acceptable prefixes; never expand default, public, loopback, multicast, link-local, oversized or virtual-adapter routes. Saved and explicitly entered addresses may be checked directly without implying that their subnet is safe to sweep. Keep concurrency, response size and timeouts bounded. Discovery must not depend on ICMP. Preserve the evidence ladder: reachable service -> camera candidate -> verified OpenIPC -> separately evidenced R2D2 compatibility -> observed hardware identity -> observed streams.
 
+Device Center activity means a camera service was successfully observed at its saved address. A scheduled scan, remembered address, failed probe or manual edit is not evidence of activity; changing a saved address or restoring a backup clears the prior observation time. Firmware versions are shown only when present in verified identity evidence.
+
 ## Authenticated firmware safety
 Credentials are session-only. Password fields are masked and cleared on reset/close/shutdown. Passwords must never be logged, persisted, included in snapshots/backups/errors/status/execution plans, shell interpolation or process argv. Password-capable SSH uses a library API with strict known-host verification. Authentication occurs before destructive execution. After authentication, current observed host, verified OpenIPC, platform and sensor must still match the approved compatible device before fixed `sysupgrade -k -r` is allowed.
 

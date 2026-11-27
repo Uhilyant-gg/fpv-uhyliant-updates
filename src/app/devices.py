@@ -1,6 +1,7 @@
 import json,os,sqlite3,uuid
 from pathlib import Path
 from PySide6.QtCore import QObject,Property,Signal,Slot
+from device_center import device_center_fields
 DATA=Path(os.environ.get('LOCALAPPDATA',Path.home()))/'FPV-Uhyliant';DB=DATA/'station.db'
 def valid_host(v):
  import ipaddress
@@ -22,20 +23,22 @@ class Devices(QObject):
  def _connect(self):return sqlite3.connect(DB)
  def _init(self):
   with self._connect() as d:
-   d.execute('CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT NOT NULL,host TEXT NOT NULL,port INTEGER NOT NULL,connection TEXT NOT NULL,notes TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 0,identity_json TEXT NOT NULL DEFAULT "{}")')
+   d.execute('CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT NOT NULL,host TEXT NOT NULL,port INTEGER NOT NULL,connection TEXT NOT NULL,notes TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 0,identity_json TEXT NOT NULL DEFAULT "{}",last_observed_at INTEGER NOT NULL DEFAULT 0)')
    cols={row[1] for row in d.execute('PRAGMA table_info(devices)')}
    if 'active' not in cols:d.execute('ALTER TABLE devices ADD COLUMN active INTEGER NOT NULL DEFAULT 0')
    if 'identity_json' not in cols:d.execute('ALTER TABLE devices ADD COLUMN identity_json TEXT NOT NULL DEFAULT "{}"')
+   if 'last_observed_at' not in cols:d.execute('ALTER TABLE devices ADD COLUMN last_observed_at INTEGER NOT NULL DEFAULT 0')
    d.execute('CREATE TABLE IF NOT EXISTS streams(id TEXT PRIMARY KEY,device_id TEXT NOT NULL,name TEXT NOT NULL,kind TEXT NOT NULL,port INTEGER NOT NULL,path TEXT NOT NULL,protocol TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 1)')
  def _load(self):
   with self._connect() as d:
-   rows=d.execute('SELECT id,name,type,host,port,connection,notes,active,identity_json FROM devices ORDER BY name').fetchall();srows=d.execute('SELECT id,device_id,name,kind,port,path,protocol,enabled FROM streams ORDER BY name').fetchall()
+   rows=d.execute('SELECT id,name,type,host,port,connection,notes,active,identity_json,last_observed_at FROM devices ORDER BY name').fetchall();srows=d.execute('SELECT id,device_id,name,kind,port,path,protocol,enabled FROM streams ORDER BY name').fetchall()
   self._items=[];self._active=''
   for r in rows:
    try:identity=json.loads(r[8]) if r[8] else {}
    except ValueError:identity={}
-   item={'id':r[0],'name':r[1],'type':r[2],'host':r[3],'port':r[4],'connection':r[5],'notes':r[6],'active':bool(r[7]),'openipcIdentity':identity};self._items.append(item)
+   item={'id':r[0],'name':r[1],'type':r[2],'host':r[3],'port':r[4],'connection':r[5],'notes':r[6],'active':bool(r[7]),'openipcIdentity':identity,'lastObservedAt':r[9]};item.update(device_center_fields(item));self._items.append(item)
    if item['active']:self._active=item['id']
+  self._items.sort(key=lambda item:(item['deviceGroup'],item['name'].casefold()))
   self._streams=[{'id':r[0],'device_id':r[1],'name':r[2],'kind':r[3],'port':r[4],'path':r[5],'protocol':r[6],'enabled':bool(r[7])} for r in srows]
  @Property('QVariantList',notify=changed)
  def items(self):return self._items
@@ -86,6 +89,13 @@ class Devices(QObject):
   self._load();self.changed.emit();self.streamsChanged.emit()
  def _save_identity(self,did,identity):
   with self._connect() as d:d.execute('UPDATE devices SET identity_json=? WHERE id=?',(json.dumps(identity,ensure_ascii=False),did))
+ @Slot(str,result=bool)
+ def markObserved(self,host):
+  address=str(host or '').strip()
+  if not address:return False
+  with self._connect() as d:changed=d.execute("UPDATE devices SET last_observed_at=strftime('%s','now') WHERE host=?",(address,)).rowcount
+  if changed:self._load();self.changed.emit()
+  return changed>0
  @Slot(str,str,str,int,str,str,result=str)
  def addStream(self,did,name,kind,port,path,protocol):
   if not any(x['id']==did for x in self._items):return ''
