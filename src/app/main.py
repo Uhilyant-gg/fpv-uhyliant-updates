@@ -36,7 +36,7 @@ def main():
   harness.mark('smoke-qtcore-complete');app=QCoreApplication(sys.argv);compile_qml_smoke(here);signal_smoke(x.smoke_marker or str(DATA/'smoke-test-ok.json'));harness.mark('smoke-complete');return 0
  harness.mark('qt-imports-begin')
  from PySide6.QtCore import QUrl,QTimer
- from PySide6.QtGui import QGuiApplication,QIcon
+ from PySide6.QtGui import QFont,QGuiApplication,QIcon
  from PySide6.QtQml import QQmlApplicationEngine
  from PySide6.QtQuickControls2 import QQuickStyle
  harness.mark('qt-imports-complete');harness.mark('application-imports-begin')
@@ -73,7 +73,7 @@ def main():
    with qtlog.open('a',encoding='utf-8') as f:f.write(line+'\n')
   except Exception:pass
   print(line,file=sys.stderr,flush=True)
- harness.mark('qgui-application-begin');app=QGuiApplication(sys.argv);app.setApplicationName('FPV-Uhyliant');app.setApplicationVersion(VERSION);harness.mark('qgui-application-complete')
+ harness.mark('qgui-application-begin');app=QGuiApplication(sys.argv);app.setFont(QFont('Segoe UI'));app.setApplicationName('FPV-Uhyliant');app.setApplicationVersion(VERSION);harness.mark('qgui-application-complete')
  harness.mark('protocol-runtimes-begin');m=MavlinkRuntime(auto_start=False);msp=MspRuntime();crsf=CrsfRuntime();msp_serial=MspSerialTransport(msp);crsf_serial=CrsfSerialTransport(crsf);harness.mark('protocol-runtimes-complete')
  if x.mavlink_self_test:QTimer.singleShot(0,m.start);QTimer.singleShot(350,app.quit);rc=app.exec();m.shutdown();msp_serial.stop();crsf_serial.stop();print(json.dumps({'status':'ok','backend':'mavlink','telemetry':'not simulated'}));return rc
  icon=here/'fpv-uhyliant.ico'

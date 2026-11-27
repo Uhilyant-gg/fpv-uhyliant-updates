@@ -4,17 +4,18 @@ class NavigationUiPolicyTests(unittest.TestCase):
  def setUp(self):
   here=Path(__file__).parent;self.main=(here/'Main.qml').read_text(encoding='utf-8');self.home=(here/'HomePanel.qml').read_text(encoding='utf-8');self.devices=(here/'DevicesPanel.qml').read_text(encoding='utf-8');self.update=(here/'UpdatePanel.qml').read_text(encoding='utf-8');self.hint=(here/'HoverHint.qml').read_text(encoding='utf-8')
  def test_home_has_single_camera_management_entry(self):
-  self.assertEqual(self.home.count('onClicked:root.openDevices()'),1);self.assertIn('Знайти / додати',self.home);self.assertNotIn('Швидке підключення',self.home);self.assertNotIn('Popup{id:quick',self.home)
+  self.assertEqual(self.home.count('action: "devices"'),1);self.assertIn('Камери',self.home);self.assertNotIn('Швидке підключення',self.home);self.assertNotIn('Popup{id:quick',self.home)
+  self.assertIn('action: "devices"',self.home)
  def test_home_keeps_secondary_app_entry_points_compact(self):
-  for label in ('Прошивка','Діагностика'):self.assertIn(label,self.home)
-  self.assertIn('Версія ',self.home);self.assertIn('Оновити до ',self.home);self.assertIn('visible:updater.updateState==="available"||updater.updateState==="ready"',self.home);self.assertNotIn('Button{text:"Оновлення"',self.home)
+  for label in ('Прошивка','Діагностика','Резервна копія','Підготовка','Симуляція'):self.assertIn(label,self.home)
+  self.assertIn('НАЗЕМНА СТАНЦІЯ',self.home);self.assertIn('Встановити ',self.home);self.assertIn('visible: updater.updateState === "available" || updater.updateState === "ready"',self.home);self.assertNotIn('Button{text:"Оновлення"',self.home)
   self.assertNotIn('Пристрої · Додати камеру',self.home);self.assertNotIn('Відео передусім',self.home)
  def test_home_checks_for_updates_and_routes_contextual_action_to_guarded_ui(self):
-  self.assertIn('Component.onCompleted:updater.check()',self.home);self.assertIn('onClicked:root.openUpdate()',self.home)
+  self.assertIn('Component.onCompleted: updater.check()',self.home);self.assertIn('onClicked: root.openUpdate()',self.home)
  def test_home_exposes_encrypted_backup_and_restore(self):
   self.assertIn('signal openBackup()',self.home);self.assertIn('Резервна копія',self.home);self.assertIn('onOpenBackup:backupPopup.open()',self.main)
  def test_saved_camera_rows_are_direct_fpv_entry(self):
-  self.assertIn('model:devicesModel.items',self.home);self.assertIn('devicesModel.streams',self.home);self.assertIn('streams[n].enabled===true',self.home);self.assertIn('root.connectDevice(modelData.id)',self.home)
+  self.assertIn('model: devicesModel.items',self.home);self.assertIn('devicesModel.streams.length',self.home);self.assertIn('enabled === true',self.home);self.assertIn('root.connectDevice(modelData.id)',self.home)
  def test_devices_activation_uses_unified_fpv_handoff(self):
   self.assertIn('signal activateDevice(string deviceId)',self.devices);self.assertIn('root.activateDevice(selectedSaved.id)',self.devices);self.assertNotIn('onClicked:devicesModel.setActive(selectedSaved.id)',self.devices);self.assertIn('onActivateDevice:function(deviceId){devices.close();connectDevice(deviceId)}',self.main)
  def test_playback_rebuild_preserves_requested_pip(self):
@@ -32,5 +33,11 @@ class NavigationUiPolicyTests(unittest.TestCase):
   for text in ('ВІДЕО','Основний','Додатковий','Поміняти місцями','Дані польоту:','Зовнішня навігація:','Мережеве з’єднання:','недоступно'):self.assertIn(text,self.main)
  def test_navigation_stop_clears_media_sources(self):self.assertIn('player.source=""',self.main);self.assertIn('secondaryPlayer.source=""',self.main)
  def test_hover_help_delay_is_five_seconds(self):self.assertIn('property int delay:5000',self.hint);self.assertIn('showTimer.restart()',self.hint)
- def test_compact_home_still_has_delayed_help(self):self.assertGreaterEqual(self.home.count('HoverHint{'),5)
+ def test_main_menu_is_a_single_translucent_drawer(self):
+  self.assertIn('objectName: "mainMenuToggle"',self.home)
+  self.assertIn('objectName: "mainMenuDrawer"',self.home)
+  self.assertIn('color: "#f20a1420"',self.home)
+  self.assertEqual(self.home.count('action: "preflight"'),1)
+  self.assertNotIn('Button{text:"Підготовка"',self.home)
+ def test_compact_home_keeps_delayed_help_on_primary_action(self):self.assertIn('HoverHint { text: "Рекомендована дія для поточного стану." }',self.home)
 if __name__=='__main__':unittest.main()

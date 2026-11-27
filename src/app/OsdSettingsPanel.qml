@@ -6,14 +6,9 @@ Item {
  id: root
  signal closeRequested()
 
- function positionIndex(position) {
-  var positions = ["top-left", "top-right", "bottom-left", "bottom-right"]
-  return Math.max(0, positions.indexOf(position))
- }
-
  Rectangle {
   anchors.fill: parent
-  color: "#0d1725"
+  color: "transparent"
  }
 
  ColumnLayout {
@@ -49,14 +44,8 @@ Item {
     Layout.fillHeight: true
     spacing: 10
 
-    Text { text: "Розташування"; color: "#dce6f2"; font.bold: true }
-    ComboBox {
-     id: positionSelector
-     Layout.fillWidth: true
-     model: ["Згори ліворуч", "Згори праворуч", "Знизу ліворуч", "Знизу праворуч"]
-     currentIndex: root.positionIndex(station.osdPosition)
-     onActivated: station.setOSDPosition(["top-left", "top-right", "bottom-left", "bottom-right"][currentIndex])
-    }
+    Switch { text: "Показувати OSD"; checked: station.osdEnabled; onToggled: station.setOSDEnabled(checked) }
+    Text { text: "Перетягніть показники на сітці праворуч."; color: "#dce6f2"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
 
     Text { text: "Прозорість фону"; color: "#dce6f2"; font.bold: true }
     Slider {
@@ -91,24 +80,38 @@ Item {
     Layout.fillWidth: true
     Layout.fillHeight: true
     spacing: 6
-    Text { text: "Приклад розміщення без телеметрії"; color: "#dce6f2"; font.bold: true }
+    Text { text: "Симуляція · приклад відео і даних"; color: "#dce6f2"; font.bold: true }
     Rectangle {
+     id: preview
      Layout.fillWidth: true
      Layout.fillHeight: true
      Layout.minimumHeight: 150
-     color: "#050a12"
+     gradient: Gradient {
+      GradientStop { position: 0; color: "#355d78" }
+      GradientStop { position: 0.55; color: "#9db4b1" }
+      GradientStop { position: 0.56; color: "#465c45" }
+      GradientStop { position: 1; color: "#182b23" }
+     }
      border.color: "#273d55"
      clip: true
+     Repeater {
+      model: 19
+      Rectangle { required property int index; x: preview.width * (index + 1) / 20; height: preview.height; width: 1; color: "#55ffffff" }
+     }
+     Repeater {
+      model: 19
+      Rectangle { required property int index; y: preview.height * (index + 1) / 20; width: preview.width; height: 1; color: "#55ffffff" }
+     }
      OsdOverlay {
-      width: Math.min(620, parent.width - 24)
-      height: implicitHeight
-      anchors.left: station.osdPosition.endsWith("left") ? parent.left : undefined
-      anchors.right: station.osdPosition.endsWith("right") ? parent.right : undefined
-      anchors.top: station.osdPosition.startsWith("top") ? parent.top : undefined
-      anchors.bottom: station.osdPosition.startsWith("bottom") ? parent.bottom : undefined
-      anchors.margins: 12
+      anchors.fill: parent
+      editing: true
+      positions: station.osdElements
+      corner: station.osdPosition
+      telemetry: ({connected:true, provider:"MAVLink", armed:false, flightMode:"STABILIZE", batteryVoltage:15.8, batteryRemaining:82, gpsFix:3, satellites:12, altitude:124, groundSpeed:12.4, heading:348})
+      video: ({streamId:"simulation", state:"playing"})
       opacityValue: station.osdOpacity
       scaleFactor: station.osdScale
+      onPositionChanged: function(name, x, y) { station.setOSDElementPosition(name, x, y) }
      }
     }
    }
@@ -123,9 +126,9 @@ Item {
   }
 
   Text {
-   text: "Зміни зберігаються автоматично. Налаштовуйте OSD до початку роботи."
-   color: "#8799ad"
-   font.pixelSize: 11
+   text: "Це лише приклад, не реальна камера чи телеметрія. Зміни зберігаються автоматично."
+   color: "#b7c8da"
+   font.pixelSize: 13
    Layout.fillWidth: true
   }
  }

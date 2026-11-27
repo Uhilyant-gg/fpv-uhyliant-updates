@@ -6,6 +6,8 @@ Item {
  id: root
  signal closeRequested()
  signal openDiagnostics()
+ signal openOsdSettings()
+ signal openSimulation()
  property string cameraName: ""
  property var video: ({})
  property var telemetry: ({})
@@ -14,7 +16,7 @@ Item {
  property var nextAction: ({})
  property bool osdEnabled: true
  property color foreground: "#f4f7fb"
- property color secondary: "#8fa1b7"
+ property color secondary: "#b7c8da"
  property color line: "#273d55"
  property color green: "#27d59a"
  property color amber: "#ffb84d"
@@ -160,6 +162,8 @@ Item {
     Layout.fillWidth: true
    }
    Button { text: "Діагностика"; onClicked: root.openDiagnostics() }
+   Button { text: "Налаштувати OSD"; onClicked: root.openOsdSettings() }
+   Button { text: "Симуляція"; onClicked: root.openSimulation() }
   }
  }
 }

@@ -116,6 +116,23 @@ class StationOsdSettingsTests(unittest.TestCase):
         self.assertIn("Не вдалося зберегти налаштування OSD", station.osdSettingsError)
         self.assertEqual(changes, [])
 
+    def test_individual_positions_persist_validate_and_reset(self):
+        settings = Settings()
+        station = Station(settings)
+        self.assertTrue(station.setOSDElementPosition("battery", 75, 35))
+        self.assertFalse(station.setOSDElementPosition("unknown", 10, 10))
+        self.assertFalse(station.setOSDElementPosition("battery", 101, 10))
+        restored = Station(settings)
+        self.assertEqual(restored.osdElements, {"battery": [75, 35]})
+        restored.resetOSDStyle()
+        self.assertEqual(Station(settings).osdElements, {})
+
+    def test_corrupt_element_positions_are_ignored(self):
+        settings = Settings({Station.OSD_ELEMENTS_KEY: '{"battery":[3, 5], "speed":[200, 0], "gps":[true, 0], "other":[1, 1]}'})
+        self.assertEqual(Station(settings).osdElements, {"battery": [3, 5]})
+        settings.values[Station.OSD_ELEMENTS_KEY] = "not json"
+        self.assertEqual(Station(settings).osdElements, {})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -36,12 +36,14 @@ class Station(QObject):
  OSD_OPACITY_KEY="osd/station-opacity"
  OSD_SCALE_KEY="osd/station-scale"
  OSD_POSITION_KEY="osd/station-position"
+ OSD_ELEMENTS_KEY="osd/station-elements"
+ OSD_ELEMENT_NAMES=("link","arm","mode","battery","gps","altitude","speed","heading","video")
  OSD_POSITIONS=("top-left","top-right","bottom-left","bottom-right")
  OSD_DEFAULT_OPACITY=.58
  OSD_DEFAULT_SCALE=1.0
  OSD_DEFAULT_POSITION="top-left"
  def __init__(self,settings=None):
-  super().__init__();self._settings=settings or QSettings("FPV-Uhyliant","FPV-Uhyliant");self._menu=False;self._video=False;self._osd='station';self._osd_enabled=self._read_osd_enabled();self._edit=False;self._opacity=self._read_osd_number(self.OSD_OPACITY_KEY,self.OSD_DEFAULT_OPACITY,.25,.8);self._scale=self._read_osd_number(self.OSD_SCALE_KEY,self.OSD_DEFAULT_SCALE,.85,1.3);self._position=self._read_osd_position();self._osd_settings_error="";self._armed=False;self._recording=False;self._streaming=False
+  super().__init__();self._settings=settings or QSettings("FPV-Uhyliant","FPV-Uhyliant");self._menu=False;self._video=False;self._osd='station';self._osd_enabled=self._read_osd_enabled();self._edit=False;self._opacity=self._read_osd_number(self.OSD_OPACITY_KEY,self.OSD_DEFAULT_OPACITY,.25,.8);self._scale=self._read_osd_number(self.OSD_SCALE_KEY,self.OSD_DEFAULT_SCALE,.85,1.3);self._position=self._read_osd_position();self._elements=self._read_osd_elements();self._osd_settings_error="";self._armed=False;self._recording=False;self._streaming=False
  def _read_osd_enabled(self):
   value=self._settings.value(self.OSD_ENABLED_KEY,True)
   return str(value).strip().lower() not in ("0","false","no","off")
@@ -53,6 +55,12 @@ class Station(QObject):
  def _read_osd_position(self):
   value=str(self._settings.value(self.OSD_POSITION_KEY,self.OSD_DEFAULT_POSITION))
   return value if value in self.OSD_POSITIONS else self.OSD_DEFAULT_POSITION
+ def _read_osd_elements(self):
+  try:
+   values=json.loads(str(self._settings.value(self.OSD_ELEMENTS_KEY,"{}")))
+  except (ValueError,TypeError):return {}
+  if not isinstance(values,dict):return {}
+  return {key:value for key,value in values.items() if key in self.OSD_ELEMENT_NAMES and isinstance(value,list) and len(value)==2 and all(type(n) is int and 0<=n<=100 for n in value)}
  @Property(bool,notify=changed)
  def menuOpen(self):return self._menu
  @Property(bool,notify=changed)
@@ -69,6 +77,8 @@ class Station(QObject):
  def osdScale(self):return self._scale
  @Property(str,notify=changed)
  def osdPosition(self):return self._position
+ @Property('QVariantMap',notify=changed)
+ def osdElements(self):return dict(self._elements)
  @Property(str,notify=changed)
  def osdSettingsError(self):return self._osd_settings_error
  @Slot()
@@ -98,10 +108,17 @@ class Station(QObject):
   self._position=value;self._settings.setValue(self.OSD_POSITION_KEY,value);saved=self._save_osd_settings()
   if saved:self.osdSettingsSaved.emit()
   self.changed.emit();return saved
+ @Slot(str,int,int,result=bool)
+ def setOSDElementPosition(self,name,x,y):
+  if name not in self.OSD_ELEMENT_NAMES or not 0<=x<=100 or not 0<=y<=100:return False
+  self._elements[name]=[x,y];self._settings.setValue(self.OSD_ELEMENTS_KEY,json.dumps(self._elements));saved=self._save_osd_settings()
+  if saved:self.osdSettingsSaved.emit()
+  self.changed.emit();return saved
  @Slot()
  def resetOSDStyle(self):
-  self._opacity=self.OSD_DEFAULT_OPACITY;self._scale=self.OSD_DEFAULT_SCALE;self._position=self.OSD_DEFAULT_POSITION
+  self._opacity=self.OSD_DEFAULT_OPACITY;self._scale=self.OSD_DEFAULT_SCALE;self._position=self.OSD_DEFAULT_POSITION;self._elements={}
   self._settings.setValue(self.OSD_OPACITY_KEY,self._opacity);self._settings.setValue(self.OSD_SCALE_KEY,self._scale);self._settings.setValue(self.OSD_POSITION_KEY,self._position)
+  self._settings.setValue(self.OSD_ELEMENTS_KEY,"{}")
   if self._save_osd_settings():self.osdSettingsSaved.emit()
   self.changed.emit()
  def _save_osd_settings(self):
