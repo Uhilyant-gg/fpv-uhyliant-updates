@@ -80,11 +80,11 @@ def main():
  if x.mavlink_self_test:QTimer.singleShot(0,m.start);QTimer.singleShot(350,app.quit);rc=app.exec();m.shutdown();msp_serial.stop();crsf_serial.stop();print(json.dumps({'status':'ok','backend':'mavlink','telemetry':'not simulated'}));return rc
  icon=here/'fpv-uhyliant.ico'
  if icon.exists():app.setWindowIcon(QIcon(str(icon)))
- harness.mark('application-objects-begin');QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();harness.mark('restore',detail={'savedDevices':d.count});home=HomeDashboard(d);video=VideoWorkspaceRuntime(d);v=video.primary;secondary=video.secondary;streams=StreamWorkspace(d);fw=FirmwareCenter(d);acquisition=OpenIPCFirmwareAcquisition(fw,DATA/'firmware-cache');fwexec=FirmwareExecutor(fw);credentials=CameraCredentials();presets=CameraPresets(d);presetexec=CameraPresetExecutor(presets);links=LinkDiagnostics();automatic=AutomaticBackup(DATA/'automatic-backups',WindowsCredentialSecretStore(),d,s);backup=StationBackup(d,automatic);pairing=PairingRegistry(metadata_store=JsonMetadataStore(DATA/'pairing-trust.json'));telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate);diag_events=DiagnosticEvents();timeline=TimelineRuntime();fwsession=FirmwareUpdateSession(fwexec,d,events=diag_events);diag=DiagnosticsRuntime(VERSION,d,links,telemetry,u,diag_events,DATA,video);hardware_e2e=HardwareE2ERuntime(d,diag,credentials,fw,fwsession);app._runtime_refs=(e,s,d,home,video,v,secondary,streams,fw,acquisition,fwexec,fwsession,credentials,presets,presetexec,links,backup,pairing,telemetry,vehicle,u,diag_events,timeline,diag,hardware_e2e,m,msp,crsf,msp_serial,crsf_serial);harness.mark('application-objects-complete')
+ harness.mark('application-objects-begin');QQuickStyle.setStyle('Basic');e=QQmlApplicationEngine();s=Station();d=Devices();harness.mark('restore',detail={'savedDevices':d.count});home=HomeDashboard(d);video=VideoWorkspaceRuntime(d);v=video.primary;secondary=video.secondary;streams=StreamWorkspace(d);fw=FirmwareCenter(d);acquisition=OpenIPCFirmwareAcquisition(fw,DATA/'firmware-cache');fwexec=FirmwareExecutor(fw);credentials=CameraCredentials();presets=CameraPresets(d);presetexec=CameraPresetExecutor(presets);links=LinkDiagnostics();automatic=AutomaticBackup(DATA/'automatic-backups',WindowsCredentialSecretStore(),d,s);backup=StationBackup(d,automatic);pairing=PairingRegistry(metadata_store=JsonMetadataStore(DATA/'pairing-trust.json'));telemetry=TelemetryRouter([MavlinkProvider(m),MspProvider(msp),CrsfProvider(crsf)]);vehicle=VehicleRuntime(telemetry,v);u=Updater(x.install_root,s.canInstallUpdate,network=not x.first_run_acceptance_smoke);diag_events=DiagnosticEvents();timeline=TimelineRuntime();fwsession=FirmwareUpdateSession(fwexec,d,events=diag_events);diag=DiagnosticsRuntime(VERSION,d,links,telemetry,u,diag_events,DATA,video);hardware_e2e=HardwareE2ERuntime(d,diag,credentials,fw,fwsession);app._runtime_refs=(e,s,d,home,video,v,secondary,streams,fw,acquisition,fwexec,fwsession,credentials,presets,presetexec,links,backup,pairing,telemetry,vehicle,u,diag_events,timeline,diag,hardware_e2e,m,msp,crsf,msp_serial,crsf_serial);harness.mark('application-objects-complete')
  d.streamsChanged.connect(streams.autoSelect);streams.autoSelect();pairing.reconcile();display_runtime=DisplayRuntime(app);app._runtime_refs=app._runtime_refs+(display_runtime,);ctx=e.rootContext()
  for name,obj in [('station',s),('homeDashboard',home),('devicesModel',d),('videoRuntime',v),('secondaryVideoRuntime',secondary),('videoWorkspaceRuntime',video),('streamWorkspace',streams),('firmwareCenter',fw),('firmwareAcquisition',acquisition),('firmwareExecutor',fwexec),('firmwareUpdateSession',fwsession),('cameraCredentials',credentials),('cameraPresets',presets),('cameraPresetExecutor',presetexec),('linkDiagnostics',links),('stationBackup',backup),('pairingRegistry',pairing),('mavlinkRuntime',m),('mspSerial',msp_serial),('crsfSerial',crsf_serial),('telemetryRuntime',telemetry),('vehicleRuntime',vehicle),('timelineRuntime',timeline),('displayRuntime',display_runtime),('updater',u),('diagnosticsRuntime',diag),('hardwareE2ERuntime',hardware_e2e)]:ctx.setContextProperty(name,obj)
  ctx.setContextProperty('appWindowTitle',WINDOW_TITLE);harness.mark('qml-load-begin');e.load(QUrl.fromLocalFile(str(here/'Main.qml')));harness.mark('qml-load-complete')
- def shutdown():hardware_e2e.reset();credentials.clear();video.stopAll();links.clear();pairing.clearPending();m.shutdown();msp_serial.stop();crsf_serial.stop()
+ def shutdown():hardware_e2e.reset();credentials.clear();video.stopAll();links.clear();pairing.clearPending();m.shutdown();msp_serial.stop();crsf_serial.stop();u.shutdown()
  if not e.rootObjects():harness.mark('launch','error',{'reasonCode':'qml-root-not-created'});shutdown();raise RuntimeError('QML root object failed to load')
  app.aboutToQuit.connect(shutdown);root=e.rootObjects()[0]
  def start_discovery():
@@ -101,7 +101,14 @@ def main():
  QTimer.singleShot(0,show_home)
  if not x.first_run_acceptance_smoke:QTimer.singleShot(0,m.start)
  QTimer.singleShot(1200,lambda:signal_ok(x.startup_token));QTimer.singleShot(1200,lambda:harness.mark('startup-ready'));harness.mark('event-loop-begin')
- return app.exec()
+ code=app.exec()
+ # Destroy QML before the Python objects it binds to; otherwise bindings re-evaluate against
+ # already-deleted context objects during interpreter teardown ("Cannot read property of null").
+ from PySide6.QtCore import QEvent
+ for window in e.rootObjects():window.deleteLater()
+ app.sendPostedEvents(None,QEvent.Type.DeferredDelete.value);root=None
+ e.deleteLater();app.sendPostedEvents(None,QEvent.Type.DeferredDelete.value);del e
+ return code
 if __name__=='__main__':
  try:raise SystemExit(main())
  except SystemExit:raise
