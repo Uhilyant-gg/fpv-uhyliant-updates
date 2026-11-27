@@ -5,6 +5,7 @@ import QtQuick.Layouts
 Item {
  id: root
  signal closeRequested()
+ property bool editingAllowed: true
  property var elementOptions: [
   {name:"link", label:"Стан зв’язку"},
   {name:"arm", label:"Стан ARM"},
@@ -67,6 +68,7 @@ Item {
    spacing: 18
 
    ScrollView {
+    enabled: root.editingAllowed
     Layout.preferredWidth: 300
     Layout.fillHeight: true
     contentWidth: availableWidth
@@ -131,6 +133,14 @@ Item {
     Layout.fillWidth: true
     Layout.fillHeight: true
     spacing: 6
+    Text {
+     objectName: "osd-editing-locked"
+     visible: !root.editingAllowed
+     text: "Телеметрія показує ARM. Редагування OSD заблоковане до завершення польоту."
+     color: "#ffcf70"
+     wrapMode: Text.WordWrap
+     Layout.fillWidth: true
+    }
     Text { text: "Попередній перегляд · екран польоту"; color: "#dce6f2"; font.bold: true }
      RowLayout {
      Layout.fillWidth: true
@@ -184,7 +194,7 @@ Item {
         id: previewOsd
         objectName: "osdPreviewOverlay"
         anchors.fill: parent
-        editing: true
+        editing: root.editingAllowed
         positions: station.osdElements
         enabledElements: station.osdEnabledElements
         corner: station.osdPosition

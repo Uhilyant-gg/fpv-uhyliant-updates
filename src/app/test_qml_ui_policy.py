@@ -77,6 +77,14 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
         self.assertIn("Додавати OSD станції поверх відео", copy)
         self.assertNotIn("Вимкнути OSD камери", copy)
 
+    def test_osd_layout_editing_locks_when_telemetry_reports_armed(self):
+        main = self.qml["Main.qml"]
+        panel = self.qml["OsdSettingsPanel.qml"]
+        self.assertIn("editingAllowed:w.simulation||t.armed!==true", re.sub(r"\s+", "", main))
+        self.assertIn("enabled: root.editingAllowed", panel)
+        self.assertIn("editing: root.editingAllowed", panel)
+        self.assertIn("Телеметрія показує ARM", panel)
+
     def test_shared_hover_hint_contract_is_five_seconds(self):
         hint = self.qml["HoverHint.qml"]
         self.assertIn("property int delay:5000", hint)
