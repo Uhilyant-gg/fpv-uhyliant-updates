@@ -72,6 +72,7 @@ MODELS = {
     "mapMarks": ("map_marks", "MapMarksRuntime"),
     "windRuntime": ("wind", "WindRuntime"),
     "mapTiles": ("map_tiles", "MapTilesRuntime"),
+    "fcLink": ("fc_link", "FcLinkRuntime"),
     "controllerActions": ("controller_actions", "ControllerActions"),
     "videoPresets": ("video_presets", "VideoPresetsRuntime"),
     "connectionsRuntime": ("connections_runtime", "ConnectionsRuntime"),

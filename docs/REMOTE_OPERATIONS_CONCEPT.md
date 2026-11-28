@@ -147,6 +147,19 @@ To try on a camera: whether an IDR request exists in the installed build.
   proposal ("+" tile, a link, checked automatically, shown only while reachable) is kept in
   DELIVERY_ROADMAP.md, P2.6.
 
+## Flight controller through the camera (agreed 2026-11-28)
+- Found by the station itself while the drone is not armed: it lists the camera's serial ports (not
+  the console), tries 115200/57600/230400/460800/921600/420000 for about a second each and names the
+  protocol only from packets with a correct checksum: MAVLink (sent by itself; HEARTBEAT tells
+  ArduPilot/PX4), MSP (answers one "which flight controller?" question: Betaflight/INAV/ArduPilot),
+  CRSF. Remembered per camera; port/speed/protocol can be set by hand ("Авто" by default) in
+  "Обладнання".
+- Brought over the station's own SSH session to the camera (encrypted, the station's networks only):
+  nothing is installed on the camera and no port is opened there (mavfwd's command input, which runs
+  text as root, is never used). MAVLink goes to the station's MAVLink reader on UDP 127.0.0.1:14550,
+  MSP (polled with read-only requests) and CRSF to their readers; the telemetry source switches to it.
+- To verify on hardware: busybox stty/timeout/od on the camera, which UART the flight controller is on.
+
 ## Map and wind
 - Satellite base map (Esri World Imagery); download a selected area in advance, or automatically
   around the drone. Orientation: north-up, track-up or follow the drone. Picture-in-picture (movable,

@@ -315,6 +315,19 @@ def main():
     if not x.first_run_acceptance_smoke:
         camera_features.start()
     link_doctor = LinkDoctor(link_monitor, d, connections, starlink=starlink_dish, camera=camera_features)
+    from fc_link import FcLinkRuntime
+
+    fc_link = FcLinkRuntime(
+        d,
+        connections,
+        dish_shell,
+        DATA / 'fc-link.json',
+        mavlink=m,
+        msp=msp,
+        crsf=crsf,
+        router=telemetry,
+        may_probe=not_armed,
+    )
     from extra_windows import ExtraWindowsRuntime
 
     extra_windows = ExtraWindowsRuntime(d, streams, DATA / 'extra-windows.json', host_resolver=connections.host_for)
@@ -450,6 +463,7 @@ def main():
         map_marks,
         wind_runtime,
         map_tiles,
+        fc_link,
         flight_alerts,
         presets,
         dvr_runtime,
@@ -501,6 +515,7 @@ def main():
         ('mapMarks', map_marks),
         ('windRuntime', wind_runtime),
         ('mapTiles', map_tiles),
+        ('fcLink', fc_link),
         ('controllerActions', controller_actions),
         ('videoPresets', video_preset_runtime),
         ('connectionsRuntime', connections),
@@ -521,6 +536,7 @@ def main():
         camera_audio.setActive(False)
         black_box.setActive(False)
         map_tiles.shutdown()
+        fc_link.setActive(False)
         inspector.close_all()
         video.stopAll()
         links.clear()
