@@ -633,3 +633,16 @@ def test_without_the_relay_the_player_gets_the_push_port(push_runtime, tmp_path)
     rt.push_url_for({"id": "c1"})
     assert "m=video 5600 RTP/AVP" in (tmp_path / "sdp" / "push-c1.sdp").read_text()
     assert rt.relay_window("c1") is None
+
+
+def test_control_host_reaches_the_camera_by_any_working_way(runtime):
+    assert runtime.control_host("c1") == "", "nothing checked yet"
+    runtime.refresh()
+    assert runtime.control_host("c1") == "192.168.1.10"
+    runtime.prober.reachable["2001:db8::10"] = 61
+    runtime.setAddress("c1", "starlink", "2001:db8::10")
+    runtime.select("c1", "starlink")
+    assert runtime.control_host("c1") == "2001:db8::10", "the selected connection first"
+    runtime.prober.reachable.pop("2001:db8::10")
+    runtime.refresh()
+    assert runtime.control_host("c1") == "192.168.1.10", "falls back to another working way"

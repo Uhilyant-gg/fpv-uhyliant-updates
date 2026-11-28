@@ -139,6 +139,7 @@ def main():
     from dvr_runtime import DvrRuntime
     from link_monitor import LinkMonitor
     from link_doctor import LinkDoctor
+    import video_presets
     from rtp_relay import RtpRelay
     from connection_profiles import ConnectionStore
     from connections_runtime import ConnectionsRuntime
@@ -290,6 +291,23 @@ def main():
         relay=RtpRelay,
     )
     link_doctor = LinkDoctor(link_monitor, d, connections)
+    camera_logins = lambda: (
+        [(credentials.username or 'root', credentials.secret())]
+        + list(  # noqa: E731
+            camera_setup.DEFAULT_CREDENTIALS
+        )
+    )
+    video_preset_runtime = video_presets.VideoPresetsRuntime(
+        video_presets.VideoPresetStore(DATA / 'video-presets.json'),
+        d,
+        connections,
+        lambda host, lines: video_presets.run_on_camera(
+            host,
+            camera_logins(),
+            lambda h, u, p: camera_setup.CameraShell(h, u, p, DATA / 'camera_known_hosts'),
+            lines,
+        ),
+    )
     v.host_resolver = connections.host_for
     secondary.host_resolver = connections.host_for
     v.push_resolver = connections.push_url_for
@@ -337,6 +355,7 @@ def main():
         ('dvrRuntime', dvr_runtime),
         ('linkMonitor', link_monitor),
         ('linkDoctor', link_doctor),
+        ('videoPresets', video_preset_runtime),
         ('connectionsRuntime', connections),
     ]:
         ctx.setContextProperty(name, obj)

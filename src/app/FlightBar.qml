@@ -106,6 +106,25 @@ Rectangle {
    caption: root.simulation ? "Симуляція" : (root.cameraName || "Камера")
    value: root.compact ? (root.cameraName || "Камера") : (root.presetName ? root.presetName : "Пресет не вибрано")
    onClicked: root.openVehicle()
+   HoverHint { text: "Пресет відео камери. Клавіші 1…0 перемикають пресети, − і + змінюють бітрейт." }
+  }
+  BarButton {
+   objectName: "flightBarBitrateDown"
+   visible: !root.simulation
+   enabled: !videoPresets.busy
+   text: "−"
+   Layout.preferredWidth: 30
+   onClicked: videoPresets.stepBitrate(-1)
+   HoverHint { text: "Зменшити бітрейт камери на крок." }
+  }
+  BarButton {
+   objectName: "flightBarBitrateUp"
+   visible: !root.simulation
+   enabled: !videoPresets.busy
+   text: "+"
+   Layout.preferredWidth: 30
+   onClicked: videoPresets.stepBitrate(1)
+   HoverHint { text: "Збільшити бітрейт камери на крок." }
   }
   Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 26; color: "#22364b" }
   Info {
