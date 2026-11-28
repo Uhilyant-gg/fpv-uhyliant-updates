@@ -55,6 +55,13 @@ def test_sources_are_the_cameras_other_streams(tmp_path):
     rt, _ = make(tmp_path)
     assert [s["id"] for s in rt.sources] == ["sub", "thermal", "cam2", "cam3", "map"], "not the main one; the map too"
     assert all(s["slot"] == -1 for s in rt.sources)
+    assert [s["number"] for s in rt.sources] == [2, 3, 4, 5, 0], "told apart by number; the map has none"
+
+
+def test_windows_carry_the_stream_number_and_kind(tmp_path):
+    rt, _ = make(tmp_path)
+    rt.open("thermal")
+    assert (rt.windows[0]["number"], rt.windows[0]["streamKind"]) == (3, "thermal")
 
 
 def test_plus_opens_up_to_three_windows_and_minus_stops_the_stream(tmp_path):

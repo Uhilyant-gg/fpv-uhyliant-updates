@@ -112,6 +112,23 @@ Order: 1+2+6, then 3, then 4+5 with telemetry forwarding, then 8+9, then 7 on re
 - Additional camera (thermal) on the camera's USB through UVC or a capture card: first tried on the
   official OpenIPC firmware, without a custom build. Picture-in-picture made on the camera to save
   bitrate comes after the separate stream works.
+- Side panel without captions (agreed 2026-11-28): video streams at the top (only those present),
+  sound, map and layouts at the bottom; square tiles with an icon of the source (camera,
+  USB, thermal, map, sound) and its number (1 is the main video); the window of a stream carries
+  the same icon and number. The name, what a click does and the settings (⚙ in the corner under the
+  mouse, or the right button) appear under the mouse.
+- Streams appear by themselves (agreed 2026-11-28): every 15 s, also in flight, the station asks the
+  camera over SSH whether its second stream (video1) is on and whether a USB video device is
+  plugged in; present streams show up on the side panel, gone ones disappear (their settings stay).
+- USB video is encoded by the camera itself (majestic `usbcam.codec: transcode`, RTSP `/stream=3`).
+  Only firmware with the `usbcam` keys can do it (per the OpenIPC wiki: Goke gk7205v200/v500 OTG
+  builds); there the station switches it on by itself while the drone is not armed (it restarts the
+  camera's video for a moment). On other cameras the hardware panel says why there is no USB stream.
+  Still to verify on hardware: the RTSP path and the bitrate control of the USB stream.
+- Sound from the camera's microphone: majestic Lite/Ultimate only (the FPV build has no audio).
+  The station plays `/audio.alaw` (64 kbit/s at 8 kHz; falls back to `/audio.pcm`) with at most
+  ~120 ms buffered, mutes with M or the "Звук" tile (a muted sound is not fetched, no bitrate), and
+  sets the camera's microphone (on/off, sensitivity, 8/16/48 kHz) from the sound panel.
 
 ## Map and wind
 - Satellite base map (Esri World Imagery); download a selected area in advance, or automatically

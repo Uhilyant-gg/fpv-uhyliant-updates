@@ -85,9 +85,17 @@ class ExtraWindowsRuntime(QObject):
     def _primary_id(self):
         return (getattr(self._workspace, "state", {}) or {}).get("primaryId", "")
 
+    def _numbers(self):
+        """Streams are told apart by number, not by name: 1 is the main one, the others follow."""
+        primary = self._primary_id()
+        others = [s.get("id") for s in self._streams() if s.get("id") != primary]
+        return {stream_id: index + 2 for index, stream_id in enumerate(others)} | {primary: 1}
+
     @Property("QVariantList", notify=changed)
     def windows(self):
         names = {s.get("id"): s.get("name", "") for s in self._streams()}
+        kinds = {s.get("id"): s.get("kind", "") for s in self._streams()}
+        numbers = self._numbers()
         out = []
         for index, (slot, runtime) in enumerate(zip(self._slots, self._runtimes)):
             out.append(
@@ -96,6 +104,8 @@ class ExtraWindowsRuntime(QObject):
                     "index": index,
                     "name": "Карта" if slot["streamId"] == MAP_ID else names.get(slot["streamId"], ""),
                     "kind": "map" if slot["streamId"] == MAP_ID else "video",
+                    "streamKind": "map" if slot["streamId"] == MAP_ID else kinds.get(slot["streamId"], ""),
+                    "number": numbers.get(slot["streamId"], 0),
                     "url": runtime.url if slot["open"] and slot["streamId"] != MAP_ID else "",
                     "display": self.display(slot["streamId"]) if slot["open"] else dict(DISPLAY_DEFAULT),
                     "state": runtime.state if slot["open"] and slot["streamId"] != MAP_ID else "stopped",
@@ -108,6 +118,7 @@ class ExtraWindowsRuntime(QObject):
         """Streams of the camera in flight that can go into a window (not the main one)."""
         primary = self._primary_id()
         open_by_stream = {s["streamId"]: i for i, s in enumerate(self._slots) if s["open"]}
+        numbers = self._numbers()
         return [
             {
                 "id": s.get("id"),
@@ -115,10 +126,20 @@ class ExtraWindowsRuntime(QObject):
                 "kind": s.get("kind", ""),
                 "slot": open_by_stream.get(s.get("id"), -1),
                 "channel": channel_for(s),
+                "number": numbers.get(s.get("id"), 0),
             }
             for s in self._streams()
             if s.get("id") != primary
-        ] + [{"id": MAP_ID, "name": "Карта", "kind": "map", "slot": open_by_stream.get(MAP_ID, -1), "channel": -1}]
+        ] + [
+            {
+                "id": MAP_ID,
+                "name": "Карта",
+                "kind": "map",
+                "slot": open_by_stream.get(MAP_ID, -1),
+                "channel": -1,
+                "number": 0,
+            }
+        ]
 
     @Property(str, notify=changed)
     def mainName(self):

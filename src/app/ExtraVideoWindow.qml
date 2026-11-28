@@ -101,7 +101,7 @@ Item {
   x: root.fullscreen || root.shownAsMain ? (root.width - width) / 2 : root.boxX + (root.boxW - width) / 2
   y: root.fullscreen || root.shownAsMain ? (root.height - height) / 2 : root.boxY + (root.boxH - height) / 2
   z: root.fullscreen ? 61 : root.baseZ + 2
-  text: (root.win.name || "Відео") + ": немає сигналу · відновлюю"
+  text: "немає сигналу · відновлюю"
   color: root.fg; font.bold: true
  }
 
@@ -205,6 +205,24 @@ Item {
    }
   }
 
+  Rectangle { // which source this is: its icon and number, the same as on the side panel
+   objectName: "extraWindowBadge" + root.slot
+   visible: !root.shownAsMain
+   anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 5
+   width: badgeRow.implicitWidth + 8; height: 20; radius: 6
+   color: "#b30b1420"
+   Row {
+    id: badgeRow
+    anchors.centerIn: parent
+    spacing: 3
+    SidebarIcon {
+     width: 14; height: 14
+     kind: ["map", "thermal", "usb"].indexOf(root.win.streamKind) >= 0 ? root.win.streamKind : "main"
+     color: root.fg
+    }
+    Text { visible: (root.win.number || 0) > 0; text: root.win.number || ""; color: root.fg; font.pixelSize: 11; font.bold: true }
+   }
+  }
   Row { // small buttons, only while the mouse is over the window
    objectName: "extraWindowTools" + root.slot
    visible: hover.hovered || tools.running

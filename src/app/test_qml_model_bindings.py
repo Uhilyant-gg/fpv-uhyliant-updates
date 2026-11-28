@@ -65,6 +65,8 @@ MODELS = {
     "linkDoctor": ("link_doctor", "LinkDoctor"),
     "extraWindows": ("extra_windows", "ExtraWindowsRuntime"),
     "starlinkDish": ("starlink_runtime", "StarlinkRuntime"),
+    "cameraFeatures": ("camera_features", "CameraFeaturesRuntime"),
+    "cameraAudio": ("camera_audio", "AudioRuntime"),
     "controllerActions": ("controller_actions", "ControllerActions"),
     "videoPresets": ("video_presets", "VideoPresetsRuntime"),
     "connectionsRuntime": ("connections_runtime", "ConnectionsRuntime"),
