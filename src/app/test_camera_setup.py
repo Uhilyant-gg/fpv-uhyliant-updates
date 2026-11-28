@@ -158,3 +158,17 @@ def test_shell_maps_ssh_errors(tmp_path, error, state):
         shell.__enter__()
     assert raised.value.state == state
     assert Client.closed
+
+
+def test_first_use_policy_only_trusts_private_hosts():
+    import paramiko
+
+    policy = cs.trust_on_first_use_policy()
+    key = paramiko.RSAKey.generate(1024)
+    client = paramiko.SSHClient()
+    policy.missing_host_key(client, "[192.168.1.10]:22", key)
+    policy.missing_host_key(client, "10.0.0.5", key)
+    assert client.get_host_keys().lookup("[192.168.1.10]:22") and client.get_host_keys().lookup("10.0.0.5")
+    for host in ("93.170.12.5", "[93.170.12.5]:22", "camera.example.net"):
+        with pytest.raises(paramiko.SSHException):
+            policy.missing_host_key(client, host, key)

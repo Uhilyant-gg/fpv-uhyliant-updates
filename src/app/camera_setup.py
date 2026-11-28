@@ -62,6 +62,28 @@ READ_COMMANDS = {
 }
 
 
+def trust_on_first_use_policy():
+    """Accept an unknown host key only for a camera on a private network, and only the first time.
+
+    A host whose key is already remembered never reaches this policy: paramiko refuses a changed
+    key itself (BadHostKeyException). Any other unknown host is refused.
+    """
+    import paramiko
+
+    class TrustOnFirstUse(paramiko.MissingHostKeyPolicy):
+        def missing_host_key(self, client, hostname, key):
+            host = hostname[1:].split("]:", 1)[0] if hostname.startswith("[") else hostname
+            try:
+                private = ipaddress.ip_address(host).is_private
+            except ValueError:
+                private = False
+            if not private:
+                raise paramiko.SSHException("unknown host key")
+            client.get_host_keys().add(hostname, key.get_name(), key)
+
+    return TrustOnFirstUse()
+
+
 class CameraShell:
     """One SSH session to a camera (paramiko), with trust-on-first-use host keys."""
 
@@ -86,7 +108,7 @@ class CameraShell:
             client = paramiko.SSHClient()
             if self.known_hosts.exists():
                 client.load_host_keys(str(self.known_hosts))
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.set_missing_host_key_policy(trust_on_first_use_policy())
         try:
             client.connect(
                 self.host,
