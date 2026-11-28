@@ -129,7 +129,9 @@ def test_address_types_need_an_address(runtime, tmp_path):
     assert runtime.statuses["c1"]["starlink"] == cp.status_entry("available", 61)
     assert runtime.canFly("c1")
     assert runtime.addressFor("c1", "starlink") == "2001:db8::10"
-    assert json.loads((tmp_path / "c.json").read_text()) == {"c1": {"starlink": "2001:db8::10"}}
+    assert json.loads((tmp_path / "c.json").read_text()) == {
+        "c1": {"starlink": "2001:db8::10", "starlinkSource": "manual"}
+    }
 
 
 def test_cloud_cannot_be_used_yet(runtime):
@@ -242,7 +244,7 @@ def test_zerotier_camera_reachable_directly(zt_runtime, tmp_path):
     assert zt_runtime.canFly("c1")
     assert zt_runtime.host_for({"id": "c1", "host": "192.168.1.10"}) == CAMERA_ZT
     saved = json.loads((tmp_path / "c.json").read_text())
-    assert saved == {"c1": {"ztNetwork": "8056c2e21c000001", "ztNode": "89e92ceee5"}}
+    assert saved == {"c1": {"ztNetwork": "8056c2e21c000001", "ztNode": "89e92ceee5", "ztSource": "manual"}}
     assert cp.ConnectionStore(tmp_path / "c.json").load() == saved
 
 
@@ -464,3 +466,106 @@ def test_grey_address_is_shown_on_the_card(setup_runtime):
     rt.setAddress("c1", "static", "93.170.12.5")
     rt.bindThisNetwork("c1")
     assert rt.statuses["c1"]["static"]["label"] == "сіра адреса"
+
+
+FACTS = {
+    "state": "read",
+    "ztInstalled": True,
+    "ztNode": "89e92ceee5",
+    "ztNetwork": "8056c2e21c000001",
+    "ipv6": ["2a0d:3344:1:2::10"],
+    "flashMb": 16,
+    "freeKb": 7120,
+    "firmware": "OpenIPC",
+    "variant": "fpv",
+    "version": "2.5",
+}
+
+
+@pytest.fixture
+def inspect_runtime(tmp_path):
+    clock = Clock()
+    calls = []
+    prober = Prober()
+    zerotier = FakeZeroTier()
+
+    def inspect(host):
+        calls.append(host)
+        return rt.facts
+
+    rt = ConnectionsRuntime(
+        FakeDevices(),
+        cp.ConnectionStore(tmp_path / "c.json"),
+        prober=prober,
+        run_async=False,
+        listen=False,
+        clock=clock,
+        zerotier=zerotier,
+        camera_inspect=inspect,
+    )
+    rt.clock, rt.calls, rt.prober, rt.facts, rt.store_path = clock, calls, prober, dict(FACTS), tmp_path / "c.json"
+    return rt
+
+
+def test_ids_are_read_from_the_camera_on_the_local_network(inspect_runtime):
+    rt = inspect_runtime
+    rt.prober.reachable[CAMERA_ZT] = 40
+    rt.refresh()
+    assert rt.calls == ["192.168.1.10"]
+    assert rt.zerotierNetworkFor("c1") == "8056c2e21c000001" and rt.zerotierNodeFor("c1") == "89e92ceee5"
+    assert rt.cameraFacts["c1"]["ztFromCamera"]
+    assert rt.cameraFacts["c1"]["summary"].startswith("OpenIPC fpv 2.5 · флеш 16 МБ")
+    assert rt.addressFor("c1", "starlink") == "", "on the local network the IPv6 is not Starlink's"
+    assert rt.statuses["c1"]["cloud"]["label"] == "40 мс · напряму", "ZeroTier works without typing anything"
+    rt.refresh()
+    assert len(rt.calls) == 1, "not read again within 10 minutes"
+    rt.clock.now += 601
+    rt.refresh()
+    assert len(rt.calls) == 2
+
+
+def test_manual_zerotier_ids_are_not_overwritten(inspect_runtime):
+    rt = inspect_runtime
+    rt.setZeroTier("c1", "2222222222222222", "1234567890")
+    rt.refresh()
+    assert rt.zerotierNetworkFor("c1") == "2222222222222222"
+    assert not rt.cameraFacts["c1"]["ztFromCamera"]
+
+
+def test_starlink_ipv6_is_taken_when_the_camera_is_seen_through_zerotier(inspect_runtime):
+    rt = inspect_runtime
+    rt.prober.reachable = {CAMERA_ZT: 45}  # not on the local network: in the field
+    rt.setZeroTier("c1", "8056c2e21c000001", "89e92ceee5")
+    rt.refresh()
+    assert rt.calls == [CAMERA_ZT]
+    assert rt.addressFor("c1", "starlink") == "2a0d:3344:1:2::10"
+    assert rt.cameraFacts["c1"]["starlinkFromCamera"]
+
+
+def test_not_read_while_flying_or_when_unreachable(inspect_runtime):
+    rt = inspect_runtime
+    rt.prober.reachable = {}
+    rt.refresh()
+    assert rt.calls == []
+    rt.prober.reachable = {"192.168.1.10": 4}
+    rt.pauseListening()
+    rt.refresh()
+    assert rt.calls == []
+
+
+def test_failed_read_is_retried_after_a_minute(inspect_runtime):
+    rt = inspect_runtime
+    rt.facts = {"state": "no-access"}
+    rt.refresh()
+    rt.refresh()
+    assert len(rt.calls) == 1
+    rt.clock.now += 61
+    rt.facts = dict(FACTS)
+    rt.refresh()
+    assert len(rt.calls) == 2 and rt.zerotierNodeFor("c1") == "89e92ceee5"
+
+
+def test_camera_is_read_as_soon_as_it_answers(inspect_runtime):
+    rt = inspect_runtime
+    rt.select("c1", "local")  # the probe answers right away (synchronous in tests)
+    assert rt.calls == ["192.168.1.10"], "no need to wait for the next periodic check"

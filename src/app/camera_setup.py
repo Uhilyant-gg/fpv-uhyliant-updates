@@ -97,8 +97,8 @@ class CameraShell:
         self.client = None
 
     def __enter__(self):
-        address = ipaddress.ip_address(self.host)
-        if address.version != 4 or not address.is_private:
+        # Only cameras on the station's own networks: the local LAN or ZeroTier (private IPv6).
+        if not ipaddress.ip_address(self.host).is_private:
             raise SetupError("unreachable")
         if self.client_factory:
             client = self.client_factory()
@@ -145,6 +145,25 @@ class CameraShell:
         return False
 
 
+def with_camera(host: str, credentials: Iterable[tuple[str, str]], shell, action) -> dict:
+    """Log in with the first working credentials and run ``action(session)``. Never raises."""
+    last = "no-access"
+    for username, password in credentials:
+        if not password:
+            continue
+        try:
+            with shell(host, username, password) as session:
+                return action(session)
+        except SetupError as error:
+            last = error.state
+            if last != "no-access":
+                break
+        except Exception:
+            last = "failed"
+            break
+    return {"state": last, "message": MESSAGES[last]}
+
+
 def configure_push(
     host: str,
     address: str,
@@ -157,28 +176,18 @@ def configure_push(
         target = push_target(address, port)
     except ValueError:
         return {"state": "failed", "message": MESSAGES["failed"]}
-    last = "no-access"
-    for username, password in credentials:
-        if not password:
-            continue
-        try:
-            with shell(host, username, password) as session:
-                code, codec = session.run(READ_COMMANDS["codec"])
-                codec = CODEC_FROM_CAMERA.get(codec.strip().strip('"').lower(), "") if code == 0 else ""
-                _, server = session.run(READ_COMMANDS["server"])
-                _, enabled = session.run(READ_COMMANDS["enabled"])
-                if server.strip().strip('"') == target and enabled.strip().strip('"') == "true":
-                    return {"state": "already", "message": MESSAGES["already"], "codec": codec, "target": target}
-                for command in setup_commands(target):
-                    code, _ = session.run(command)
-                    if code != 0 and not command.startswith("killall"):
-                        return {"state": "failed", "message": MESSAGES["failed"]}
-                return {"state": "configured", "message": MESSAGES["configured"], "codec": codec, "target": target}
-        except SetupError as error:
-            last = error.state
-            if last != "no-access":
-                break
-        except Exception:
-            last = "failed"
-            break
-    return {"state": last, "message": MESSAGES[last]}
+
+    def apply(session):
+        code, codec = session.run(READ_COMMANDS["codec"])
+        codec = CODEC_FROM_CAMERA.get(codec.strip().strip('"').lower(), "") if code == 0 else ""
+        _, server = session.run(READ_COMMANDS["server"])
+        _, enabled = session.run(READ_COMMANDS["enabled"])
+        if server.strip().strip('"') == target and enabled.strip().strip('"') == "true":
+            return {"state": "already", "message": MESSAGES["already"], "codec": codec, "target": target}
+        for command in setup_commands(target):
+            code, _ = session.run(command)
+            if code != 0 and not command.startswith("killall"):
+                return {"state": "failed", "message": MESSAGES["failed"]}
+        return {"state": "configured", "message": MESSAGES["configured"], "codec": codec, "target": target}
+
+    return with_camera(host, credentials, shell, apply)

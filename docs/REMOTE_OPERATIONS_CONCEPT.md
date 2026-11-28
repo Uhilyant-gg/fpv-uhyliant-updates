@@ -45,6 +45,11 @@ This records decisions agreed with the product owner, so later work builds on th
   direct/relayed path and latency on the card.
   - Equal rights with ZeroTier: everyone who shares a camera needs permission to manage its network
     (a shared controller account/organization, or a self-hosted controller such as ztnet). To decide.
+- Reading the camera instead of typing (*done*): whenever a camera is reachable (local network or ZeroTier)
+  the station reads over SSH, with read-only commands, its ZeroTier node and network IDs, its public IPv6,
+  firmware variant/version, flash size and free space. ZeroTier IDs fill in by themselves unless a person
+  entered other values; the Starlink IPv6 is taken only when the camera is seen through ZeroTier (in the
+  field, so the address is Starlink's). Read again every 10 minutes, at once when the camera appears.
 - Camera firmware: official OpenIPC plus selected add-ons installed during or after flashing:
   ZeroTier, a flight-controller bridge (raw bytes to/from the network), settings sync, watchdog.
   The station checks over SSH whether an add-on fits (firmware variant, flash size, free space).
