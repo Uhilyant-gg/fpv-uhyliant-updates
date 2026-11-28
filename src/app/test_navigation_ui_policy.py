@@ -41,7 +41,7 @@ class NavigationUiPolicyTests(unittest.TestCase):
     def test_home_exposes_encrypted_backup_and_restore(self):
         self.assertIn('signal openBackup()', self.home)
         self.assertIn('резервна копія', self.home)
-        self.assertIn('onOpenBackup:openStationSettings("backup")', self.main)
+        self.assertIn('onOpenBackup:w.openStationSettings("backup")', self.main)
         self.assertIn('{key:"backup",label:"Резервна копія"', self.main)
         self.assertIn('Component{id:backupPage;BackupPanel{}}', self.main)
 

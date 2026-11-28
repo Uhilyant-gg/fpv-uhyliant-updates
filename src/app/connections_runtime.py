@@ -15,7 +15,10 @@ import time
 from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 
 import connection_profiles as cp
+import push_video as pv
 import zerotier_local as zt
+
+PUSH_FRESH_S = 3.0
 
 PROBE_INTERVAL_MS = 5000
 PROBE_TIMEOUT_S = 1.5
@@ -36,9 +39,31 @@ class ConnectionsRuntime(QObject):
     changed = Signal()
     _probed = Signal(str, str, str, object)  # device id, type, host, latency ms or None
     _ztSnapshot = Signal(object)
+    _bound = Signal(str, object)
 
-    def __init__(self, devices, store, prober=tcp_probe, interval_ms=PROBE_INTERVAL_MS, run_async=True, zerotier=None):
+    def __init__(
+        self,
+        devices,
+        store,
+        prober=tcp_probe,
+        interval_ms=PROBE_INTERVAL_MS,
+        run_async=True,
+        zerotier=None,
+        listen=True,
+        sdp_folder=None,
+        binder=None,
+        clock=time.monotonic,
+    ):
         super().__init__()
+        self._listen = listen
+        self._listening_paused = False
+        self._sockets: dict[int, object] = {}
+        self._push_seen: dict[int, float] = {}
+        self._clock = clock
+        self._sdp_folder = sdp_folder
+        self._binder = binder
+        self._bind_status: dict = {}
+        self._bound.connect(self._apply_bind)
         self._zerotier = zerotier
         self._zt = {"service": "missing", "nodeId": "", "networks": {}, "peers": {}}
         self._zt_busy = False
@@ -82,6 +107,10 @@ class ConnectionsRuntime(QObject):
     def zerotierNodeId(self):
         return self._zt.get("nodeId", "")
 
+    @Property("QVariantMap", notify=changed)
+    def bindStatus(self):
+        return dict(self._bind_status)
+
     @Property("QVariantList", constant=True)
     def types(self):
         return [
@@ -98,6 +127,44 @@ class ConnectionsRuntime(QObject):
     @Slot()
     def stop(self):
         self._timer.stop()
+        self._close_listeners()
+
+    @Slot()
+    def pauseListening(self):
+        """Free the video ports for the player while flying."""
+        self._listening_paused = True
+        self._close_listeners()
+
+    @Slot()
+    def resumeListening(self):
+        self._listening_paused = False
+        self._sync_listeners()
+
+    @Slot(str, result=int)
+    def pushPortFor(self, device_id):
+        return int(self._addresses.get(device_id, {}).get("pushPort", 0))
+
+    @Slot(str)
+    def bindThisNetwork(self, device_id):
+        """Find this network's public address, check it and open the camera's port on the router."""
+        if device_id not in self._statuses or self._bind_status.get("busy"):
+            return
+        port = self._ensure_push_port(device_id)
+        self._bind_status = {"deviceId": device_id, "busy": True, "state": "", "message": "Перевіряю мережу…"}
+        self.changed.emit()
+        binder = self._binder or (lambda p: pv.bind_this_network(p, pv.Upnp(), pv.public_ip_https, pv.lan_address))
+
+        def work():
+            try:
+                result = binder(port)
+            except Exception:
+                result = {"state": "no-internet", "message": "Не вдалося перевірити мережу."}
+            self._bound.emit(device_id, result)
+
+        if self._run_async:
+            threading.Thread(target=work, daemon=True).start()
+        else:
+            work()
 
     @Slot(str, str, result=bool)
     def select(self, device_id, kind):
@@ -108,6 +175,8 @@ class ConnectionsRuntime(QObject):
         if kind == "cloud":
             self._join_camera_network(device_id)
             self.refresh()
+        elif kind == "static":
+            self._update_push_statuses()
         else:
             self._probe(device_id, kind)
         return True
@@ -125,9 +194,12 @@ class ConnectionsRuntime(QObject):
         except ValueError:
             return False
         self._addresses.setdefault(device_id, {})[kind] = value
+        if kind == "static":
+            self._ensure_push_port(device_id)
         self._store.save(self._addresses)
         self._rebuild()
-        self._probe(device_id, kind)
+        if kind != "static":
+            self._probe(device_id, kind)
         return True
 
     @Slot(str, result=str)
@@ -180,8 +252,9 @@ class ConnectionsRuntime(QObject):
     def refresh(self):
         for device_id, statuses in self._statuses.items():
             for kind, entry in statuses.items():
-                if kind != "cloud" and entry["state"] not in ("unconfigured", "unsupported"):
+                if kind not in ("cloud", "static") and entry["state"] not in ("unconfigured", "unsupported"):
                     self._probe(device_id, kind)
+        self._update_push_statuses()
         self._refresh_zerotier()
 
     # --- used by the video runtime ---------------------------------------------
@@ -189,9 +262,18 @@ class ConnectionsRuntime(QObject):
         """Address the video should use for this camera, by the selected connection type."""
         device_id = device.get("id", "")
         kind = self._selected.get(device_id, "local")
-        if kind in cp.ADDRESS_TYPES or kind == "cloud":
+        if kind in ("starlink", "cloud"):
             return self._host(device_id, kind)
         return str(device.get("host", "")).strip()
+
+    def push_url_for(self, device) -> str:
+        """For "Static IP" the camera sends RTP here; the player opens it through an SDP file."""
+        device_id = device.get("id", "")
+        port = self.pushPortFor(device_id)
+        if self._selected.get(device_id) != "static" or not port or self._sdp_folder is None:
+            return ""
+        path = pv.write_sdp(self._sdp_folder, device_id, port, self._addresses[device_id].get("pushCodec", "h265"))
+        return path.as_uri()
 
     # --- internals -------------------------------------------------------------
     def _devices_changed(self):
@@ -229,6 +311,12 @@ class ConnectionsRuntime(QObject):
                     entry[kind] = cp.status_entry("unsupported")
                 elif not self._host(device_id, kind):
                     entry[kind] = cp.status_entry("unconfigured", None, "вказати мережу" if kind == "cloud" else None)
+                elif kind == "static":
+                    entry[kind] = (
+                        old.get(kind)
+                        if old.get(kind, {}).get("state") in ("available", "unavailable")
+                        else cp.status_entry("unavailable", None, "чекає камеру")
+                    )
                 elif kind in old and old[kind]["state"] not in ("unconfigured", "unsupported"):
                     entry[kind] = old[kind]
                 else:
@@ -236,6 +324,71 @@ class ConnectionsRuntime(QObject):
             statuses[device_id] = entry
         self._statuses = statuses
         self._selected = {k: v for k, v in self._selected.items() if k in statuses}
+        self._update_push_statuses(emit=False)
+        self._sync_listeners()
+        self.changed.emit()
+
+    # --- video pushed by the camera to this PC ("Static IP") ------------------------
+    def _ensure_push_port(self, device_id):
+        addresses = self._addresses.setdefault(device_id, {})
+        if not addresses.get("pushPort"):
+            used = {a.get("pushPort") for a in self._addresses.values() if a.get("pushPort")}
+            addresses["pushPort"] = pv.free_port(used)
+            self._store.save(self._addresses)
+        return addresses["pushPort"]
+
+    def _note_packet(self, port, when=None):
+        first = self._clock() - self._push_seen.get(port, -1e9) > PUSH_FRESH_S
+        self._push_seen[port] = self._clock() if when is None else when
+        if first:
+            self._update_push_statuses()
+
+    def _update_push_statuses(self, emit=True):
+        now = self._clock()
+        for device_id, statuses in self._statuses.items():
+            if "static" not in statuses or statuses["static"]["state"] == "unconfigured":
+                continue
+            port = self.pushPortFor(device_id)
+            fresh = port and now - self._push_seen.get(port, -1e9) <= PUSH_FRESH_S
+            statuses["static"] = (
+                cp.status_entry("available", None, "камера надсилає")
+                if fresh
+                else cp.status_entry("unavailable", None, "чекає камеру")
+            )
+        if emit:
+            self.changed.emit()
+
+    def _sync_listeners(self):
+        if not self._listen or self._listening_paused:
+            return
+        wanted = {self.pushPortFor(d) for d in self._statuses if self.pushPortFor(d)}
+        for port in list(self._sockets):
+            if port not in wanted:
+                self._sockets.pop(port).close()
+        for port in wanted - set(self._sockets):
+            from PySide6.QtNetwork import QHostAddress, QUdpSocket
+
+            sock = QUdpSocket(self)
+            if sock.bind(QHostAddress(QHostAddress.AnyIPv4), port):
+                sock.readyRead.connect(lambda port=port, sock=sock: self._drain(port, sock))
+                self._sockets[port] = sock
+            else:
+                sock.deleteLater()
+
+    def _drain(self, port, sock):
+        while sock.hasPendingDatagrams():
+            sock.receiveDatagram(2048)
+        self._note_packet(port)
+
+    def _close_listeners(self):
+        for sock in self._sockets.values():
+            sock.close()
+        self._sockets.clear()
+
+    def _apply_bind(self, device_id, result):
+        self._bind_status = {"deviceId": device_id, "busy": False, **result}
+        if result.get("state") in ("ready", "manual") and result.get("publicIp"):
+            self.setAddress(device_id, "static", result["publicIp"])
         self.changed.emit()
 
     def _probe(self, device_id, kind):

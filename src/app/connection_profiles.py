@@ -93,6 +93,11 @@ class ConnectionStore:
                     clean[kind] = validate_address(kind, addresses.get(kind))
                 except ValueError:
                     continue
+            port = addresses.get("pushPort")
+            if isinstance(port, int) and not isinstance(port, bool) and 1024 <= port <= 65535:
+                clean["pushPort"] = port
+            if addresses.get("pushCodec") in ("h264", "h265"):
+                clean["pushCodec"] = addresses["pushCodec"]
             try:
                 from zerotier_local import validate_network_id, validate_node_id
 

@@ -2,6 +2,9 @@ import argparse, json, os, sys, time, traceback
 from pathlib import Path
 
 PROCESS_STARTED_AT = time.monotonic()
+# FFmpeg in Qt Multimedia opens only whitelisted protocols. Video pushed by the camera
+# ("Static IP") arrives as RTP over UDP described by a local SDP file.
+os.environ.setdefault('QT_FFMPEG_PROTOCOL_WHITELIST', 'file,crypto,data,rtsp,rtp,udp,tcp')
 from version import VERSION, WINDOW_TITLE
 
 DATA = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'FPV-Uhyliant'
@@ -253,9 +256,16 @@ def main():
     presets = PresetsRuntime(preset_store, s)
     backup.restored.connect(presets.reload)
     dvr_runtime = DvrRuntime()
-    connections = ConnectionsRuntime(d, ConnectionStore(DATA / 'connections.json'), zerotier=ZeroTierLocal())
+    connections = ConnectionsRuntime(
+        d,
+        ConnectionStore(DATA / 'connections.json'),
+        zerotier=ZeroTierLocal(),
+        listen=not x.first_run_acceptance_smoke,
+        sdp_folder=DATA / 'push-video',
+    )
     v.host_resolver = connections.host_for
     secondary.host_resolver = connections.host_for
+    v.push_resolver = connections.push_url_for
     dvr_runtime.recordingChanged.connect(lambda: s.setRecordingActive(dvr_runtime.recording))
     app._runtime_refs = app._runtime_refs + (flight_alerts, presets, dvr_runtime, connections)
     ctx = e.rootContext()

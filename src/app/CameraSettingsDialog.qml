@@ -11,6 +11,17 @@ Popup {
  property string deviceId: ""
  property var camera: ({})
  property string error: ""
+ readonly property bool bindForThis: connectionsRuntime.bindStatus.deviceId === deviceId
+ readonly property bool binding: bindForThis && connectionsRuntime.bindStatus.busy === true
+ Connections {
+  target: connectionsRuntime
+  function onChanged() {
+   if (root.bindForThis && !root.binding && root.opened) {
+    var address = connectionsRuntime.addressFor(root.deviceId, "static")
+    if (address !== "") staticField.text = address
+   }
+  }
+ }
  property color fg: "#f4f7fb"
  property color sub: "#b7c8da"
  property color red: "#ff6678"
@@ -77,8 +88,36 @@ Popup {
   Text { text: "Локальна адреса (у мережі станції)"; color: root.sub; font.pixelSize: 12; Layout.topMargin: 4 }
   TextField { id: hostField; objectName: "cameraHostField"; Layout.fillWidth: true; placeholderText: "192.168.1.10" }
 
-  Text { text: "Статичний IP або доменне ім’я (DDNS)"; color: root.sub; font.pixelSize: 12; Layout.topMargin: 4 }
-  TextField { id: staticField; objectName: "cameraStaticField"; Layout.fillWidth: true; placeholderText: "93.170.12.5 або drone.example.net" }
+  Text { text: "Статичний IP пілота — біла адреса інтернету, куди камера надсилає відео"; color: root.sub; font.pixelSize: 12; Layout.topMargin: 4; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+  RowLayout {
+   Layout.fillWidth: true
+   spacing: 8
+   TextField { id: staticField; objectName: "cameraStaticField"; Layout.fillWidth: true; placeholderText: "93.170.12.5 або drone.example.net" }
+   Button {
+    objectName: "cameraBindNetwork"
+    text: root.binding ? "Перевіряю…" : "Прив’язати до цієї мережі"
+    enabled: !root.binding
+    onClicked: connectionsRuntime.bindThisNetwork(root.deviceId)
+    HoverHint { text: "Визначити білу адресу цього інтернету, перевірити її та відкрити порт для відео на роутері." }
+   }
+  }
+  Text {
+   objectName: "cameraBindMessage"
+   visible: text !== ""
+   text: root.bindForThis ? (connectionsRuntime.bindStatus.message || "") : ""
+   color: root.binding ? root.sub : ({ready: "#3ddc97", manual: "#ffbf4a"})[connectionsRuntime.bindStatus.state] || root.red
+   wrapMode: Text.WordWrap
+   Layout.fillWidth: true
+   font.pixelSize: 12
+  }
+  Text {
+   // statuses is read so the text refreshes when the runtime changes (a port is assigned on binding)
+   readonly property int port: connectionsRuntime.statuses && root.deviceId ? connectionsRuntime.pushPortFor(root.deviceId) : 0
+   visible: port > 0
+   text: "Порт для відео цієї камери: " + port + " (UDP)"
+   color: root.sub
+   font.pixelSize: 11
+  }
 
   Text { text: "Адреса через Starlink (IPv6)"; color: root.sub; font.pixelSize: 12; Layout.topMargin: 4 }
   TextField { id: starlinkField; objectName: "cameraStarlinkField"; Layout.fillWidth: true; placeholderText: "2001:db8::10" }

@@ -24,6 +24,14 @@ This records decisions agreed with the product owner, so later work builds on th
 - Before flying, the pilot picks a connection type on the camera card; "Fly" lights up only for a
   type that is reachable right now. *Done:* Local, Static IP/DDNS, ZeroTier, Starlink IPv6 with live
   status probed every 5 s; the video uses the chosen address.
+- **Static IP** = the pilot's public ("white") IPv4 from the provider. Starlink gives the drone a shared
+  CGNAT IPv4, so the station cannot reach the camera over IPv4; instead the camera sends RTP video to
+  the pilot's address. *Done (station):* each camera gets its own UDP port (5600, 5602, ...); the card
+  shows "waiting for camera" / "camera sends" from incoming packets; the ports are freed for the player
+  while flying; "Bind to this network" finds the public address, detects a grey (CGNAT) address and
+  forwards the port on the router via UPnP (or says which port to forward manually); the player opens
+  the stream through a local SDP file (RTP payload type 97 for H.265, 96 for H.264).
+  *Next:* write the address, port and payload type into the camera over SSH.
 - Cloud = **ZeroTier** (ready-made service instead of an own server). One ZeroTier network per camera:
   sharing = authorizing a PC in that network, revoking = deauthorizing it, archive = deauthorizing
   the camera. Addresses never need syncing: a camera's address follows from the network and node IDs

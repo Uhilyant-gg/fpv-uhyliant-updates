@@ -141,9 +141,9 @@ def test_cloud_cannot_be_used_yet(runtime):
 def test_video_uses_the_selected_address(runtime):
     device = {"id": "c1", "host": "192.168.1.10"}
     assert runtime.host_for(device) == "192.168.1.10"
-    runtime.setAddress("c1", "static", "93.170.12.5")
-    runtime.select("c1", "static")
-    assert runtime.host_for(device) == "93.170.12.5"
+    runtime.setAddress("c1", "starlink", "2001:db8::10")
+    runtime.select("c1", "starlink")
+    assert runtime.host_for(device) == "2001:db8::10"
 
 
 def test_stale_probe_result_is_ignored(runtime):
@@ -181,15 +181,15 @@ def test_video_runtime_builds_url_from_the_selected_ipv6_address(monkeypatch):
 
 
 def test_clear_address_unselects_and_forgets(runtime, tmp_path):
-    runtime.prober.reachable["93.170.12.5"] = 20
-    runtime.setAddress("c1", "static", "93.170.12.5")
-    runtime.select("c1", "static")
+    runtime.prober.reachable["2001:db8::10"] = 20
+    runtime.setAddress("c1", "starlink", "2001:db8::10")
+    runtime.select("c1", "starlink")
     assert runtime.canFly("c1")
-    runtime.clearAddress("c1", "static")
+    runtime.clearAddress("c1", "starlink")
     assert runtime.selected == {}
-    assert runtime.statuses["c1"]["static"]["state"] == "unconfigured"
+    assert runtime.statuses["c1"]["starlink"]["state"] == "unconfigured"
     assert json.loads((tmp_path / "c.json").read_text()) == {}
-    runtime.clearAddress("c1", "starlink")  # nothing saved: no error
+    runtime.clearAddress("c1", "static")  # nothing saved: no error
 
 
 class FakeZeroTier:
@@ -281,3 +281,91 @@ def test_clearing_zerotier_unselects(zt_runtime):
     assert zt_runtime.setZeroTier("c1", "", "")
     assert zt_runtime.selected == {}
     assert zt_runtime.statuses["c1"]["cloud"]["label"] == "вказати мережу"
+
+
+class Clock:
+    def __init__(self):
+        self.now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+@pytest.fixture
+def push_runtime(tmp_path):
+    clock = Clock()
+    results = []
+
+    def binder(port):
+        results.append(port)
+        return push_runtime.bind_result
+
+    rt = ConnectionsRuntime(
+        FakeDevices(),
+        cp.ConnectionStore(tmp_path / "c.json"),
+        prober=Prober(),
+        run_async=False,
+        listen=False,
+        sdp_folder=tmp_path / "sdp",
+        binder=binder,
+        clock=clock,
+    )
+    rt.clock, rt.bind_ports = clock, results
+    push_runtime.bind_result = {"state": "ready", "publicIp": "93.170.12.5", "message": "Готово"}
+    return rt
+
+
+def test_static_ip_waits_for_the_camera_to_send_video(push_runtime, tmp_path):
+    rt = push_runtime
+    assert rt.setAddress("c1", "static", "93.170.12.5")
+    assert rt.pushPortFor("c1") == 5600
+    assert rt.statuses["c1"]["static"]["label"] == "чекає камеру"
+    rt.select("c1", "static")
+    assert not rt.canFly("c1")
+
+    rt._note_packet(5600)
+    assert rt.statuses["c1"]["static"] == cp.status_entry("available", None, "камера надсилає")
+    assert rt.canFly("c1")
+
+    url = rt.push_url_for({"id": "c1"})
+    assert url.startswith("file://") and url.endswith("push-c1.sdp")
+    assert "m=video 5600 RTP/AVP 97" in (tmp_path / "sdp" / "push-c1.sdp").read_text()
+    assert rt.host_for({"id": "c1", "host": "192.168.1.10"}) == "192.168.1.10"
+
+    rt.clock.now += 5
+    rt.refresh()
+    assert rt.statuses["c1"]["static"]["label"] == "чекає камеру", "no packets for a while"
+    assert not rt.canFly("c1")
+
+
+def test_push_url_only_for_the_static_choice(push_runtime):
+    rt = push_runtime
+    rt.setAddress("c1", "static", "93.170.12.5")
+    assert rt.push_url_for({"id": "c1"}) == ""
+    rt.select("c1", "local")
+    assert rt.push_url_for({"id": "c1"}) == ""
+
+
+def test_push_ports_are_unique_and_saved(push_runtime, tmp_path):
+    rt = push_runtime
+    rt._addresses["other"] = {"pushPort": 5600}
+    rt.setAddress("c1", "static", "93.170.12.5")
+    assert rt.pushPortFor("c1") == 5602
+    assert cp.ConnectionStore(tmp_path / "c.json").load()["c1"]["pushPort"] == 5602
+
+
+def test_bind_this_network_fills_the_static_address(push_runtime):
+    rt = push_runtime
+    rt.bindThisNetwork("c1")
+    assert rt.bind_ports == [5600]
+    assert rt.bindStatus["state"] == "ready" and not rt.bindStatus["busy"]
+    assert rt.addressFor("c1", "static") == "93.170.12.5"
+
+
+def test_bind_on_a_grey_network_keeps_the_address_empty(push_runtime):
+    rt = push_runtime
+    push_runtime_result = {"state": "grey", "publicIp": "93.170.12.5", "message": "сіру"}
+    rt._binder = lambda port: push_runtime_result
+    rt.bindThisNetwork("c1")
+    assert rt.bindStatus["state"] == "grey"
+    assert rt.addressFor("c1", "static") == ""
