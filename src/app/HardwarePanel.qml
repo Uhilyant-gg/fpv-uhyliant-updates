@@ -94,8 +94,17 @@ Item {
   }
  }
 
- ColumnLayout {
+ // Scrolls when the rows (and the flight-controller settings) are taller than the window.
+ Flickable {
+  id: hwScroll
   anchors.fill: parent
+  contentHeight: hwColumn.implicitHeight
+  clip: true
+  boundsBehavior: Flickable.StopAtBounds
+  ScrollBar.vertical: ScrollBar { policy: hwScroll.contentHeight > hwScroll.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
+ ColumnLayout {
+  id: hwColumn
+  width: hwScroll.width - 12
   spacing: 14
 
   RowLayout {
@@ -125,8 +134,10 @@ Item {
   Row_ {
    objectName: "hardwareLink"
    title: "Канал зв’язку · " + root.kindLabel(root.kind)
-   value: root.link.state === "available" && root.link.latencyMs !== null && root.link.latencyMs !== undefined ? "затримка " + root.link.label : (root.link.label || "немає даних")
-   dot: root.stateColor(root.link.state)
+   // A camera pushing to a static IP is not pinged: the video arriving is its answer.
+   readonly property bool pushing: root.kind === "static" && linkDoctor.details.hasStream === true && !linkMonitor.lost
+   value: pushing ? "камера надсилає відео" : (root.link.state === "available" && root.link.latencyMs !== null && root.link.latencyMs !== undefined ? "затримка " + root.link.label : (root.link.label || "немає даних"))
+   dot: pushing ? root.green : root.stateColor(root.link.state)
    detail: root.streamText()
    LinkGraph { width: Math.min(parent.width, 480); height: 36; values: linkMonitor.history }
   }
@@ -164,6 +175,55 @@ Item {
    dot: cameraAudio.playing ? root.green : (cameraFeatures.micEnabled ? root.amber : root.grey)
   }
   Row_ {
+   objectName: "hardwareFcLink"
+   title: "Польотник через камеру"
+   value: fcLink.text
+   detail: "Станція сама знаходить порт, протокол і швидкість (лише коли дрон не заармлено). За потреби задайте вручну."
+   dot: fcLink.streaming ? root.green : (fcLink.text.indexOf("не знайдено") >= 0 ? root.amber : root.grey)
+   ColumnLayout {
+    width: parent.width
+    spacing: 6
+    RowLayout {
+     spacing: 8
+     Button { objectName: "fcLinkSearch"; text: "Шукати знову"; onClicked: fcLink.search() }
+     Button { objectName: "fcLinkManualToggle"; text: manualBox.visible ? "Сховати ручні" : "Вручну…"; onClicked: manualBox.visible = !manualBox.visible }
+    }
+    RowLayout {
+     id: manualBox
+     visible: false
+     spacing: 6
+     ComboBox {
+      id: fcPort
+      objectName: "fcLinkPort"
+      model: ["Авто"].concat(fcLink.ports.map(function(p) { return p.replace("/dev/", "") }))
+      currentIndex: Math.max(0, model.indexOf((fcLink.manual.port || "").replace("/dev/", "")))
+      Layout.preferredWidth: 120
+     }
+     ComboBox {
+      id: fcBaud
+      objectName: "fcLinkBaud"
+      model: ["Авто"].concat(fcLink.bauds.map(function(b) { return String(b) }))
+      currentIndex: Math.max(0, model.indexOf(String(fcLink.manual.baud || "")))
+      Layout.preferredWidth: 110
+     }
+     ComboBox {
+      id: fcProtocol
+      objectName: "fcLinkProtocol"
+      model: ["Авто", "MAVLink", "MSP", "CRSF"]
+      currentIndex: Math.max(0, model.indexOf(fcLink.manual.protocol || ""))
+      Layout.preferredWidth: 110
+     }
+     Button {
+      objectName: "fcLinkApply"
+      text: "Застосувати"
+      onClicked: fcLink.setManual(fcPort.currentIndex > 0 ? "/dev/" + fcPort.currentText : "",
+                                  fcBaud.currentIndex > 0 ? Number(fcBaud.currentText) : 0,
+                                  fcProtocol.currentIndex > 0 ? fcProtocol.currentText : "")
+     }
+    }
+   }
+  }
+  Row_ {
    objectName: "hardwareFlightController"
    title: "Польотний контролер"
    value: root.fcValue()
@@ -195,5 +255,6 @@ Item {
    Button { objectName: "hardwareStarlink"; visible: root.kind === "starlink"; text: "Starlink"; onClicked: root.openStarlink() }
    Button { objectName: "hardwareNetworkDetails"; text: "Мережа ПК детально"; onClicked: root.openNetworkDetails() }
   }
+ }
  }
 }

@@ -56,6 +56,9 @@ Audio = make('Audio', {'text': str, 'playing': bool, 'muted': bool, 'volume': in
              {'setMuted': ((bool,), None, lambda self, v: heard.append(('muted', v))),
               'setVolume': ((int,), None, lambda self, v: heard.append(('volume', v))),
               'toggleMute': ((), None, lambda self: heard.append('toggle'))})
+FcLink = make('FcLink', {'text': str, 'streaming': bool, 'manual': 'QVariantMap', 'bauds': 'QVariantList', 'ports': 'QVariantList'},
+               {'search': ((), None, lambda self: None), 'setManual': ((str, int, str), None, lambda self, p, b, pr: manual_set.append((p, b, pr)))})
+manual_set = []
 Station = make('Station', {'osdEnabled': bool}, {'setOSDEnabled': ((bool,), None, lambda self, v: None)})
 
 types = [{'key': 'local', 'label': 'Локальна мережа'}, {'key': 'starlink', 'label': 'Starlink IPv6'}]
@@ -76,6 +79,7 @@ props = dict(
     starlinkDish=Dish(available=True, status={'stateText': 'на зв’язку', 'latencyMs': 42, 'dropPct': 0.5, 'obstructedPct': 3.1, 'currentlyObstructed': False, 'downMbps': 85.3, 'upMbps': 12.4, 'alerts': ['антена перегріта, швидкість знижена']}, reason='', lastOutageCause='перешкода в небі (дерева, будівлі, корпус дрона)'),
     cameraFeatures=Features(features={'usb': {'device': 'P2 Pro', 'enabled': True}, 'health': {'videoService': True, 'tempC': 61}}, healthText='відеосервіс працює · чип 61 °C · навантаження 0,4', usbText='P2 Pro: камера кодує, потік на бічній панелі',
                             audioText='мікрофон увімкнено · 8 кГц', audioSupported=True, micEnabled=True, micRate=8000, micVolume=60, message=''),
+    fcLink=FcLink(text='дані надходять · MAVLink · порт ttyS2 · 57600 · ArduPilot', streaming=True, manual={}, bauds=[115200, 57600], ports=['/dev/ttyS2']),
     cameraAudio=Audio(text='звук грає', playing=True, muted=False, volume=80),
     linkDoctor=Doctor(details={'internet': False, 'hasStream': True, 'lossPct': 2.5, 'jitterMs': 4.2, 'kbps': 3200, 'codec': 'H.265', 'keyframeS': 1.0}, text='', level='ok'),
 )
@@ -159,7 +163,7 @@ props['connectionsRuntime']._v['selected'] = {'c1': 'static'}
 props['connectionsRuntime']._v['statuses'] = {'c1': {'static': {'state': 'available', 'latencyMs': None, 'label': 'камера надсилає'}}}
 props['connectionsRuntime'].changed.emit()
 app.processEvents()
-assert 'камера надсилає' in value_texts(hw), 'a static IP has no latency to show'
+assert 'камера надсилає відео' in value_texts(hw), 'a static IP has no latency to show: the video arriving is the answer'
 props['connectionsRuntime']._v['selected'] = {'c1': 'starlink'}
 props['connectionsRuntime']._v['statuses'] = statuses
 props['connectionsRuntime'].changed.emit()
@@ -178,6 +182,12 @@ props['connectionsRuntime'].changed.emit()
 app.processEvents()
 assert child(sl, 'starlinkState').property('text') == 'Адресу камери в Starlink ще не отримано'
 assert 'відеосервіс працює · чип 61 °C · навантаження 0,4' in value_texts(hw)
+assert 'дані надходять · MAVLink · порт ttyS2 · 57600 · ArduPilot' in value_texts(hw)
+hw.findChild(QObject, 'fcLinkPort').setProperty('currentIndex', 1)
+hw.findChild(QObject, 'fcLinkBaud').setProperty('currentIndex', 2)
+hw.findChild(QObject, 'fcLinkProtocol').setProperty('currentIndex', 1)
+hw.findChild(QObject, 'fcLinkApply').clicked.emit()
+assert manual_set == [('/dev/ttyS2', 57600, 'MAVLink')], manual_set
 assert 'P2 Pro: камера кодує, потік на бічній панелі' in value_texts(hw) and 'звук грає' in value_texts(hw)
 
 audio = load('AudioPanel.qml')
