@@ -31,6 +31,7 @@ MAX_STORE_BYTES = 1500 * 1024 * 1024
 AHEAD = ((10, 15.0), (12, 6.0), (13, 4.0), (14, 3.0), (15, 2.0), (16, 1.5), (17, 1.0))
 MOVED_KM = 1.0  # a new area is added once the drone is this far from the last one
 PACE_S = 0.12  # between fetched tiles, about eight a second at most
+VIEW_MAX_TILES = 400  # what one map window can show at once, with room to spare
 _PATH = re.compile(r"^/tile/(\d{1,2})/(\d{1,7})/(\d{1,7})$")
 
 
@@ -55,6 +56,42 @@ def tiles_around(lat: float, lon: float, ahead=AHEAD) -> list[tuple[int, int, in
                 if 0 <= y < n and math.hypot(x + 0.5 - cx, y + 0.5 - cy) <= r + 0.5:
                     out.append((z, x % n, y))
     return out
+
+
+def tiles_in_box(north: float, west: float, south: float, east: float, z: int) -> list[tuple[int, int, int]]:
+    """(z, x, y) of the tiles that cover the box (what the map window shows)."""
+    n = 2**z
+    x0, y0 = tile_xy(north, west, z)
+    x1, y1 = tile_xy(south, east, z)
+    xs = range(int(x0), int(x1) + 1) if x1 >= x0 else list(range(int(x0), n)) + list(range(0, int(x1) + 1))
+    return [(z, x % n, y) for x in xs for y in range(max(0, int(y0)), min(n - 1, int(y1)) + 1)]
+
+
+def overzoom(store, z: int, x: int, y: int, levels=3) -> bytes | None:
+    """Where the imagery has no tile this detailed, a part of a coarser tile, enlarged."""
+    from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QRect, Qt
+    from PySide6.QtGui import QImage
+
+    for up in range(1, levels + 1):
+        if z - up < 0:
+            break
+        data = store.read(z - up, x >> up, y >> up)
+        if data is None:
+            continue
+        image = QImage.fromData(QByteArray(data))
+        if image.isNull():
+            continue
+        part = image.width() >> up
+        if part < 8:
+            break
+        crop = image.copy(QRect((x % (1 << up)) * part, (y % (1 << up)) * part, part, part))
+        big = crop.scaled(image.width(), image.height(), Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        out = QByteArray()
+        buffer = QBuffer(out)
+        buffer.open(QIODevice.WriteOnly)
+        big.save(buffer, "JPG", 85)
+        return bytes(out)
+    return None
 
 
 def distance_km(a, b) -> float:
@@ -160,6 +197,9 @@ def make_server(store: TileStore, fetcher=fetch_tile) -> ThreadingHTTPServer:
                 return
             data = store.get_or_fetch(z, x, y, fetcher)
             if data is None:
+                # Not kept on disk: the real tile is fetched next time it is online.
+                data = overzoom(store, z, x, y)
+            if data is None:
                 self.send_error(404)
                 return
             self.send_response(200)
@@ -247,8 +287,28 @@ class MapTilesRuntime(QObject):
             return
         self._area = where
         missing = [t for t in tiles_around(*where) if not self._store.has(*t)]
+        self._enqueue(missing)
+        self.changed.emit()
+
+    @Slot(float, float, float, float, float)
+    def prefetchView(self, north, west, south, east, zoom):
+        """What the map window shows, and one level closer, so zooming in is already there."""
+        try:
+            z = max(0, min(19, int(zoom)))
+        except (TypeError, ValueError):
+            return
+        if not (-90 <= south <= north <= 90):
+            return
+        wanted = []
+        for level in sorted({z, min(19, z + 1)}):
+            tiles = tiles_in_box(north, west, south, east, level)
+            if len(tiles) > VIEW_MAX_TILES:
+                break
+            wanted += [t for t in tiles if not self._store.has(*t)]
+        self._enqueue(wanted)
+
+    def _enqueue(self, missing):
         with self._lock:
-            # The new area goes first: the drone is there now.
             first = set(missing)
             self._queue = missing + [t for t in self._queue if t not in first]
             if not self._busy:
@@ -258,8 +318,6 @@ class MapTilesRuntime(QObject):
             self._busy = True
             self.changed.emit()
             self._run(self._work)
-        else:
-            self.changed.emit()
 
     def _run(self, work):
         if self._run_async:

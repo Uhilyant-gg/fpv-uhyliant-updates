@@ -210,8 +210,21 @@ Item {
  }
  Connections {
   target: view.map
-  function onZoomLevelChanged() { root.zoomedAt = Date.now() }
-  function onCenterChanged() { if (!root.centring && root.follow) Qt.callLater(root.checkPan) }
+  function onZoomLevelChanged() { root.zoomedAt = Date.now(); viewSettled.restart() }
+  function onCenterChanged() { if (!root.centring && root.follow) Qt.callLater(root.checkPan); viewSettled.restart() }
+  function onWidthChanged() { viewSettled.restart() }
+  function onHeightChanged() { viewSettled.restart() }
+ }
+ // Once the view stops moving: the station fetches what the window shows, and one level closer.
+ Timer {
+  id: viewSettled
+  interval: 600
+  onTriggered: {
+   if (typeof mapTiles === "undefined" || !mapTiles) return
+   var box = view.map.visibleRegion.boundingGeoRectangle()
+   if (!box.isValid) return
+   mapTiles.prefetchView(box.topLeft.latitude, box.topLeft.longitude, box.bottomRight.latitude, box.bottomRight.longitude, view.map.zoomLevel)
+  }
  }
  function checkPan() { if (Date.now() - zoomedAt > 300) root.follow = false }
 
@@ -242,6 +255,18 @@ Item {
    on: saved.courseUp
    onClicked: saved.courseUp = !saved.courseUp
    HoverHint { text: saved.courseUp ? "Карта повертається за курсом дрона. Натисніть — північ угорі." : "Північ угорі. Натисніть — карта за курсом дрона."; delay: 500 }
+  }
+  MapButton {
+   objectName: "flightMapZoomIn"
+   text: "+"
+   onClicked: root.zoomAt(1, Qt.point(view.width / 2, view.height / 2))
+   HoverHint { text: "Ближче (або колесо миші над картою)"; delay: 500 }
+  }
+  MapButton {
+   objectName: "flightMapZoomOut"
+   text: "−"
+   onClicked: root.zoomAt(-1, Qt.point(view.width / 2, view.height / 2))
+   HoverHint { text: "Далі (або колесо миші над картою)"; delay: 500 }
   }
   MapButton {
    objectName: "flightMapMarks"

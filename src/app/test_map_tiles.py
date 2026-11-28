@@ -78,3 +78,38 @@ def test_store_limit_removes_the_oldest(tmp_path):
         os.utime(store.path(10, i, 0), (1000 + i, 1000 + i))
     store.prune()
     assert [store.has(10, i, 0) for i in range(5)] == [False, False, False, True, True]
+
+
+def test_what_the_window_shows_is_fetched_with_one_level_closer(tmp_path):
+    calls = []
+    rt = mt.MapTilesRuntime(tmp_path, Telemetry(), fetcher=fake_fetch(calls), serve=False, run_async=False)
+    rt.prefetchView(50.46, 30.50, 50.44, 30.54, 15.4)
+    zooms = sorted({z for z, _, _ in calls})
+    assert zooms == [15, 16], zooms
+    assert set(calls) == set(
+        mt.tiles_in_box(50.46, 30.50, 50.44, 30.54, 15) + mt.tiles_in_box(50.46, 30.50, 50.44, 30.54, 16)
+    )
+    before = len(calls)
+    rt.prefetchView(50.46, 30.50, 50.44, 30.54, 15.4)
+    assert len(calls) == before, "kept tiles are not fetched again"
+    rt.prefetchView(80, -170, -80, 170, 12)
+    assert len(calls) == before, "a whole-world view is not bulk-downloaded"
+
+
+def test_a_missing_detailed_tile_is_an_enlarged_part_of_a_coarser_one(tmp_path):
+    from PySide6.QtCore import QBuffer, QByteArray, QIODevice
+    from PySide6.QtGui import QColor, QImage
+
+    image = QImage(256, 256, QImage.Format_RGB32)
+    image.fill(QColor("darkgreen"))
+    data = QByteArray()
+    buffer = QBuffer(data)
+    buffer.open(QIODevice.WriteOnly)
+    image.save(buffer, "JPG")
+    store = mt.TileStore(tmp_path)
+    store.write(16, 100, 200, bytes(data))
+    out = mt.overzoom(store, 18, 401, 803)
+    enlarged = QImage.fromData(QByteArray(out))
+    assert enlarged.width() == 256 and enlarged.pixelColor(128, 128).green() > 80
+    assert mt.overzoom(store, 18, 0, 0) is None, "nothing coarser kept: nothing to show"
+    assert not store.has(18, 401, 803), "an enlarged part is not kept: the real tile comes later"
