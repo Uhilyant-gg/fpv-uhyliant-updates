@@ -329,6 +329,7 @@ def main():
                 'lossPct': details.get('lossPct', 0),
                 'jitterMs': details.get('jitterMs', 0),
                 'latencyMs': status.get('latencyMs'),
+                'smoothingMs': details.get('smoothingMs', 0),
             }
         )
 

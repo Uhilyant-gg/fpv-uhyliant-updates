@@ -46,7 +46,7 @@ Item {
  function streamText() {
   var d = linkDoctor.details
   if (!d.hasStream) return ""
-  return "втрачено " + String(d.lossPct).replace(".", ",") + "% пакетів · нерівність " + Math.round(d.jitterMs) + " мс · " + (d.kbps / 1000).toFixed(1).replace(".", ",") + " Мбіт/с"
+  return "втрачено " + String(d.lossPct).replace(".", ",") + "% пакетів · нерівність " + Math.round(d.jitterMs) + " мс · " + (d.kbps / 1000).toFixed(1).replace(".", ",") + " Мбіт/с" + (d.smoothingMs ? " · згладжування " + d.smoothingMs + " мс" : "")
  }
  function videoValue2() {
   var d = linkDoctor.details
