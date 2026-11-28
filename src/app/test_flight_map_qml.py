@@ -31,6 +31,11 @@ class Telemetry(QObject):
 tel = Telemetry()
 engine = QQmlEngine()
 engine.rootContext().setContextProperty("telemetryRuntime", tel)
+import tempfile, pathlib
+sys.path.insert(0, str(pathlib.Path(sys.argv[1]).parent))
+from map_marks import MapMarksRuntime
+marks = MapMarksRuntime(pathlib.Path(tempfile.mkdtemp()) / "marks.json")
+engine.rootContext().setContextProperty("mapMarks", marks)
 component = QQmlComponent(engine, QUrl.fromLocalFile(sys.argv[1]))
 item = component.create()
 assert item is not None, [e.toString() for e in component.errors()]
@@ -91,6 +96,16 @@ pump(0.4)
 item.panTo(50.0, 30.0)
 pump(0.6)
 assert not item.findChild(QObject, "flightMapFollow").property("on")
+# Points by MGRS: typed in the panel, drawn on the map, the drone's own MGRS shown.
+assert child("flightMapDroneMgrs").isVisible()
+item.findChild(QObject, "flightMapMarks").clicked.emit()
+pump(0.2)
+assert child("flightMapMarksPanel").isVisible()
+field = item.findChild(QObject, "flightMapMgrsField")
+field.setProperty("text", "36U UA 24182 91607")
+item.findChild(QObject, "flightMapMgrsAdd").clicked.emit()
+pump(0.2)
+assert [m["name"] for m in marks.marks] == ["1"] and field.property("text") == ""
 print("ok")
 """
 

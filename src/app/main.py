@@ -409,6 +409,9 @@ def main():
         return {'camera': d.activeName, 'link': label, 'station': WINDOW_TITLE}
 
     black_box = BlackBoxRuntime(flight_sample, flight_header)
+    from map_marks import MapMarksRuntime
+
+    map_marks = MapMarksRuntime(DATA / 'map-marks.json')
     from link_test import LinkTestRuntime
 
     def link_test_sample():
@@ -435,6 +438,7 @@ def main():
         camera_audio,
         black_box,
         link_test,
+        map_marks,
         flight_alerts,
         presets,
         dvr_runtime,
@@ -483,6 +487,7 @@ def main():
         ('cameraAudio', camera_audio),
         ('blackBox', black_box),
         ('linkTest', link_test),
+        ('mapMarks', map_marks),
         ('controllerActions', controller_actions),
         ('videoPresets', video_preset_runtime),
         ('connectionsRuntime', connections),

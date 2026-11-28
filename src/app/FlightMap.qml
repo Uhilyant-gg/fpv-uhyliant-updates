@@ -20,6 +20,8 @@ Item {
  readonly property var home: hasHome ? QtPositioning.coordinate(Number(telemetry.homeLatitude), Number(telemetry.homeLongitude)) : QtPositioning.coordinate()
  readonly property real heading: isFinite(Number(telemetry.heading)) && telemetry.heading !== null ? Number(telemetry.heading) : 0
  property var trail: []
+ readonly property bool marksAvailable: typeof mapMarks !== "undefined" && mapMarks !== null
+ property bool marksOpen: false
  // For checks: where the map looks and how it is turned.
  readonly property real centerLatitude: view.map.center.latitude
  readonly property real centerLongitude: view.map.center.longitude
@@ -92,6 +94,27 @@ Item {
    line.color: "#cc27d59a"
    path: root.hasDrone && root.hasHome ? [root.drone, root.home] : []
   }
+  MapItemView {
+   parent: view.map
+   model: root.marksAvailable ? mapMarks.marks : []
+   delegate: MapQuickItem {
+    required property var modelData
+    coordinate: QtPositioning.coordinate(modelData.lat, modelData.lon)
+    anchorPoint.x: pin.width / 2
+    anchorPoint.y: pin.height
+    sourceItem: Item {
+     id: pin
+     width: Math.max(24, label.implicitWidth + 10); height: 34
+     Rectangle {
+      anchors.horizontalCenter: parent.horizontalCenter
+      width: parent.width; height: 22; radius: 6
+      color: "#e6ff6678"; border.color: "white"; border.width: 1.5
+      Text { id: label; anchors.centerIn: parent; text: modelData.name; color: "white"; font.bold: true; font.pixelSize: 12 }
+     }
+     Rectangle { anchors.horizontalCenter: parent.horizontalCenter; y: 22; width: 2; height: 12; color: "white" }
+    }
+   }
+  }
   MapQuickItem {
    objectName: "flightMapHome"
    parent: view.map
@@ -137,6 +160,15 @@ Item {
   objectName: "flightMapWheel"
   anchors.fill: parent
   z: 1
+  TapHandler {
+   // A right click marks the place: the station names it and shows its MGRS.
+   acceptedButtons: Qt.RightButton
+   enabled: root.marksAvailable
+   onTapped: function(eventPoint) {
+    var c = view.map.toCoordinate(eventPoint.position, false)
+    if (c.isValid) mapMarks.addAt(c.latitude, c.longitude)
+   }
+  }
   WheelHandler {
    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
    target: null
@@ -207,6 +239,14 @@ Item {
    onClicked: saved.courseUp = !saved.courseUp
    HoverHint { text: saved.courseUp ? "Карта повертається за курсом дрона. Натисніть — північ угорі." : "Північ угорі. Натисніть — карта за курсом дрона."; delay: 500 }
   }
+  MapButton {
+   objectName: "flightMapMarks"
+   visible: root.marksAvailable
+   text: "⚑"
+   on: root.marksOpen
+   onClicked: root.marksOpen = !root.marksOpen
+   HoverHint { text: "Точки на карті: додати за координатами MGRS. Правий клік по карті теж ставить точку."; delay: 500 }
+  }
  }
 
  Rectangle {
@@ -217,6 +257,60 @@ Item {
   width: noDrone.implicitWidth + 16; height: noDrone.implicitHeight + 8; radius: 6
   color: "#cc0b1420"
   Text { id: noDrone; anchors.centerIn: parent; text: "Чекаю координати від польотника"; color: "#dddddd"; font.pixelSize: 11 }
+ }
+
+ Rectangle {
+  objectName: "flightMapMarksPanel"
+  visible: root.marksOpen && root.marksAvailable
+  z: 3
+  anchors.left: parent.left; anchors.leftMargin: 46
+  anchors.top: parent.top; anchors.topMargin: 28
+  width: Math.min(300, parent.width - 56)
+  height: Math.min(parent.height - 40, marksColumn.implicitHeight + 16)
+  radius: 8
+  color: "#ee0b1420"; border.color: "#5f7f9e"
+  Column {
+   id: marksColumn
+   anchors.fill: parent; anchors.margins: 8
+   spacing: 6
+   Row {
+    spacing: 6
+    TextField {
+     id: mgrsField
+     objectName: "flightMapMgrsField"
+     width: marksColumn.width - addButton.width - 6
+     placeholderText: "MGRS, напр. 36U UA 24182 91607"
+     font.pixelSize: 12
+     onAccepted: if (mapMarks.addMgrs(text, "")) text = ""
+    }
+    Button { id: addButton; objectName: "flightMapMgrsAdd"; text: "＋"; width: 34; onClicked: if (mapMarks.addMgrs(mgrsField.text, "")) mgrsField.text = "" }
+   }
+   Text { visible: root.marksAvailable && mapMarks.message !== ""; text: root.marksAvailable ? mapMarks.message : ""; color: "#b7c8da"; font.pixelSize: 11; wrapMode: Text.Wrap; width: marksColumn.width }
+   Repeater {
+    model: root.marksAvailable ? mapMarks.marks : []
+    delegate: Row {
+     required property var modelData
+     spacing: 6
+     Button {
+      width: marksColumn.width - 34
+      height: 26; padding: 2
+      contentItem: Text { text: modelData.name + "   " + modelData.mgrs; color: "#f4f7fb"; font.pixelSize: 12; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter }
+      background: Rectangle { radius: 4; color: parent.hovered ? "#22364b" : "transparent" }
+      onClicked: { saved.follow = false; view.map.center = QtPositioning.coordinate(modelData.lat, modelData.lon) }
+     }
+     Button { width: 28; height: 26; text: "✕"; onClicked: mapMarks.remove(modelData.index) }
+    }
+   }
+  }
+ }
+
+ Rectangle {
+  objectName: "flightMapDroneMgrs"
+  visible: root.hasDrone && root.marksAvailable
+  anchors.left: parent.left; anchors.bottom: parent.bottom
+  width: droneMgrs.implicitWidth + 10; height: droneMgrs.implicitHeight + 4
+  color: "#99000000"
+  Text { id: droneMgrs; anchors.centerIn: parent; text: root.marksAvailable && root.hasDrone ? "Дрон: " + mapMarks.mgrsOf(Number(root.telemetry.latitude), Number(root.telemetry.longitude)) : ""; color: "#f4f7fb"; font.pixelSize: 11; font.bold: true }
  }
 
  Rectangle {
