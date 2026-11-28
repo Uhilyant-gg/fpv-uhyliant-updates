@@ -269,19 +269,17 @@ def main():
             lambda h, u, p: camera_setup.CameraShell(h, u, p, DATA / 'camera_known_hosts'),
         )
 
-    def inspect_camera(host):
-        session = [(credentials.username or 'root', credentials.secret())]
-        return camera_inspect.inspect_camera(
-            host,
-            session + list(camera_setup.DEFAULT_CREDENTIALS),
-            lambda h, u, p: camera_setup.CameraShell(h, u, p, DATA / 'camera_known_hosts'),
-        )
+    inspector = camera_inspect.InspectorPool(
+        lambda: [(credentials.username or 'root', credentials.secret())] + list(camera_setup.DEFAULT_CREDENTIALS),
+        lambda h, u, p: camera_setup.CameraShell(h, u, p, DATA / 'camera_known_hosts'),
+    )
 
     connections = ConnectionsRuntime(
         d,
         ConnectionStore(DATA / 'connections.json'),
         camera_setup=configure_camera,
-        camera_inspect=inspect_camera,
+        camera_inspect=inspector.inspect,
+        camera_inspect_close=inspector.close_all,
         zerotier=ZeroTierLocal(),
         listen=not x.first_run_acceptance_smoke,
         sdp_folder=DATA / 'push-video',
@@ -337,6 +335,7 @@ def main():
         credentials.clear()
         dvr_runtime.shutdown()
         connections.stop()
+        inspector.close_all()
         video.stopAll()
         links.clear()
         pairing.clearPending()

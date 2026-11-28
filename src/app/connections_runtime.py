@@ -19,7 +19,9 @@ import push_video as pv
 import zerotier_local as zt
 
 PUSH_FRESH_S = 3.0
-INSPECT_EVERY_S = 600.0
+# Read the camera on every periodic check (5 s); it never happens in flight, and the
+# SSH session stays open between reads. After a failed login wait a minute.
+INSPECT_EVERY_S = 5.0
 INSPECT_RETRY_S = 60.0
 SETUP_RETRY_S = 60.0
 SETUP_LABELS = {
@@ -66,9 +68,11 @@ class ConnectionsRuntime(QObject):
         clock=time.monotonic,
         camera_setup=None,
         camera_inspect=None,
+        camera_inspect_close=None,
     ):
         super().__init__()
         self._camera_inspect = camera_inspect
+        self._camera_inspect_close = camera_inspect_close
         self._inspect_busy: set[str] = set()
         self._inspect_at: dict[str, tuple[float, bool]] = {}
         self._inspected.connect(self._apply_inspect)
@@ -176,9 +180,11 @@ class ConnectionsRuntime(QObject):
 
     @Slot()
     def pauseListening(self):
-        """Free the video ports for the player while flying."""
+        """Before a flight: free the video ports for the player and close camera sessions."""
         self._listening_paused = True
         self._close_listeners()
+        if self._camera_inspect_close is not None:
+            self._camera_inspect_close()
 
     @Slot()
     def resumeListening(self):
@@ -525,7 +531,7 @@ class ConnectionsRuntime(QObject):
         else:
             return
         at, ok = self._inspect_at.get(device_id, (-1e9, False))
-        if self._clock() - at < (INSPECT_EVERY_S if ok else INSPECT_RETRY_S):
+        if self._clock() - at < (INSPECT_EVERY_S if ok else INSPECT_RETRY_S) - 0.5:
             return
         host = self._host(device_id, channel)
         self._inspect_busy.add(device_id)

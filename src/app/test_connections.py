@@ -518,10 +518,10 @@ def test_ids_are_read_from_the_camera_on_the_local_network(inspect_runtime):
     assert rt.addressFor("c1", "starlink") == "", "on the local network the IPv6 is not Starlink's"
     assert rt.statuses["c1"]["cloud"]["label"] == "40 мс · напряму", "ZeroTier works without typing anything"
     rt.refresh()
-    assert len(rt.calls) == 1, "not read again within 10 minutes"
-    rt.clock.now += 601
+    assert len(rt.calls) == 1, "not twice within the same periodic check"
+    rt.clock.now += 5
     rt.refresh()
-    assert len(rt.calls) == 2
+    assert len(rt.calls) == 2, "read again on the next 5-second check"
 
 
 def test_manual_zerotier_ids_are_not_overwritten(inspect_runtime):
@@ -569,3 +569,21 @@ def test_camera_is_read_as_soon_as_it_answers(inspect_runtime):
     rt = inspect_runtime
     rt.select("c1", "local")  # the probe answers right away (synchronous in tests)
     assert rt.calls == ["192.168.1.10"], "no need to wait for the next periodic check"
+
+
+def test_flight_closes_camera_sessions_and_stops_reading(inspect_runtime):
+    rt = inspect_runtime
+    closed = []
+    rt._camera_inspect_close = lambda: closed.append(True)
+    rt.refresh()
+    assert len(rt.calls) == 1
+    rt.pauseListening()
+    assert closed == [True], "sessions are closed before the flight"
+    for _ in range(5):
+        rt.clock.now += 5
+        rt.refresh()
+    assert len(rt.calls) == 1, "nothing is read from the camera in flight"
+    rt.resumeListening()
+    rt.clock.now += 5
+    rt.refresh()
+    assert len(rt.calls) == 2
