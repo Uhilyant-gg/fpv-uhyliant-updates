@@ -142,6 +142,7 @@ def test_layout_presets_are_saved_and_applied_by_the_pilot(tmp_path):
     assert rt.saveLayout() == 1
     assert [x["name"] for x in rt.layouts] == ["Розташування 1", "Розташування 2"]
     assert [x["count"] for x in rt.layouts] == [1, 2]
+    assert rt.layouts[0]["windows"] == [{"x": 0.0, "y": 0.0, "w": 0.4}], "a little picture of the arrangement"
     assert rt.applyLayout(0) == 1
     assert rt.openCount == 1 and rt.windows[0]["streamId"] == "thermal" and rt.windows[0]["w"] == 0.4
     rt.deleteLayout(0)

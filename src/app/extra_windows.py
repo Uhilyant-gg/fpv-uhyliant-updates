@@ -271,8 +271,29 @@ class ExtraWindowsRuntime(QObject):
         if not isinstance(items, list):
             return []
         return [
-            {"name": str(i.get("name", "")), "count": len(i.get("windows") or [])} for i in items if isinstance(i, dict)
+            {
+                "name": str(i.get("name", "")),
+                "count": len(i.get("windows") or []),
+                "windows": self._shapes(i.get("windows")),
+            }
+            for i in items
+            if isinstance(i, dict)
         ]
+
+    @staticmethod
+    def _shapes(windows):
+        """Where the windows of an arrangement stand, for its little picture in the menu."""
+        out = []
+        for item in windows or []:
+            try:
+                out.append({"x": float(item["x"]), "y": float(item["y"]), "w": float(item["w"])})
+            except (KeyError, TypeError, ValueError):
+                continue
+        return out
+
+    @Property("QVariantList", notify=changed)
+    def lastWindows(self):
+        return self._shapes(self._saved())
 
     @Slot(result=int)
     def saveLayout(self):

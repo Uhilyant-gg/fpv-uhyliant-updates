@@ -57,10 +57,15 @@ Rectangle {
    Layout.preferredHeight: 52
    padding: 2
    background: Rectangle { radius: 8; color: parent.hovered ? "#22364b" : "#132235"; border.color: "#2f4860" }
-   contentItem: ColumnLayout {
-    spacing: 1
-    Text { Layout.alignment: Qt.AlignHCenter; text: "▦"; color: root.fg; font.pixelSize: 18 }
-    Text { Layout.alignment: Qt.AlignHCenter; text: "Розташ."; color: root.fg; font.pixelSize: 10 }
+   contentItem: Item {
+    // A little screen with two windows: the layouts.
+    Rectangle {
+     anchors.centerIn: parent
+     width: 34; height: 22; radius: 3
+     color: "transparent"; border.color: root.fg; border.width: 1.5
+     Rectangle { x: 19; y: 3; width: 12; height: 7; radius: 1; color: root.green }
+     Rectangle { x: 19; y: 12; width: 12; height: 7; radius: 1; color: root.green; opacity: 0.6 }
+    }
    }
    onClicked: root.openLayouts()
    HoverHint { text: "Пресети розташування вікон: зберегти поточне, відкрити збережене, як минулого разу." }
