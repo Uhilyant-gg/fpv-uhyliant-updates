@@ -112,7 +112,8 @@ Order: 1+2+6, then 3, then 4+5 with telemetry forwarding, then 8+9, then 7 on re
 - Additional camera (thermal) on the camera's USB through UVC or a capture card: first tried on the
   official OpenIPC firmware, without a custom build. Picture-in-picture made on the camera to save
   bitrate comes after the separate stream works.
-- Side panel without captions (agreed 2026-11-28): square tiles with an icon of the source (camera,
+- Side panel without captions (agreed 2026-11-28): video streams at the top (only those present),
+  sound, map and layouts at the bottom; square tiles with an icon of the source (camera,
   USB, thermal, map, sound) and its number (1 is the main video); the window of a stream carries
   the same icon and number. The name, what a click does and the settings (⚙ in the corner under the
   mouse, or the right button) appear under the mouse.

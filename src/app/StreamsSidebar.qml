@@ -2,7 +2,8 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Left strip of the flight screen: one square tile per source, no captions. A tile shows what the
+// Left strip of the flight screen: one square tile per source, no captions. Video streams at the
+// top (only those the camera has now), sound, map and layouts at the bottom. A tile shows what the
 // source is (an icon) and its number (1 is the main video; the same number is on its window).
 // The name, what a click does and the settings appear under the mouse.
 //   click — show in a window / close it (a closed stream is paused: no bitrate);
@@ -93,10 +94,29 @@ Rectangle {
   HoverHint { text: tile.hint; delay: 500 }
  }
 
+ readonly property var videoSources: extraWindows.sources.filter(function(x) { return x.kind !== "map" })
+ readonly property var mapSource: extraWindows.sources.filter(function(x) { return x.kind === "map" })[0] || ({ id: "map", kind: "map", name: "Карта", slot: -1 })
+
+ component SourceTile: Tile {
+  property var source: ({})
+  iconKind: root.iconFor(source.kind)
+  number: source.number || 0
+  on: source.slot >= 0
+  enabled: on || extraWindows.openCount < 3
+  dot: root.dotFor(source, source.slot)
+  settings: source.kind !== "map"
+  hint: (source.number ? source.number + " · " : "") + (source.name || "") + " — "
+        + (source.slot >= 0 ? "клік закриває" + (source.kind !== "map" ? ", потік стане на паузу." : ".")
+                            : (enabled ? "клік показує у вікні." : "вже відкрито три вікна."))
+  onClicked: source.slot >= 0 ? extraWindows.close(source.slot) : extraWindows.open(source.id)
+  onSettingsRequested: root.openStreamSettings(source)
+ }
+
+ // Top: the video streams — the main one, then the camera's others (only those it has now).
  Flickable {
-  anchors.fill: parent
-  anchors.topMargin: 7
-  anchors.bottomMargin: 64
+  anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+  anchors.bottom: bottomGroup.top
+  anchors.topMargin: 7; anchors.bottomMargin: 7
   contentHeight: list.implicitHeight
   clip: true
   ColumnLayout {
@@ -112,46 +132,42 @@ Rectangle {
     hint: "1 · " + stream.name + " — на великому екрані. ⚙ — пресети якості."
     onSettingsRequested: root.openStreamSettings(stream)
    }
-   Tile {
-    objectName: "sideSound"
-    visible: cameraFeatures.audioSupported
-    iconKind: "sound"
-    on: cameraFeatures.micEnabled && !cameraAudio.muted
-    muted: cameraAudio.muted || !cameraFeatures.micEnabled
-    dot: cameraAudio.playing ? root.green : (on ? root.amber : "transparent")
-    hint: "Звук з камери: " + cameraAudio.text + ". " + (cameraFeatures.micEnabled ? (cameraAudio.muted ? "Клік — увімкнути (M)." : "Клік — вимкнути (M).") : "⚙ — увімкнути мікрофон.")
-    onClicked: cameraFeatures.micEnabled ? cameraAudio.toggleMute() : root.openAudio()
-    onSettingsRequested: root.openAudio()
-   }
-   Rectangle { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 34; Layout.preferredHeight: 1; color: "#22364b" }
    Repeater {
-    model: extraWindows.sources
-    delegate: Tile {
+    model: root.videoSources
+    delegate: SourceTile {
      required property var modelData
      objectName: "sideStream"
-     iconKind: root.iconFor(modelData.kind)
-     number: modelData.number || 0
-     on: modelData.slot >= 0
-     enabled: on || extraWindows.openCount < 3
-     dot: root.dotFor(modelData, modelData.slot)
-     settings: modelData.kind !== "map"
-     hint: (modelData.number ? modelData.number + " · " : "") + (modelData.name || "") + " — "
-           + (modelData.slot >= 0 ? "клік закриває" + (modelData.kind !== "map" ? ", потік стане на паузу." : ".")
-                                  : (enabled ? "клік показує у вікні." : "вже відкрито три вікна."))
-     onClicked: modelData.slot >= 0 ? extraWindows.close(modelData.slot) : extraWindows.open(modelData.id)
-     onSettingsRequested: root.openStreamSettings(modelData)
+     source: modelData
     }
    }
   }
  }
 
- Tile {
-  objectName: "sideLayouts"
-  anchors.horizontalCenter: parent.horizontalCenter
-  anchors.bottom: parent.bottom; anchors.bottomMargin: 8
-  iconKind: "layouts"
-  settings: false
-  hint: "Розташування вікон: зберегти поточне, відкрити збережене, як минулого разу"
-  onClicked: root.openLayouts()
+ // Bottom: sound, map, layouts.
+ ColumnLayout {
+  id: bottomGroup
+  anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+  anchors.bottomMargin: 8
+  spacing: 7
+  Rectangle { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 34; Layout.preferredHeight: 1; color: "#22364b" }
+  Tile {
+   objectName: "sideSound"
+   visible: cameraFeatures.audioSupported
+   iconKind: "sound"
+   on: cameraFeatures.micEnabled && !cameraAudio.muted
+   muted: cameraAudio.muted || !cameraFeatures.micEnabled
+   dot: cameraAudio.playing ? root.green : (on ? root.amber : "transparent")
+   hint: "Звук з камери: " + cameraAudio.text + ". " + (cameraFeatures.micEnabled ? (cameraAudio.muted ? "Клік — увімкнути (M)." : "Клік — вимкнути (M).") : "⚙ — увімкнути мікрофон.")
+   onClicked: cameraFeatures.micEnabled ? cameraAudio.toggleMute() : root.openAudio()
+   onSettingsRequested: root.openAudio()
+  }
+  SourceTile { objectName: "sideMap"; source: root.mapSource }
+  Tile {
+   objectName: "sideLayouts"
+   iconKind: "layouts"
+   settings: false
+   hint: "Розташування вікон: зберегти поточне, відкрити збережене, як минулого разу"
+   onClicked: root.openLayouts()
+  }
  }
 }
