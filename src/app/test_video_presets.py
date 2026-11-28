@@ -36,8 +36,8 @@ def test_nine_slots_on_keys_2_to_0_with_defaults_from_the_weakest_link(tmp_path)
     rt, _, _ = make(tmp_path)
     keys = [s["key"] for s in rt.slots]
     assert keys == ["2", "3", "4", "5", "6", "7", "8", "9", "0"]
-    assert rt.slots[0]["name"] == "Мінімум" and rt.slots[0]["bitrateKbps"] == 1024
-    assert rt.slots[8]["name"] == "Максимум" and rt.slots[8]["bitrateKbps"] == 10240
+    assert rt.slots[0]["name"] == "Мінімум" and rt.slots[0]["bitrateKbps"] == 512
+    assert rt.slots[8]["name"] == "Максимум" and rt.slots[8]["bitrateKbps"] == 6144
     assert not any(s["empty"] for s in rt.slots), "the station fills every slot by itself"
     assert rt.label == "Пресет відео не вибрано"
 
@@ -51,14 +51,14 @@ def test_applying_a_preset_writes_it_into_the_camera(tmp_path):
             [
                 "cli -s .video0.rcMode cbr",
                 "cli -s .video0.size 1280x720",
-                "cli -s .video0.fps 60",
-                "cli -s .video0.bitrate 4096",
-                "cli -s .video0.gopSize 1",
+                "cli -s .video0.fps 30",
+                "cli -s .video0.bitrate 2048",
+                "cli -s .video0.gopSize 0.5",
                 "killall -1 majestic",
             ],
         )
     ]
-    assert rt.activeKey == "6" and rt.label == "6 · Середній · 4 Мбіт/с"
+    assert rt.activeKey == "6" and rt.label == "6 · Середній · 2 Мбіт/с"
     assert rt.message == "Пресет 6 «Середній» застосовано в камері" and rt.messageOk
     assert store.load()["c1"]["active"] == "6", "remembered for this camera"
 
@@ -67,11 +67,11 @@ def test_quick_bitrate_steps_mark_the_preset_as_changed(tmp_path):
     rt, sent, _ = make(tmp_path)
     rt.apply("6")
     assert rt.stepBitrate(-1)
-    assert sent[-1][1] == ["cli -s .video0.bitrate 3072", "killall -1 majestic"]
-    assert rt.label == "6 · Середній* · 3 Мбіт/с"
+    assert sent[-1][1] == ["cli -s .video0.bitrate 1536", "killall -1 majestic"]
+    assert rt.label == "6 · Середній* · 1,5 Мбіт/с"
     rt.stepBitrate(+1)
     rt.stepBitrate(+1)
-    assert rt.bitrateKbps == 6144
+    assert rt.bitrateKbps == 2560
     assert not rt.setBitrate(50000), "out of range never reaches the camera"
 
 
@@ -173,7 +173,7 @@ def test_auto_moves_between_this_cameras_own_presets(tmp_path):
     )
     rt.apply("6")
     assert rt.choose("1"), "key 1 is Auto"
-    assert rt.auto and rt.label == "Авто · 6 · Середній · 4 Мбіт/с"
+    assert rt.auto and rt.label == "Авто · 6 · Середній · 2 Мбіт/с"
     for _ in range(3):
         clock[0] += 1
         rt.observe({"lossPct": 6, "jitterMs": 2})
@@ -195,6 +195,8 @@ def test_the_ladder_keeps_enough_data_per_pixel_and_smoothness_first():
             assert kbps * 1000 / (w * h * fps) >= vp.MIN_BITS_PER_PIXEL, (kbps, size, fps)
     assert vp.picture_for(3072) == ("1280x720", 60), "60 fps before 1080p"
     assert vp.picture_for(8192) == ("1920x1080", 60)
+    assert max(vp.LADDER_KBPS) <= 6144, "Starlink on the drone carries at most ~6 Mbit/s"
+    assert sum(k <= 2560 for k in vp.LADDER_KBPS) >= 6, "most steps where Starlink works reliably"
 
 
 def test_rebuild_brings_back_the_stations_presets(tmp_path):

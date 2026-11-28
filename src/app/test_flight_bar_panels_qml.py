@@ -90,6 +90,14 @@ app.processEvents()
 link = child(bar, 'flightBarLink')
 assert link.property('caption') == 'Зв’язок · Starlink IPv6' and link.property('value') == '58 мс · 30 к/с'
 assert child(bar, 'flightBarFc').property('value') == 'АКБ 16,4 В'
+assert not child(bar, 'flightBarPip').property('visible'), 'no second stream: no small-window button'
+bar.setProperty('pipAvailable', True)
+toggles = []
+bar.togglePip.connect(lambda: toggles.append(1))
+app.processEvents()
+assert child(bar, 'flightBarPip').property('visible') and child(bar, 'flightBarPip').property('text') == '□'
+child(bar, 'flightBarPip').clicked.emit()
+assert toggles == [1]
 child(bar, 'flightBarBitrateDown').clicked.emit()
 child(bar, 'flightBarBitrateUp').clicked.emit()
 assert steps == [-1, 1], steps

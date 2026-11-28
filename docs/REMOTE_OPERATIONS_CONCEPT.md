@@ -91,6 +91,13 @@ Order: 1+2+6, then 3, then 4+5 with telemetry forwarding, then 8+9, then 7 on re
   largest picture that still gets enough data per pixel to stay free of blocks, never below 30 fps
   and 60 fps as soon as the bitrate carries it; an even (CBR) stream; a short full-frame interval on
   weak links. The pilot may edit any preset and rebuild them all.
+- Starlink on the drone carried at most ~6 Mbit/s in the owner's tests and works reliably up to
+  ~2.5 Mbit/s: the ladder runs 0.5–6 Mbit/s with most steps at or below 2.5.
+- A stream that is not shown is paused so it spends no bitrate.
+- Windows: at the start of a flight only the main stream is shown. Layouts are switched by the
+  pilot (flight bar, keys, click on the small window); the small window is dragged to a corner and
+  resized by the pilot. The station never moves or arranges windows by itself. No second controller
+  switch for layouts; the existing one swaps the streams.
 - Delay target: at most 150 ms from the camera to the pilot's screen. A small smoothing buffer on
   the PC is allowed inside that budget.
 - Additional camera (thermal) on the camera's USB through UVC or a capture card: first tried on the
