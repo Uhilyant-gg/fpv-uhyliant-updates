@@ -18,7 +18,7 @@ Item {
 
   RowLayout {
    Layout.fillWidth: true
-   Text { text: "ЗАПИС ВІДЕО"; color: root.fg; font.pixelSize: 20; font.bold: true; Layout.fillWidth: true }
+   Text { text: "ЗАПИС І ЧОРНА СКРИНЬКА"; color: root.fg; font.pixelSize: 20; font.bold: true; Layout.fillWidth: true }
    Button { objectName: "closeRecording"; text: "Закрити"; onClicked: root.closeRequested() }
   }
 
@@ -61,6 +61,39 @@ Item {
    }
   }
 
+  Rectangle {
+   Layout.fillWidth: true
+   implicitHeight: boxColumn.implicitHeight + 24
+   radius: 12
+   color: "#132235"
+   border.color: root.line
+   ColumnLayout {
+    id: boxColumn
+    anchors.fill: parent
+    anchors.margins: 12
+    spacing: 8
+    Text { text: "Чорна скринька"; color: root.sub; font.pixelSize: 13 }
+    Text {
+     text: "Кожен політ сам записується в окрему папку: що було з відео, зв’язком, Starlink і польотником щосекунди, усі події і короткий підсумок. Зберігаються останні 200 польотів."
+     color: root.sub; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true
+    }
+    Text {
+     objectName: "blackBoxFolderText"
+     text: blackBox.folder + (blackBox.folderIsDefault ? "  (типова)" : "")
+     color: root.fg; font.pixelSize: 15; font.bold: true; wrapMode: Text.WrapAnywhere; Layout.fillWidth: true
+    }
+    RowLayout {
+     Layout.fillWidth: true
+     spacing: 8
+     Button { objectName: "chooseBlackBoxFolder"; text: "Змінити папку…"; enabled: !blackBox.active; onClicked: boxDialog.open() }
+     Button { objectName: "openBlackBoxFolder"; text: "Відкрити папку"; onClicked: blackBox.openFolder() }
+     Button { objectName: "resetBlackBoxFolder"; text: "Типова папка"; enabled: !blackBox.folderIsDefault && !blackBox.active; onClicked: blackBox.resetFolder() }
+     Item { Layout.fillWidth: true }
+    }
+    Text { visible: blackBox.error !== ""; text: blackBox.error; color: root.red; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+   }
+  }
+
   Text {
    objectName: "recordingState"
    text: dvrRuntime.recording ? "● Іде запис: " + dvrRuntime.elapsedText : (dvrRuntime.lastFileName !== "" ? "Останній запис: " + dvrRuntime.lastFileName : "Записів у цьому сеансі ще немає.")
@@ -82,6 +115,12 @@ Item {
   Item { Layout.fillHeight: true }
  }
 
+ FolderDialog {
+  id: boxDialog
+  title: "Папка чорної скриньки"
+  currentFolder: blackBox.folderUrl
+  onAccepted: blackBox.setFolder(selectedFolder.toString())
+ }
  FolderDialog {
   id: folderDialog
   title: "Папка для записів відео"

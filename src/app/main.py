@@ -357,10 +357,63 @@ def main():
         )
 
     link_doctor.changed.connect(feed_auto)
+    from flight_log import BlackBoxRuntime
+
+    def flight_sample():
+        # Once a second in flight: what the station sees, for the black box.
+        device_id = d.activeId
+        kind = connections.selected.get(device_id, '')
+        status = connections.statuses.get(device_id, {}).get(kind, {})
+        details = link_doctor.details
+        tel = telemetry.telemetry or {}
+        dish = starlink_dish.status if starlink_dish.available else {}
+        sample = {
+            'fps': link_monitor.fps,
+            'lost': link_monitor.lost,
+            'frameSize': link_monitor.frameSize,
+            'latencyMs': status.get('latencyMs'),
+            'verdictLevel': link_doctor.level,
+            'verdictText': link_doctor.text if link_doctor.level != 'ok' else '',
+            'preset': video_preset_runtime.label,
+            'recording': dvr_runtime.recording,
+            'windows': extra_windows.openCount,
+            'sound': camera_audio.playing,
+        }
+        for key in ('lossPct', 'jitterMs', 'kbps', 'smoothingMs', 'internet'):
+            if key in details:
+                sample[key] = details[key]
+        for key in (
+            'armed',
+            'flightMode',
+            'batteryVoltage',
+            'batteryRemaining',
+            'altitude',
+            'groundSpeed',
+            'heading',
+            'satellites',
+            'homeDistance',
+            'linkQuality',
+        ):
+            if tel.get(key) is not None:
+                sample[key] = tel[key]
+        if dish:
+            sample['starlinkLatencyMs'] = dish.get('latencyMs')
+            sample['starlinkDropPct'] = dish.get('dropPct')
+            sample['starlinkObstructed'] = bool(dish.get('currentlyObstructed'))
+        return sample
+
+    def flight_header():
+        device_id = d.activeId
+        kind = connections.selected.get(device_id, '')
+        label = next((t['label'] for t in connections.types if t.get('key') == kind), kind)
+        return {'camera': d.activeName, 'link': label, 'station': WINDOW_TITLE}
+
+    black_box = BlackBoxRuntime(flight_sample, flight_header)
     app._runtime_refs = app._runtime_refs + (
         starlink_dish,
         camera_features,
         camera_audio,
+        black_box,
         flight_alerts,
         presets,
         dvr_runtime,
@@ -407,6 +460,7 @@ def main():
         ('starlinkDish', starlink_dish),
         ('cameraFeatures', camera_features),
         ('cameraAudio', camera_audio),
+        ('blackBox', black_box),
         ('controllerActions', controller_actions),
         ('videoPresets', video_preset_runtime),
         ('connectionsRuntime', connections),
@@ -424,6 +478,7 @@ def main():
         connections.stop()
         camera_features.stop()
         camera_audio.setActive(False)
+        black_box.setActive(False)
         inspector.close_all()
         video.stopAll()
         links.clear()

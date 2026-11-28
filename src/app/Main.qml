@@ -43,7 +43,7 @@ ApplicationWindow {
  onConnectedChanged: { if (!connected) { dvrRuntime.stop(); extraWindows.closeAll(); w.mainSource = -1; connectionsRuntime.resumeListening() } else connectionsRuntime.pauseListening() }
  function attachDvrSink(){var sink=player.videoOutput ? player.videoOutput.videoSink : null;dvrRuntime.setVideoSink(sink);linkMonitor.setVideoSink(sink)}
  property bool linkWatchActive: connected && !simulation && !serviceMode
- onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive);controllerActions.setActive(linkWatchActive);starlinkDish.setActive(linkWatchActive);cameraAudio.setActive(linkWatchActive)}
+ onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive);controllerActions.setActive(linkWatchActive);starlinkDish.setActive(linkWatchActive);cameraAudio.setActive(linkWatchActive);blackBox.setActive(linkWatchActive)}
  Connections{target:controllerActions;function onSwapRequested(){w.swapWindows()}}
  Connections{target:linkDoctor;function onRetryNeeded(){w.recoverPrimary()}}
  Connections{target:linkMonitor;function onRetryNeeded(){if(!videoRecovery.running)w.recoverPrimary()}}
@@ -634,6 +634,32 @@ ApplicationWindow {
  Popup{id:preflightPopup;objectName:"preflightPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#f00d1725";border.color:amber;radius:14}onAboutToShow:{preflightContent.active=true;controllerRuntime.observe()}contentItem:Loader{id:preflightContent;objectName:"preflightContent";anchors.fill:parent;active:false;sourceComponent:Component{PreflightPanel{anchors.fill:parent;anchors.margins:16;cameraName:devicesModel.activeName;video:vd;telemetry:t;network:net;navigation:ext;nextAction:homeDashboard.nextAction;osdEnabled:station.osdEnabled;controllerHealth:controllerRuntime.health;controllerDetail:controllerRuntime.summary;onCloseRequested:preflightPopup.close();onOpenOsdSettings:function(){preflightPopup.close();w.openOsdSettings()}onOpenSimulation:function(){preflightPopup.close();simulation=true}onOpenDiagnostics:function(){preflightPopup.close();diagnostics.open()}}}}}
  Dialog{id:leaveFlightConfirm;objectName:"leaveFlightConfirm";modal:true;anchors.centerIn:Overlay.overlay;title:"Дрон озброєний. Вийти з польоту?";standardButtons:Dialog.Yes|Dialog.No;onAccepted:disconnectDevice();Text{text:"Відео і телеметрія на станції зупиняться. На сам дрон це не впливає.";color:fg;wrapMode:Text.Wrap;width:360}}
  Popup{id:videoPresetsPopup;objectName:"videoPresetsPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#f00d1725";border.color:"#2f4860";radius:14}onAboutToShow:videoPresetsContent.active=true;contentItem:Loader{id:videoPresetsContent;objectName:"videoPresetsContent";anchors.fill:parent;active:false;sourceComponent:Component{VideoPresetsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:videoPresetsPopup.close()}}}}
+ Connections { target: blackBox; function onFinished() { flightSummaryPopup.open() } }
+ Popup {
+  id: flightSummaryPopup
+  objectName: "flightSummaryPopup"
+  modal: true
+  anchors.centerIn: Overlay.overlay
+  width: Math.min(560, w.width - 40)
+  padding: 18
+  background: Rectangle { color: "#f00d1725"; border.color: "#2f4860"; radius: 14 }
+  contentItem: ColumnLayout {
+   spacing: 8
+   Text { text: "Підсумок польоту"; color: "#f4f7fb"; font.pixelSize: 20; font.bold: true }
+   Text { text: (blackBox.lastSummary.camera || "") + (blackBox.lastSummary.started ? " · " + blackBox.lastSummary.started : ""); color: "#b7c8da"; font.pixelSize: 13 }
+   Repeater {
+    model: blackBox.lastSummaryLines
+    delegate: Text { required property string modelData; text: "• " + modelData; color: "#f4f7fb"; font.pixelSize: 15; wrapMode: Text.Wrap; Layout.fillWidth: true }
+   }
+   Text { text: "Усі деталі польоту записано в чорну скриньку."; color: "#b7c8da"; font.pixelSize: 12; Layout.topMargin: 4 }
+   RowLayout {
+    Layout.fillWidth: true
+    Button { objectName: "flightSummaryOpen"; text: "Відкрити папку польоту"; onClicked: blackBox.openLastFlight() }
+    Item { Layout.fillWidth: true }
+    Button { objectName: "flightSummaryClose"; text: "Закрити"; onClicked: flightSummaryPopup.close() }
+   }
+  }
+ }
  Popup{id:hardwarePopup;objectName:"hardwarePopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(760,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#f00d1725";border.color:"#2f4860";radius:14}onAboutToShow:hardwareContent.active=true;contentItem:Loader{id:hardwareContent;objectName:"hardwareContent";anchors.fill:parent;active:false;sourceComponent:Component{HardwarePanel{anchors.fill:parent;anchors.margins:16;video:vd;telemetry:t;onCloseRequested:hardwarePopup.close();onOpenStarlink:{hardwarePopup.close();starlinkPopup.open()}onOpenNetworkDetails:{hardwarePopup.close();diagnostics.open()}}}}}
  Popup{id:starlinkPopup;objectName:"starlinkPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(640,w.width-40);height:Math.min(460,w.height-48);background:Rectangle{color:"#f00d1725";border.color:"#2f4860";radius:14}onAboutToShow:starlinkContent.active=true;contentItem:Loader{id:starlinkContent;objectName:"starlinkContent";anchors.fill:parent;active:false;sourceComponent:Component{StarlinkPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:starlinkPopup.close()}}}}
  Popup{id:diagnostics;objectName:"diagnostics";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#0d1725";border.color:green;radius:14}onAboutToShow:diagnosticsContent.active=true;contentItem:Loader{id:diagnosticsContent;objectName:"diagnosticsContent";anchors.fill:parent;active:false;sourceComponent:Component{DiagnosticsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:diagnostics.close()}}}}
