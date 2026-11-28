@@ -40,6 +40,8 @@ Link = make('Link', {'history': 'QVariantList', 'fps': int, 'lost': bool, 'lostS
 Dvr = make('Dvr', {'recording': bool, 'canStart': bool, 'elapsedText': str, 'freeSpaceText': str, 'lowSpace': bool},
            {'toggle': ((), None, lambda self: None)})
 Ctl = make('Ctl', {'health': str, 'summary': str})
+Dish = make('Dish', {'available': bool, 'status': 'QVariantMap', 'reason': str, 'lastOutageCause': str}, {'poll': ((), None, lambda self: polled.append(1))})
+polled = []
 VP = make('VP', {'busy': bool}, {'stepBitrate': ((int,), bool, lambda self, d: steps.append(d) or True)})
 steps = []
 Doctor = make('Doctor', {'details': 'QVariantMap', 'text': str, 'level': str})
@@ -60,6 +62,7 @@ props = dict(
     controllerRuntime=Ctl(health='ready', summary='Пульт готовий'),
     station=Station(osdEnabled=True),
     videoPresets=VP(busy=False),
+    starlinkDish=Dish(available=True, status={'stateText': 'на зв’язку', 'latencyMs': 42, 'dropPct': 0.5, 'obstructedPct': 3.1, 'currentlyObstructed': False, 'downMbps': 85.3, 'upMbps': 12.4, 'alerts': ['антена перегріта, швидкість знижена']}, reason='', lastOutageCause='перешкода в небі (дерева, будівлі, корпус дрона)'),
     linkDoctor=Doctor(details={'internet': False, 'hasStream': True, 'lossPct': 2.5, 'jitterMs': 4.2, 'kbps': 3200, 'codec': 'H.265', 'keyframeS': 1.0}, text='', level='ok'),
 )
 for name, obj in props.items():
@@ -150,6 +153,10 @@ assert child(sl, 'starlinkState').property('text') == 'Зв’язок є · з�
 assert child(sl, 'starlinkAddress').property('text') == '2001:db8::10 — зчитано з камери'
 child(sl, 'starlinkCheckNow').clicked.emit()
 assert refreshed == [1]
+assert polled == [1], 'the dish is asked too'
+assert child(sl, 'starlinkDishState').property('text') == 'на зв’язку · затримка до мережі Starlink 42 мс · втрати 0,5%'
+assert child(sl, 'starlinkDishAlerts').property('text') == 'Увага: антена перегріта, швидкість знижена'
+assert child(sl, 'starlinkLastOutage').property('text') == 'Останній обрив: перешкода в небі (дерева, будівлі, корпус дрона)'
 props['connectionsRuntime']._v['statuses'] = {'c1': {'starlink': {'state': 'unconfigured', 'latencyMs': None, 'label': 'вказати адресу'}}}
 props['connectionsRuntime'].changed.emit()
 app.processEvents()

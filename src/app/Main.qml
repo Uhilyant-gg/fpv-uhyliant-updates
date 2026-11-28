@@ -37,7 +37,7 @@ ApplicationWindow {
  onConnectedChanged: { if (!connected) { dvrRuntime.stop(); connectionsRuntime.resumeListening() } else connectionsRuntime.pauseListening() }
  function attachDvrSink(){var sink=player.videoOutput ? player.videoOutput.videoSink : null;dvrRuntime.setVideoSink(sink);linkMonitor.setVideoSink(sink)}
  property bool linkWatchActive: connected && !simulation && !serviceMode
- onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive);controllerActions.setActive(linkWatchActive)}
+ onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive);controllerActions.setActive(linkWatchActive);starlinkDish.setActive(linkWatchActive)}
  Connections{target:controllerActions;function onSwapRequested(){if(streamWorkspace.state.pipAvailable){streamWorkspace.swap();w.rebuildPlayback()}}}
  Connections{target:linkDoctor;function onRetryNeeded(){w.recoverPrimary()}}
  Connections{target:linkMonitor;function onRetryNeeded(){if(!videoRecovery.running)w.recoverPrimary()}}
@@ -171,7 +171,7 @@ ApplicationWindow {
      anchors.centerIn: parent
      spacing: 3
      Text { objectName: "linkBannerText"; anchors.horizontalCenter: parent.horizontalCenter; text: linkBanner.warning ? linkDoctor.text : linkMonitor.text; color: "white"; font.pixelSize: 19; font.bold: true }
-     Text { objectName: "linkBannerCause"; anchors.horizontalCenter: parent.horizontalCenter; visible: linkMonitor.lost && linkDoctor.text !== ""; text: linkDoctor.text; color: "white"; font.pixelSize: 15 }
+     Text { objectName: "linkBannerCause"; anchors.horizontalCenter: parent.horizontalCenter; visible: text !== ""; text: linkMonitor.lost ? linkDoctor.text : (linkMonitor.justRestored && starlinkDish.lastOutageCause !== "" ? "Причина за даними Starlink: " + starlinkDish.lastOutageCause : ""); color: "white"; font.pixelSize: 15 }
     }
    }
    Rectangle {

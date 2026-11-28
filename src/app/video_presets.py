@@ -3,8 +3,8 @@ weakest link (2) up.
 
 A preset is written into the camera itself (majestic's settings) and the video
 service reloads; the station re-opens the video by itself. In flight this goes
-through a connection the station can reach the camera on (local, ZeroTier or
-Starlink); with only a static IP the camera sends but cannot be reached.
+through a connection the station can log in to the camera on (local or ZeroTier);
+over a static IP or Starlink's public address the camera sends video only.
 Only fixed, validated values ever go into the commands.
 """
 
@@ -80,7 +80,7 @@ MESSAGES = {
     "bitrate": "Бітрейт {mbps} Мбіт/с застосовано в камері",
     "busy": "Камера ще застосовує попередню зміну",
     "no-camera": "Камеру не вибрано",
-    "unreachable": "Камера недоступна для керування: потрібне підключення через локальну мережу, ZeroTier або Starlink",
+    "unreachable": "Камера недоступна для керування: потрібне підключення через локальну мережу або ZeroTier",
     "empty": "Цей слот порожній. Задайте пресет у налаштуваннях пресетів відео.",
     "invalid": "Перевірте значення пресета",
 }

@@ -140,6 +140,11 @@ class CameraShell:
         output = stdout.read().decode("utf-8", "replace").strip()
         return stdout.channel.recv_exit_status(), output
 
+    def open_tcp(self, host: str, port: int, timeout=5.0):
+        """A TCP channel from the camera to a device next to it (the Starlink dish)."""
+        transport = self.client.get_transport()
+        return transport.open_channel("direct-tcpip", (host, port), ("127.0.0.1", 0), timeout=timeout)
+
     def __exit__(self, *exc):
         self.client.close()
         return False

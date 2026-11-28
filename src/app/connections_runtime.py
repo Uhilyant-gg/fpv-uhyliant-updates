@@ -211,16 +211,25 @@ class ConnectionsRuntime(QObject):
     def control_host(self, device_id) -> str:
         """Where the station can reach the camera to change its settings, in flight too.
 
-        The selected connection if it reaches the camera, otherwise any other that does.
-        A static IP only receives video: the camera cannot be reached through it.
+        The selected connection if it reaches the camera, otherwise any other that does,
+        on the station's own networks only (local or ZeroTier). A static IP or Starlink's
+        public address carry video, but the camera is not logged in to through them.
         """
+        import ipaddress
+
         statuses = self._statuses.get(device_id, {})
         selected = self._selected.get(device_id)
-        order = ([selected] if selected in ("local", "cloud", "starlink") else []) + ["cloud", "starlink", "local"]
+        order = ([selected] if selected in ("local", "cloud") else []) + ["cloud", "local"]
         for kind in order:
             if statuses.get(kind, {}).get("state") == "available":
                 host = self._host(device_id, kind)
-                if host:
+                try:
+                    private = ipaddress.ip_address(host).is_private
+                except ValueError:
+                    private = False
+                # The station logs in to cameras only on its own networks (LAN, ZeroTier),
+                # never over the open internet: Starlink's public address is for video only.
+                if private:
                     return host
         return ""
 
