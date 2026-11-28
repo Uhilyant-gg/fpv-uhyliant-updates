@@ -27,9 +27,12 @@ Popup {
   hostField.text = device.host
   staticField.text = connectionsRuntime.addressFor(device.id, "static")
   starlinkField.text = connectionsRuntime.addressFor(device.id, "starlink")
+  ztNetworkField.text = connectionsRuntime.zerotierNetworkFor(device.id)
+  ztNodeField.text = connectionsRuntime.zerotierNodeFor(device.id)
   error = ""
   open()
-  if (focusKind === "starlink") starlinkField.forceActiveFocus()
+  if (focusKind === "cloud") ztNetworkField.forceActiveFocus()
+  else if (focusKind === "starlink") starlinkField.forceActiveFocus()
   else if (focusKind === "static") staticField.forceActiveFocus()
   else nameField.forceActiveFocus()
  }
@@ -51,6 +54,11 @@ Popup {
   }
   if (!saveAddress("static", staticField.text)) { error = "Статична адреса має неправильний формат."; return }
   if (!saveAddress("starlink", starlinkField.text)) { error = "Адреса Starlink має бути IPv6-адресою, наприклад 2001:db8::10."; return }
+  if ((ztNetworkField.text.trim() !== connectionsRuntime.zerotierNetworkFor(deviceId) || ztNodeField.text.trim() !== connectionsRuntime.zerotierNodeFor(deviceId))
+    && !connectionsRuntime.setZeroTier(deviceId, ztNetworkField.text, ztNodeField.text)) {
+   error = "ZeroTier: ID мережі — 16 символів (0–9, a–f), ID вузла камери — 10 символів."
+   return
+  }
   close()
  }
 
@@ -74,6 +82,14 @@ Popup {
 
   Text { text: "Адреса через Starlink (IPv6)"; color: root.sub; font.pixelSize: 12; Layout.topMargin: 4 }
   TextField { id: starlinkField; objectName: "cameraStarlinkField"; Layout.fillWidth: true; placeholderText: "2001:db8::10" }
+
+  Text { text: "ZeroTier: ID мережі та ID вузла камери"; color: root.sub; font.pixelSize: 12; Layout.topMargin: 4 }
+  RowLayout {
+   Layout.fillWidth: true
+   spacing: 8
+   TextField { id: ztNetworkField; objectName: "cameraZtNetworkField"; Layout.fillWidth: true; Layout.preferredWidth: 3; placeholderText: "8056c2e21c000001" }
+   TextField { id: ztNodeField; objectName: "cameraZtNodeField"; Layout.fillWidth: true; Layout.preferredWidth: 2; placeholderText: "89e92ceee5" }
+  }
 
   Text { text: "Порожнє поле — цей тип підключення не використовується."; color: root.sub; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
   Text { objectName: "cameraSettingsError"; visible: text !== ""; text: root.error; color: root.red; wrapMode: Text.WordWrap; Layout.fillWidth: true }

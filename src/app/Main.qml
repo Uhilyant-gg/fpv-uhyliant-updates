@@ -444,12 +444,14 @@ ApplicationWindow {
     tabs:[
      {key:"controller",label:"Пульт",detail:controllerRuntime.summary},
      {key:"recording",label:"Запис відео",detail:dvrRuntime.folder},
+     {key:"zerotier",label:"ZeroTier",detail:connectionsRuntime.zerotierNodeId?"Адреса ПК: "+connectionsRuntime.zerotierNodeId:connectionsRuntime.zerotierText},
      {key:"backup",label:"Резервна копія",detail:"Зберегти або відновити налаштування"}
     ]
-    pages:({controller:controllerPage,recording:recordingPage,backup:backupPage})
+    pages:({controller:controllerPage,recording:recordingPage,zerotier:zerotierPage,backup:backupPage})
     onCloseRequested:stationSettingsPopup.close()
     Component{id:controllerPage;ControllerPanel{}}
     Component{id:recordingPage;RecordingPanel{}}
+    Component{id:zerotierPage;ZeroTierPanel{}}
     Component{id:backupPage;BackupPanel{}}
    }}
   }

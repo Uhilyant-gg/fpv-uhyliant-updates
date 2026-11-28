@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 TYPES = ("local", "static", "cloud", "starlink")
-LABELS = {"local": "Локальна", "static": "Статичний IP", "cloud": "Хмара", "starlink": "Starlink IPv6"}
+LABELS = {"local": "Локальна", "static": "Статичний IP", "cloud": "ZeroTier", "starlink": "Starlink IPv6"}
 ADDRESS_TYPES = ("static", "starlink")
 DEFAULT_VIDEO_PORT = 554
 
@@ -47,7 +47,7 @@ def validate_address(kind: str, value: Any) -> str:
     raise ValueError("address-invalid")
 
 
-def status_entry(state: str, latency_ms: int | None = None) -> dict[str, Any]:
+def status_entry(state: str, latency_ms: int | None = None, label: str | None = None) -> dict[str, Any]:
     labels = {
         "available": f"{latency_ms} мс" if latency_ms is not None else "доступно",
         "unavailable": "недоступно",
@@ -55,7 +55,7 @@ def status_entry(state: str, latency_ms: int | None = None) -> dict[str, Any]:
         "unconfigured": "вказати адресу",
         "unsupported": "немає сервера",
     }
-    return {"state": state, "latencyMs": latency_ms, "label": labels[state]}
+    return {"state": state, "latencyMs": latency_ms, "label": label or labels[state]}
 
 
 def can_fly(selected: str, statuses: Mapping[str, Mapping[str, Any]]) -> bool:
@@ -93,6 +93,16 @@ class ConnectionStore:
                     clean[kind] = validate_address(kind, addresses.get(kind))
                 except ValueError:
                     continue
+            try:
+                from zerotier_local import validate_network_id, validate_node_id
+
+                network, node = (
+                    validate_network_id(addresses.get("ztNetwork")),
+                    validate_node_id(addresses.get("ztNode")),
+                )
+                clean.update(ztNetwork=network, ztNode=node)
+            except ValueError:
+                pass
             if clean:
                 result[str(device_id)] = clean
         return result

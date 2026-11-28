@@ -28,12 +28,19 @@ station_backup.StationBackup._protect_change = lambda self: True
 original_station = backend.Station
 backend.Station = lambda: original_station(QSettings(str(root / 'settings.ini'), QSettings.IniFormat))
 updater_engine.Updater.check = lambda self: None
-reachable = {'192.168.1.10': 7, '2001:db8::10': 55}
+reachable = {'192.168.1.10': 7, '2001:db8::10': 55, 'fd80:56c2:e21c:0:199:9389:e92c:eee5': 41}
+class FakeZeroTier:
+    def snapshot(self):
+        return {'service': 'ok', 'nodeId': 'a1b2c3d4e5', 'networks': {'8056c2e21c000001': {'status': 'OK', 'name': ''}},
+                'peers': {'89e92ceee5': {'latency': 41, 'direct': True}}}
+    def join(self, network):
+        return True
 runtimes = []
 original_init = connections_runtime.ConnectionsRuntime.__init__
 def init(self, *args, **kwargs):
     kwargs['prober'] = lambda host, port: reachable.get(host)
     kwargs['run_async'] = False
+    kwargs['zerotier'] = FakeZeroTier()
     original_init(self, *args, **kwargs)
     runtimes.append(self)
 connections_runtime.ConnectionsRuntime.__init__ = init
@@ -73,8 +80,28 @@ def single_shot(delay, callback):
         app.processEvents()
         fly = one(window, 'cameraFly')
         assert not fly.property('enabled'), 'no connection chosen yet'
-        one(window, 'connection-cloud')
-        assert not one(window, 'connection-cloud').property('enabled'), 'cloud needs a server'
+        cloud = one(window, 'connection-cloud')
+        assert cloud.property('enabled')
+        assert runtime.statuses['c1']['cloud']['label'] == 'вказати мережу'
+        cloud.clicked.emit()
+        app.processEvents()
+        dialog = window.findChild(QObject, 'cameraSettingsDialog')
+        assert dialog.property('visible'), 'ZeroTier IDs are asked for in the camera settings'
+        window.findChild(QObject, 'cameraZtNetworkField').setProperty('text', '8056c2e21c000001')
+        window.findChild(QObject, 'cameraZtNodeField').setProperty('text', 'bad')
+        window.findChild(QObject, 'cameraSettingsSave').clicked.emit()
+        app.processEvents()
+        assert dialog.property('visible') and window.findChild(QObject, 'cameraSettingsError').property('text') != ''
+        window.findChild(QObject, 'cameraZtNodeField').setProperty('text', '89e92ceee5')
+        window.findChild(QObject, 'cameraSettingsSave').clicked.emit()
+        app.processEvents()
+        assert not dialog.property('visible')
+        assert runtime.statuses['c1']['cloud']['label'] == '41 мс · напряму'
+        one(window, 'connection-cloud').clicked.emit()
+        app.processEvents()
+        assert runtime.selected == {'c1': 'cloud'}
+        assert one(window, 'cameraFly').property('enabled'), 'ZeroTier camera is reachable'
+        fly = one(window, 'cameraFly')
         one(window, 'connection-local').clicked.emit()
         app.processEvents()
         assert runtime.selected == {'c1': 'local'}
@@ -100,7 +127,8 @@ def single_shot(delay, callback):
         window.findChild(QObject, 'cameraSettingsSave').clicked.emit()
         app.processEvents()
         assert not dialog.property('visible')
-        assert json.loads((root / 'FPV-Uhyliant' / 'connections.json').read_text()) == {'c1': {'starlink': '2001:db8::10'}}
+        assert json.loads((root / 'FPV-Uhyliant' / 'connections.json').read_text()) == {
+            'c1': {'starlink': '2001:db8::10', 'ztNetwork': '8056c2e21c000001', 'ztNode': '89e92ceee5'}}
         names = [d['name'] for d in runtime._devices.items]
         assert names == ['Квадрик 7'], names
         assert runtime.statuses['c1']['starlink']['state'] == 'available'

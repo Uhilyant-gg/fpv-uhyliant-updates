@@ -36,7 +36,7 @@ Item {
  readonly property var menuItems: [
   {label: "Камери", detail: "Знайти, вибрати або додати камеру", glyph: "◉", action: "devices", section: "main"},
   {label: "Дрони і пресети", detail: "Пресети, OSD і попередження для кожного дрона", glyph: "☰", action: "vehicles", section: "main"},
-  {label: "Налаштування станції", detail: "Пульт, запис відео, резервна копія", glyph: "⚙", action: "station", section: "main"},
+  {label: "Налаштування станції", detail: "Пульт, запис відео, ZeroTier, резервна копія", glyph: "⚙", action: "station", section: "main"},
   {label: "Обслуговування", detail: "Діагностика, події, прошивка камери", glyph: "⌕", action: "service", section: "main"}
  ]
 

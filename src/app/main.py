@@ -136,6 +136,7 @@ def main():
     from dvr_runtime import DvrRuntime
     from connection_profiles import ConnectionStore
     from connections_runtime import ConnectionsRuntime
+    from zerotier_local import ZeroTierLocal
     from settings_presets import PresetStore
 
     harness.mark('application-imports-complete')
@@ -252,7 +253,7 @@ def main():
     presets = PresetsRuntime(preset_store, s)
     backup.restored.connect(presets.reload)
     dvr_runtime = DvrRuntime()
-    connections = ConnectionsRuntime(d, ConnectionStore(DATA / 'connections.json'))
+    connections = ConnectionsRuntime(d, ConnectionStore(DATA / 'connections.json'), zerotier=ZeroTierLocal())
     v.host_resolver = connections.host_for
     secondary.host_resolver = connections.host_for
     dvr_runtime.recordingChanged.connect(lambda: s.setRecordingActive(dvr_runtime.recording))

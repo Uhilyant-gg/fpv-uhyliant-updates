@@ -35,6 +35,7 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
                 "RecordingPanel.qml",
                 "TabbedHub.qml",
                 "TimelinePanel.qml",
+                "ZeroTierPanel.qml",
                 "UpdatePanel.qml",
             },
         )

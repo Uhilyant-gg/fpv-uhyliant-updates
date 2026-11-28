@@ -160,7 +160,7 @@ def test_unknown_camera_or_type_is_rejected(runtime):
 
 def test_types_for_qml(runtime):
     assert [t["key"] for t in runtime.types] == ["local", "static", "cloud", "starlink"]
-    assert [t["needsAddress"] for t in runtime.types] == [False, True, False, True]
+    assert [t["needsAddress"] for t in runtime.types] == [False, True, True, True]
 
 
 def test_video_runtime_builds_url_from_the_selected_ipv6_address(monkeypatch):
@@ -190,3 +190,94 @@ def test_clear_address_unselects_and_forgets(runtime, tmp_path):
     assert runtime.statuses["c1"]["static"]["state"] == "unconfigured"
     assert json.loads((tmp_path / "c.json").read_text()) == {}
     runtime.clearAddress("c1", "starlink")  # nothing saved: no error
+
+
+class FakeZeroTier:
+    def __init__(self):
+        self.state = {
+            "service": "ok",
+            "nodeId": "a1b2c3d4e5",
+            "networks": {"8056c2e21c000001": {"status": "OK", "name": ""}},
+            "peers": {"89e92ceee5": {"latency": 40, "direct": True}},
+        }
+        self.joined = []
+
+    def snapshot(self):
+        return self.state
+
+    def join(self, network):
+        self.joined.append(network)
+        self.state["networks"][network] = {"status": "REQUESTING_CONFIGURATION", "name": ""}
+        return True
+
+
+@pytest.fixture
+def zt_runtime(tmp_path):
+    prober = Prober()
+    zerotier = FakeZeroTier()
+    rt = ConnectionsRuntime(
+        FakeDevices(), cp.ConnectionStore(tmp_path / "c.json"), prober=prober, run_async=False, zerotier=zerotier
+    )
+    rt.prober, rt.zerotier = prober, zerotier
+    return rt
+
+
+CAMERA_ZT = "fd80:56c2:e21c:0:199:9389:e92c:eee5"
+
+
+def test_zerotier_needs_network_and_node(zt_runtime):
+    assert zt_runtime.statuses["c1"]["cloud"]["label"] == "вказати мережу"
+    assert not zt_runtime.setZeroTier("c1", "bad", "89e92ceee5")
+    assert not zt_runtime.setZeroTier("c1", "8056c2e21c000001", "")
+    assert zt_runtime.zerotierNetworkFor("c1") == ""
+
+
+def test_zerotier_camera_reachable_directly(zt_runtime, tmp_path):
+    zt_runtime.prober.reachable[CAMERA_ZT] = 44
+    assert zt_runtime.setZeroTier("c1", "8056C2E21C000001", "89E92CEEE5")
+    assert zt_runtime.statuses["c1"]["cloud"] == cp.status_entry("available", 44, "44 мс · напряму")
+    assert zt_runtime.zerotierState == "ok"
+    assert zt_runtime.zerotierNodeId == "a1b2c3d4e5"
+    zt_runtime.select("c1", "cloud")
+    assert zt_runtime.canFly("c1")
+    assert zt_runtime.host_for({"id": "c1", "host": "192.168.1.10"}) == CAMERA_ZT
+    saved = json.loads((tmp_path / "c.json").read_text())
+    assert saved == {"c1": {"ztNetwork": "8056c2e21c000001", "ztNode": "89e92ceee5"}}
+    assert cp.ConnectionStore(tmp_path / "c.json").load() == saved
+
+
+def test_zerotier_relayed_path_is_labelled(zt_runtime):
+    zt_runtime.zerotier.state["peers"]["89e92ceee5"]["direct"] = False
+    zt_runtime.prober.reachable[CAMERA_ZT] = 120
+    zt_runtime.setZeroTier("c1", "8056c2e21c000001", "89e92ceee5")
+    assert zt_runtime.statuses["c1"]["cloud"]["label"] == "120 мс · через сервер"
+
+
+def test_selecting_zerotier_joins_the_camera_network_and_waits_for_permission(zt_runtime):
+    zt_runtime.zerotier.state["networks"] = {}
+    zt_runtime.setZeroTier("c1", "8056c2e21c000001", "89e92ceee5")
+    assert zt_runtime.statuses["c1"]["cloud"]["label"] == "не в мережі"
+    zt_runtime.select("c1", "cloud")
+    assert zt_runtime.zerotier.joined == ["8056c2e21c000001"]
+    assert zt_runtime.statuses["c1"]["cloud"]["label"] == "чекає дозволу"
+    assert not zt_runtime.canFly("c1")
+
+
+@pytest.mark.parametrize(
+    "service,label",
+    [("missing", "встановіть ZeroTier"), ("stopped", "ZeroTier вимкнено"), ("no-access", "немає доступу")],
+)
+def test_zerotier_service_problems_are_shown_on_the_card(zt_runtime, service, label):
+    zt_runtime.zerotier.state = {"service": service, "nodeId": "", "networks": {}, "peers": {}}
+    zt_runtime.setZeroTier("c1", "8056c2e21c000001", "89e92ceee5")
+    assert zt_runtime.statuses["c1"]["cloud"]["label"] == label
+    assert zt_runtime.zerotierText
+
+
+def test_clearing_zerotier_unselects(zt_runtime):
+    zt_runtime.prober.reachable[CAMERA_ZT] = 44
+    zt_runtime.setZeroTier("c1", "8056c2e21c000001", "89e92ceee5")
+    zt_runtime.select("c1", "cloud")
+    assert zt_runtime.setZeroTier("c1", "", "")
+    assert zt_runtime.selected == {}
+    assert zt_runtime.statuses["c1"]["cloud"]["label"] == "вказати мережу"
