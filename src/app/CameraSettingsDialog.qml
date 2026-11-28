@@ -82,6 +82,16 @@ Popup {
    Button { text: "✕"; flat: true; onClicked: root.close() }
   }
 
+  readonly property var facts: connectionsRuntime.cameraFacts[root.deviceId] || ({})
+  Text {
+   objectName: "cameraFactsSummary"
+   visible: text !== ""
+   text: parent.facts.summary ? "Камера: " + parent.facts.summary : ""
+   color: root.sub
+   font.pixelSize: 12
+   wrapMode: Text.WordWrap
+   Layout.fillWidth: true
+  }
   Text { text: "Назва"; color: root.sub; font.pixelSize: 12 }
   TextField { id: nameField; objectName: "cameraNameField"; Layout.fillWidth: true }
 
@@ -141,10 +151,10 @@ Popup {
    font.pixelSize: 11
   }
 
-  Text { text: "Адреса через Starlink (IPv6)"; color: root.sub; font.pixelSize: 12; Layout.topMargin: 4 }
+  Text { text: "Адреса через Starlink (IPv6)" + (parent.facts.starlinkFromCamera ? " — зчитано з камери" : ""); color: root.sub; font.pixelSize: 12; Layout.topMargin: 4 }
   TextField { id: starlinkField; objectName: "cameraStarlinkField"; Layout.fillWidth: true; placeholderText: "2001:db8::10" }
 
-  Text { text: "ZeroTier: ID мережі та ID вузла камери"; color: root.sub; font.pixelSize: 12; Layout.topMargin: 4 }
+  Text { text: "ZeroTier: ID мережі та ID вузла камери" + (parent.facts.ztFromCamera ? " — зчитано з камери" : ""); color: root.sub; font.pixelSize: 12; Layout.topMargin: 4 }
   RowLayout {
    Layout.fillWidth: true
    spacing: 8

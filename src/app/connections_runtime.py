@@ -19,6 +19,8 @@ import push_video as pv
 import zerotier_local as zt
 
 PUSH_FRESH_S = 3.0
+INSPECT_EVERY_S = 600.0
+INSPECT_RETRY_S = 60.0
 SETUP_RETRY_S = 60.0
 SETUP_LABELS = {
     "no-access": "потрібен пароль камери",
@@ -48,6 +50,7 @@ class ConnectionsRuntime(QObject):
     _ztSnapshot = Signal(object)
     _bound = Signal(str, object)
     _setupDone = Signal(str, object)
+    _inspected = Signal(str, str, object)
 
     def __init__(
         self,
@@ -62,8 +65,13 @@ class ConnectionsRuntime(QObject):
         binder=None,
         clock=time.monotonic,
         camera_setup=None,
+        camera_inspect=None,
     ):
         super().__init__()
+        self._camera_inspect = camera_inspect
+        self._inspect_busy: set[str] = set()
+        self._inspect_at: dict[str, tuple[float, bool]] = {}
+        self._inspected.connect(self._apply_inspect)
         self._camera_setup = camera_setup
         self._setup: dict[str, dict] = {}
         self._setup_busy: set[str] = set()
@@ -119,6 +127,21 @@ class ConnectionsRuntime(QObject):
     @Property(str, notify=changed)
     def zerotierNodeId(self):
         return self._zt.get("nodeId", "")
+
+    @Property("QVariantMap", notify=changed)
+    def cameraFacts(self):
+        import camera_inspect as ci
+
+        result = {}
+        for device_id, addresses in self._addresses.items():
+            facts = addresses.get("facts")
+            if facts:
+                result[device_id] = {
+                    "summary": ci.summary(facts),
+                    "ztFromCamera": addresses.get("ztSource") == "camera",
+                    "starlinkFromCamera": addresses.get("starlinkSource") == "camera",
+                }
+        return result
 
     @Property("QVariantMap", notify=changed)
     def cameraSetup(self):
@@ -216,6 +239,8 @@ class ConnectionsRuntime(QObject):
         except ValueError:
             return False
         self._addresses.setdefault(device_id, {})[kind] = value
+        if kind == "starlink":
+            self._addresses[device_id]["starlinkSource"] = "manual"
         if kind == "static":
             self._ensure_push_port(device_id)
         self._store.save(self._addresses)
@@ -236,11 +261,20 @@ class ConnectionsRuntime(QObject):
 
     @Slot(str, str, str, result=bool)
     def setZeroTier(self, device_id, network_id, node_id):
-        """Camera's ZeroTier network and node IDs; both empty removes them."""
+        """Camera's ZeroTier network and node IDs entered by a person; both empty removes them."""
+        return self._set_zerotier(device_id, network_id, node_id, "manual")
+
+    def _set_zerotier(self, device_id, network_id, node_id, source):
         addresses = self._addresses.setdefault(device_id, {})
+        if (
+            addresses.get("ztNetwork") != str(network_id).strip().lower()
+            or addresses.get("ztNode") != str(node_id).strip().lower()
+        ):
+            addresses["ztSource"] = source
         if not str(network_id).strip() and not str(node_id).strip():
             addresses.pop("ztNetwork", None)
             addresses.pop("ztNode", None)
+            addresses.pop("ztSource", None)
         else:
             try:
                 network, node = zt.validate_network_id(network_id), zt.validate_node_id(node_id)
@@ -261,6 +295,7 @@ class ConnectionsRuntime(QObject):
         addresses = self._addresses.get(device_id, {})
         if kind in addresses:
             del addresses[kind]
+            addresses.pop(kind + "Source", None)
             if not addresses:
                 self._addresses.pop(device_id, None)
             self._store.save(self._addresses)
@@ -281,6 +316,7 @@ class ConnectionsRuntime(QObject):
         self._update_push_statuses()
         for device_id in list(self._statuses):
             self._auto_setup(device_id)
+            self._auto_inspect(device_id)
         self._refresh_zerotier()
 
     # --- used by the video runtime ---------------------------------------------
@@ -476,6 +512,63 @@ class ConnectionsRuntime(QObject):
         else:
             work()
 
+    # --- read facts from the camera itself ------------------------------------------
+    def _auto_inspect(self, device_id):
+        """Read the camera's IDs and facts whenever it is reachable, so nobody types them."""
+        if self._camera_inspect is None or self._listening_paused or device_id in self._inspect_busy:
+            return
+        statuses = self._statuses.get(device_id, {})
+        if statuses.get("local", {}).get("state") == "available":
+            channel = "local"
+        elif statuses.get("cloud", {}).get("state") == "available":
+            channel = "cloud"
+        else:
+            return
+        at, ok = self._inspect_at.get(device_id, (-1e9, False))
+        if self._clock() - at < (INSPECT_EVERY_S if ok else INSPECT_RETRY_S):
+            return
+        host = self._host(device_id, channel)
+        self._inspect_busy.add(device_id)
+        self._inspect_at[device_id] = (self._clock(), False)
+
+        def work():
+            try:
+                result = self._camera_inspect(host)
+            except Exception:
+                result = {"state": "failed"}
+            self._inspected.emit(device_id, channel, result)
+
+        if self._run_async:
+            threading.Thread(target=work, daemon=True).start()
+        else:
+            work()
+
+    def _apply_inspect(self, device_id, channel, result):
+        import camera_inspect as ci
+
+        self._inspect_busy.discard(device_id)
+        if result.get("state") != "read" or device_id not in self._statuses:
+            return
+        self._inspect_at[device_id] = (self._clock(), True)
+        addresses = self._addresses.setdefault(device_id, {})
+        addresses["facts"] = {k: result[k] for k in cp.FACT_KEYS if k in result}
+        network, node = ci.valid_zt(result)
+        zt_changed = False
+        if network and (not addresses.get("ztNetwork") or addresses.get("ztSource") == "camera"):
+            zt_changed = (addresses.get("ztNetwork"), addresses.get("ztNode")) != (network, node)
+            addresses.update(ztNetwork=network, ztNode=node, ztSource="camera")
+        if channel == "cloud" and result.get("ipv6"):
+            # Seen through ZeroTier the camera is in the field: its public IPv6 comes from Starlink.
+            if addresses.get("starlink") != result["ipv6"][0] or addresses.get("starlinkSource") != "camera":
+                addresses.update(starlink=result["ipv6"][0], starlinkSource="camera")
+                zt_changed = True
+        self._store.save(self._addresses)
+        if zt_changed:
+            self._rebuild()
+            self.refresh()
+        else:
+            self.changed.emit()
+
     def _apply_setup(self, device_id, result):
         self._setup_busy.discard(device_id)
         self._setup[device_id] = dict(result, at=self._clock())
@@ -516,6 +609,10 @@ class ConnectionsRuntime(QObject):
             label = zt.path_label(self._zt, self._addresses[device_id]["ztNode"], latency)
         self._statuses[device_id][kind] = cp.status_entry(state, latency, label)
         self.changed.emit()
+        if state == "available" and kind in ("local", "cloud"):
+            # React at once: the camera just became reachable.
+            self._auto_inspect(device_id)
+            self._auto_setup(device_id)
 
     # --- ZeroTier ----------------------------------------------------------------
     def _refresh_zerotier(self):

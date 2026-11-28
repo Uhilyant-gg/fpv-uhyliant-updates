@@ -17,6 +17,7 @@ TYPES = ("local", "static", "cloud", "starlink")
 LABELS = {"local": "Локальна", "static": "Статичний IP", "cloud": "ZeroTier", "starlink": "Starlink IPv6"}
 ADDRESS_TYPES = ("static", "starlink")
 DEFAULT_VIDEO_PORT = 554
+FACT_KEYS = ("ztInstalled", "ztNode", "ztNetwork", "ipv6", "flashMb", "freeKb", "firmware", "variant", "version")
 
 _HOSTNAME = re.compile(
     r"^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$"
@@ -103,6 +104,16 @@ class ConnectionStore:
                 clean["pushPayload"] = payload
             if isinstance(addresses.get("pushConfigured"), str) and addresses["pushConfigured"].startswith("udp://"):
                 clean["pushConfigured"] = addresses["pushConfigured"]
+            for key in ("ztSource", "starlinkSource"):
+                if addresses.get(key) in ("camera", "manual"):
+                    clean[key] = addresses[key]
+            facts = addresses.get("facts")
+            if isinstance(facts, dict):
+                clean["facts"] = {
+                    k: v
+                    for k, v in facts.items()
+                    if k in FACT_KEYS and isinstance(v, (str, int, bool, list)) and not isinstance(v, dict)
+                }
             try:
                 from zerotier_local import validate_network_id, validate_node_id
 

@@ -42,6 +42,8 @@ def init(self, *args, **kwargs):
     kwargs['run_async'] = False
     kwargs['zerotier'] = FakeZeroTier()
     kwargs['listen'] = False
+    kwargs['camera_setup'] = None
+    kwargs['camera_inspect'] = None
     kwargs['binder'] = lambda port: {'state': 'grey', 'message': 'сіра адреса'}
     original_init(self, *args, **kwargs)
     runtimes.append(self)
@@ -136,7 +138,8 @@ def single_shot(delay, callback):
         app.processEvents()
         assert not dialog.property('visible')
         assert json.loads((root / 'FPV-Uhyliant' / 'connections.json').read_text()) == {
-            'c1': {'starlink': '2001:db8::10', 'ztNetwork': '8056c2e21c000001', 'ztNode': '89e92ceee5', 'pushPort': 5600}}
+            'c1': {'starlink': '2001:db8::10', 'starlinkSource': 'manual', 'ztNetwork': '8056c2e21c000001',
+                   'ztNode': '89e92ceee5', 'ztSource': 'manual', 'pushPort': 5600}}
         names = [d['name'] for d in runtime._devices.items]
         assert names == ['Квадрик 7'], names
         assert runtime.statuses['c1']['starlink']['state'] == 'available'
