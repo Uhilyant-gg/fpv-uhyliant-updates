@@ -20,7 +20,36 @@ READ_ONLY_COMMANDS = {
     "release": "cat /etc/os-release",
     "mtd": "cat /proc/mtd",
     "overlay": "df -k /overlay",
+    # What the camera's video service (majestic) is set to send.
+    "videoCodec": "cli -g .video0.codec",
+    "videoSize": "cli -g .video0.size",
+    "videoFps": "cli -g .video0.fps",
+    "videoBitrate": "cli -g .video0.bitrate",
+    "videoGop": "cli -g .video0.gopSize",
 }
+
+
+def parse_video(codec: str, size: str, fps: str, bitrate: str, gop: str) -> dict:
+    """The camera's own video settings; a value it did not give stays out."""
+
+    def number(text):
+        try:
+            value = float(text.strip())
+        except ValueError:
+            return None
+        return int(value) if value == int(value) else value
+
+    video = {}
+    codec = codec.strip().lower()
+    if codec in ("h264", "h265"):
+        video["codec"] = codec
+    if re.fullmatch(r"\d{3,4}x\d{3,4}", size.strip()):
+        video["size"] = size.strip()
+    for key, text in (("fps", fps), ("bitrateKbps", bitrate), ("gopS", gop)):
+        value = number(text)
+        if value is not None and value > 0:
+            video[key] = value
+    return video
 
 
 def parse_zt_node(text: str) -> str:
@@ -96,6 +125,7 @@ def read_facts(session) -> dict:
         "freeKb": parse_free_kb(run("overlay")),
     }
     facts.update(parse_release(run("release")))
+    facts["video"] = parse_video(*(run(k) for k in ("videoCodec", "videoSize", "videoFps", "videoBitrate", "videoGop")))
     return facts
 
 

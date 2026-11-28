@@ -36,7 +36,7 @@ Connections = make('Connections', {'selected': 'QVariantMap', 'statuses': 'QVari
                                    'types': 'QVariantList', 'zerotierText': str, 'zerotierState': str},
                    {'addressFor': ((str, str), str, lambda self, d, k: '2001:db8::10'),
                     'refresh': ((), None, lambda self: refreshed.append(1))})
-Link = make('Link', {'history': 'QVariantList', 'fps': int, 'lost': bool, 'lostSeconds': int})
+Link = make('Link', {'history': 'QVariantList', 'fps': int, 'lost': bool, 'lostSeconds': int, 'frameSize': str})
 Dvr = make('Dvr', {'recording': bool, 'canStart': bool, 'elapsedText': str, 'freeSpaceText': str, 'lowSpace': bool},
            {'toggle': ((), None, lambda self: None)})
 Ctl = make('Ctl', {'health': str, 'summary': str})
@@ -51,13 +51,13 @@ ctx = engine.rootContext()
 props = dict(
     devicesModel=Devices(activeId='c1', activeName='Квадрик'),
     connectionsRuntime=Connections(selected={'c1': 'local'}, statuses=statuses,
-                                   cameraFacts={'c1': {'summary': 'OpenIPC fpv', 'starlinkFromCamera': True}},
+                                   cameraFacts={'c1': {'summary': 'OpenIPC fpv', 'starlinkFromCamera': True, 'video': {'codec': 'h265', 'size': '1920x1080', 'fps': 60, 'bitrateKbps': 4096, 'gopS': 1}}},
                                    types=types, zerotierText='', zerotierState='ok'),
-    linkMonitor=Link(history=[30, 30, 0, 12, 30], fps=30, lost=False, lostSeconds=0),
+    linkMonitor=Link(history=[30, 30, 0, 12, 30], fps=30, lost=False, lostSeconds=0, frameSize='1280×720'),
     dvrRuntime=Dvr(recording=False, canStart=True, elapsedText='', freeSpaceText='вільно 3,1 ГБ', lowSpace=False),
     controllerRuntime=Ctl(health='ready', summary='Пульт готовий'),
     station=Station(osdEnabled=True),
-    linkDoctor=Doctor(details={'internet': False, 'hasStream': True, 'lossPct': 2.5, 'jitterMs': 4.2, 'kbps': 3200}, text='', level='ok'),
+    linkDoctor=Doctor(details={'internet': False, 'hasStream': True, 'lossPct': 2.5, 'jitterMs': 4.2, 'kbps': 3200, 'codec': 'H.265', 'keyframeS': 1.0}, text='', level='ok'),
 )
 for name, obj in props.items():
     ctx.setContextProperty(name, obj)
@@ -116,7 +116,8 @@ def value_texts(item):
     texts = [o.property('text') for o in item.findChildren(QObject)]
     return [t for t in texts if isinstance(t, str) and t]
 texts = value_texts(hw)
-assert '1280×720 · 30 к/с' in texts, texts
+assert 'H.265 · 1280×720 · 30 к/с · 3,2 Мбіт/с' in texts, texts
+assert 'повний кадр кожні 1 с · у камері задано: 1920×1080, 60 к/с, 4,1 Мбіт/с, повний кадр кожні 1 с' in texts, texts
 assert 'затримка 3 мс' in texts, texts
 assert 'дані надходять · АКБ 16.4 В · супутників 12' in texts, texts
 assert 'Пульт готовий' in texts and 'OpenIPC fpv' in texts, texts

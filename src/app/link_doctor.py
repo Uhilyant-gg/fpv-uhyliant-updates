@@ -126,6 +126,8 @@ class LinkDoctor(QObject):
             "lossPct": stream.get("lossPct", 0.0),
             "jitterMs": stream.get("jitterMs", 0.0),
             "kbps": stream.get("kbps", 0),
+            "codec": stream.get("codec", ""),
+            "keyframeS": stream.get("keyframeS"),
         }
 
     @Slot(bool)

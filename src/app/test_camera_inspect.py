@@ -37,6 +37,11 @@ def full():
         "cat /etc/os-release": RELEASE,
         "cat /proc/mtd": MTD,
         "df -k /overlay": DF,
+        "cli -g .video0.codec": "h265\n",
+        "cli -g .video0.size": "1920x1080\n",
+        "cli -g .video0.fps": "60\n",
+        "cli -g .video0.bitrate": "4096\n",
+        "cli -g .video0.gopSize": "1\n",
     }
 
 
@@ -53,6 +58,7 @@ def test_reads_every_fact():
         "firmware": "OpenIPC",
         "variant": "fpv",
         "version": "2.5.06.12",
+        "video": {"codec": "h265", "size": "1920x1080", "fps": 60, "bitrateKbps": 4096, "gopS": 1},
     }
     assert set(session.commands) == set(ci.READ_ONLY_COMMANDS.values()), "only the read-only commands"
     assert ci.summary(facts) == "OpenIPC fpv 2.5.06.12 · флеш 16 МБ · вільно 7,0 МБ · ZeroTier є"
@@ -64,6 +70,7 @@ def test_camera_without_zerotier_and_unknown_answers():
     facts = ci.read_facts(session)
     assert facts["ztInstalled"] is False and facts["ztNode"] == "" and facts["ztNetwork"] == ""
     assert facts["flashMb"] == 0 and facts["freeKb"] == 0 and facts["ipv6"] == []
+    assert facts["video"] == {}, "a camera without majestic's cli gives no video settings"
     assert "zerotier-cli listnetworks" not in session.commands
     assert ci.summary(facts) == "ZeroTier немає"
     assert ci.valid_zt(facts) == ("", "")
@@ -182,3 +189,14 @@ def test_pool_reports_a_wrong_password():
     pool = ci.InspectorPool(lambda: [("root", "a"), ("root", "12345")], camera)
     assert pool.inspect("192.168.1.10")["state"] == "no-access"
     assert pool.open_sessions == 0
+
+
+def test_video_settings_tolerate_odd_answers():
+    assert ci.parse_video("H264", "1280x720", "30", "2048", "0.5") == {
+        "codec": "h264",
+        "size": "1280x720",
+        "fps": 30,
+        "bitrateKbps": 2048,
+        "gopS": 0.5,
+    }
+    assert ci.parse_video("mjpeg", "big", "x", "-1", "") == {}

@@ -110,3 +110,45 @@ def test_window_counts_a_single_packet(seq):
     stats = RtpStats()
     stats.feed(packet(seq), 1.0)
     assert stats.window(1.5)["packets"] == 1
+
+
+def h265(seq, ts, nal_type, fu_start=None):
+    if fu_start is None:
+        body = bytes([nal_type << 1, 1]) + b"\0" * 50
+    else:
+        body = bytes([49 << 1, 1, (0x80 if fu_start else 0) | nal_type]) + b"\0" * 50
+    return struct.pack("!BBHII", 0x80, 97, seq, ts, 7) + body
+
+
+def h264(seq, ts, nal_type, fu_start=None):
+    if fu_start is None:
+        body = bytes([0x60 | nal_type]) + b"\0" * 50
+    else:
+        body = bytes([0x60 | 28, (0x80 if fu_start else 0) | nal_type]) + b"\0" * 50
+    return struct.pack("!BBHII", 0x80, 96, seq, ts, 7) + body
+
+
+def test_full_frame_interval_for_h265():
+    stats = RtpStats(codec="h265")
+    seq = 0
+    for second in range(4):
+        for frame in range(30):
+            at = second + frame / 30
+            if frame == 0:
+                stats.feed(h265(seq, 0, 19, fu_start=True), at)  # IDR, first fragment
+                seq += 1
+                stats.feed(h265(seq, 0, 19, fu_start=False), at)  # same frame, not a new one
+            else:
+                stats.feed(h265(seq, 0, 1), at)
+            seq += 1
+    window = stats.window(4.0)
+    assert window["keyframeS"] == 1.0 and window["codec"] == "H.265"
+
+
+def test_full_frame_interval_for_h264_and_unknown_before_two_keyframes():
+    stats = RtpStats(codec="h264")
+    stats.feed(h264(0, 0, 5), 0.0)
+    assert stats.window(0.5)["keyframeS"] is None
+    stats.feed(h264(1, 0, 1), 0.6)
+    stats.feed(h264(2, 0, 5, fu_start=True), 2.0)
+    assert stats.window(2.5)["keyframeS"] == 2.0

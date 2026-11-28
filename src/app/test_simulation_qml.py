@@ -93,8 +93,9 @@ def single_shot(delay, callback):
         assert menu is not None and menu.property('visible')
         content = window.findChild(QObject, 'flightMenuContent')
         assert content is not None and content.property('width') <= menu.property('width'), 'flight menu content fits the menu'
-        hardware_devices = window.findChild(QObject, 'flightMenuDevices')
-        assert hardware_devices is not None and not hardware_devices.property('enabled')
+        for moved in ('flightMenuDevices', 'flightMenuRecordingSettings', 'flightMenuPresets', 'flightMenuService'):
+            assert window.findChild(QObject, moved) is None, moved + ' lives in the home menu, not in flight'
+        assert not window.findChild(QObject, 'flightMenuDisconnect').property('visible')
         flight_video = window.findChild(QObject, 'mainFlightVideoOutput')
         assert attached_sinks and isinstance(attached_sinks[-1], dvr_runtime.QVideoSink)
         assert attached_sinks[-1] == flight_video.property('videoSink'), 'recording follows the flight video'
@@ -104,9 +105,8 @@ def single_shot(delay, callback):
         assert flight_bar is not None and flight_bar.property('visible')
         video_area = window.findChild(QObject, 'flightVideoArea')
         assert video_area.property('y') >= flight_bar.property('height') > 0, 'video starts below the bar'
-        assert window.findChild(QObject, 'flightMenuRecordingSettings') is not None
         edit = window.findChild(QObject, 'flightMenuOsdSettings')
-        assert edit is not None and edit.property('enabled')
+        assert edit is not None and edit.property('visible'), 'the OSD layout is set up in the simulation'
         edit.clicked.emit()
         app.processEvents()
         assert popup.property('visible')

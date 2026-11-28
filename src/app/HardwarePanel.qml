@@ -48,6 +48,30 @@ Item {
   if (!d.hasStream) return ""
   return "втрачено " + String(d.lossPct).replace(".", ",") + "% пакетів · нерівність " + Math.round(d.jitterMs) + " мс · " + (d.kbps / 1000).toFixed(1).replace(".", ",") + " Мбіт/с"
  }
+ function videoValue2() {
+  var d = linkDoctor.details
+  var parts = []
+  var codec = d.codec || ({h265: "H.265", h264: "H.264"})[(root.facts.video || {}).codec] || ""
+  if (codec) parts.push(codec)
+  if (video.width && video.height) parts.push(video.width + "×" + video.height)
+  else if (linkMonitor.frameSize) parts.push(linkMonitor.frameSize)
+  if (linkMonitor.fps) parts.push(linkMonitor.fps + " к/с")
+  if (d.hasStream) parts.push((d.kbps / 1000).toFixed(1).replace(".", ",") + " Мбіт/с")
+  return parts.length ? parts.join(" · ") : "немає даних"
+ }
+ function videoDetail() {
+  var d = linkDoctor.details
+  var parts = []
+  if (d.keyframeS) parts.push("повний кадр кожні " + String(d.keyframeS).replace(".", ",") + " с")
+  var v = root.facts.video || {}
+  var set = []
+  if (v.size) set.push(v.size.replace("x", "×"))
+  if (v.fps) set.push(v.fps + " к/с")
+  if (v.bitrateKbps) set.push((v.bitrateKbps / 1000).toFixed(1).replace(".", ",") + " Мбіт/с")
+  if (v.gopS) set.push("повний кадр кожні " + String(v.gopS).replace(".", ",") + " с")
+  if (set.length) parts.push("у камері задано: " + set.join(", "))
+  return parts.join(" · ")
+ }
  function controllerColor(health) { return health === "ready" ? green : (health === "problem" ? red : (health === "attention" ? amber : grey)) }
 
  component Row_: RowLayout {
@@ -87,8 +111,15 @@ Item {
   Row_ {
    objectName: "hardwareCamera"
    title: "Камера · " + (devicesModel.activeName || "не вибрана")
-   value: root.videoValue()
-   detail: root.facts.summary || ""
+   value: root.facts.summary || (linkMonitor.lost ? "немає кадрів " + linkMonitor.lostSeconds + " с · відновлюю" : "на зв’язку")
+   detail: ""
+   dot: root.video.streamId && !linkMonitor.lost && root.video.state === "playing" ? root.green : root.red
+  }
+  Row_ {
+   objectName: "hardwareVideo"
+   title: "Відео"
+   value: root.videoValue2()
+   detail: root.videoDetail()
    dot: root.video.streamId && !linkMonitor.lost && root.video.state === "playing" ? root.green : root.red
   }
   Row_ {

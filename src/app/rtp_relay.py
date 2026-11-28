@@ -24,10 +24,32 @@ def parse_rtp(data: bytes):
     return seq, ts, ssrc, marker_payload & 0x7F
 
 
+CODEC_NAMES = {"h265": "H.265", "h264": "H.264"}
+
+
+def starts_keyframe(payload: bytes, codec: str) -> bool:
+    """Whether this RTP payload begins a full (key) frame: IRAP for H.265, IDR for H.264."""
+    if not payload:
+        return False
+    if codec == "h264":
+        nal = payload[0] & 0x1F
+        if nal == 28 and len(payload) > 1:  # FU-A: only its first fragment starts the frame
+            return bool(payload[1] & 0x80) and (payload[1] & 0x1F) == 5
+        return nal == 5
+    if len(payload) < 2:
+        return False
+    nal = (payload[0] >> 1) & 0x3F
+    if nal == 49 and len(payload) > 2:  # fragmentation unit
+        return bool(payload[2] & 0x80) and 16 <= (payload[2] & 0x3F) <= 21
+    return 16 <= nal <= 21
+
+
 class RtpStats:
     """Counts one window (normally a second) at a time; jitter follows RFC 3550."""
 
-    def __init__(self):
+    def __init__(self, codec: str = "h265"):
+        self._codec = codec if codec in CODEC_NAMES else "h265"
+        self._keyframes: list[float] = []
         self._ssrc = None
         self._max_seq = None
         self._jitter = 0.0
@@ -48,12 +70,15 @@ class RtpStats:
             return
         seq, ts, ssrc, _ = header
         self._last_at = arrival
+        if starts_keyframe(data[12 + 4 * (data[0] & 0x0F) :], self._codec):
+            self._keyframes = (self._keyframes + [arrival])[-6:]
         self._packets += 1
         self._bytes += len(data)
         if ssrc != self._ssrc:
             if self._ssrc is not None:
                 self._restarted = True
             self._ssrc = ssrc
+            self._keyframes = self._keyframes[-1:] if self._keyframes and self._keyframes[-1] == arrival else []
             self._max_seq = seq
             self._transit = None
             self._expected += 1
@@ -69,6 +94,13 @@ class RtpStats:
                 self._jitter += (d - self._jitter) / 16
         self._transit = transit
 
+    def _keyframe_interval(self):
+        """Seconds between full frames: how long a re-opened player waits for a picture."""
+        if len(self._keyframes) < 2:
+            return None
+        gaps = [b - a for a, b in zip(self._keyframes, self._keyframes[1:])]
+        return round(sum(gaps) / len(gaps), 1)
+
     def window(self, now: float) -> dict:
         lost = max(0, self._expected - self._packets)
         result = {
@@ -78,6 +110,8 @@ class RtpStats:
             "kbps": round(self._bytes * 8 / 1000),
             "restarted": self._restarted,
             "lastPacketAge": round(now - self._last_at, 2) if self._last_at is not None else None,
+            "codec": CODEC_NAMES[self._codec],
+            "keyframeS": self._keyframe_interval(),
         }
         self._reset_window()
         return result
@@ -86,11 +120,11 @@ class RtpStats:
 class RtpRelay:
     """Listens on the camera's push port and forwards every packet to the player."""
 
-    def __init__(self, listen_port: int, forward_port: int, clock=time.monotonic):
+    def __init__(self, listen_port: int, forward_port: int, codec: str = "h265", clock=time.monotonic):
         self.listen_port = listen_port
         self.forward_port = forward_port
         self._clock = clock
-        self._stats = RtpStats()
+        self._stats = RtpStats(codec)
         self._lock = threading.Lock()
         self._sock = None
         self._thread = None

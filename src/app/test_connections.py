@@ -592,8 +592,8 @@ def test_flight_closes_camera_sessions_and_stops_reading(inspect_runtime):
 class FakeRelay:
     made = []
 
-    def __init__(self, listen, forward, starts=True):
-        self.listen, self.forward, self.starts = listen, forward, starts
+    def __init__(self, listen, forward, codec="h265", starts=True):
+        self.listen, self.forward, self.starts, self.codec = listen, forward, starts, codec
         self.stopped = False
         FakeRelay.made.append(self)
 
@@ -616,6 +616,7 @@ def test_pushed_video_goes_through_the_station_relay(push_runtime, tmp_path):
     rt.push_url_for({"id": "c1"})
     relay = FakeRelay.made[0]
     assert relay.listen == 5600 and relay.forward != 5600 and relay.forward % 2 == 0
+    assert relay.codec == "h265", "the relay knows the codec to find full frames"
     assert f"m=video {relay.forward} RTP/AVP" in (tmp_path / "sdp" / "push-c1.sdp").read_text()
     assert rt.relay_window("c1") == {"packets": 30, "lossPct": 0.0}
     rt.push_url_for({"id": "c1"})
@@ -626,7 +627,7 @@ def test_pushed_video_goes_through_the_station_relay(push_runtime, tmp_path):
 
 def test_without_the_relay_the_player_gets_the_push_port(push_runtime, tmp_path):
     rt = push_runtime
-    rt._relay_factory = lambda listen, forward: FakeRelay(listen, forward, starts=False)
+    rt._relay_factory = lambda listen, forward, codec: FakeRelay(listen, forward, codec, starts=False)
     rt.setAddress("c1", "static", "93.170.12.5")
     rt.select("c1", "static")
     rt.push_url_for({"id": "c1"})

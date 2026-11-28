@@ -148,6 +148,7 @@ class ConnectionsRuntime(QObject):
                     "summary": ci.summary(facts),
                     "ztFromCamera": addresses.get("ztSource") == "camera",
                     "starlinkFromCamera": addresses.get("starlinkSource") == "camera",
+                    "video": dict(facts.get("video") or {}),
                 }
         return result
 
@@ -371,7 +372,7 @@ class ConnectionsRuntime(QObject):
             if relay is not None:
                 relay.stop()
             forward = pv.free_loopback_port()
-            relay = self._relay_factory(port, forward) if forward else None
+            relay = self._relay_factory(port, forward, codec=addresses.get("pushCodec", "h265")) if forward else None
             if relay is not None and relay.start():
                 self._relays[device_id] = relay
                 player_port = forward
