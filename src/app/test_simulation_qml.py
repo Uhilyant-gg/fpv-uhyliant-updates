@@ -126,7 +126,7 @@ def single_shot(delay, callback):
             app.processEvents()
         from PySide6.QtCore import QMetaObject, Q_ARG
         hubs = {
-            'openStationSettings': ('stationSettingsPopup', ('controller', 'recording', 'backup')),
+            'openStationSettings': ('stationSettingsPopup', ('controller', 'recording', 'zerotier', 'backup')),
             'openVehicleSettings': ('vehicleSettingsPopup', ('presets', 'osd')),
             'openService': ('servicePopup', ('diagnostics', 'timeline', 'firmware')),
         }

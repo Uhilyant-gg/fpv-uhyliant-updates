@@ -25,13 +25,9 @@ def _int(value, low, high, nullable=False):
 
 
 def validate_snapshot(value):
-    if not isinstance(value, dict) or set(value) != {
-        'devices',
-        'streams',
-        'videoProfiles',
-        'openipcIdentities',
-        'activeDeviceId',
-    }:
+    required = {'devices', 'streams', 'videoProfiles', 'openipcIdentities', 'activeDeviceId'}
+    # 'archivedDeviceIds' is optional so snapshots made before the archive stay valid.
+    if not isinstance(value, dict) or not required <= set(value) <= required | {'archivedDeviceIds'}:
         return False
     if not all(
         isinstance(value[k], list) for k in ('devices', 'streams', 'videoProfiles', 'openipcIdentities')
@@ -59,6 +55,11 @@ def validate_snapshot(value):
         ids.add(d['id'])
         hostports.add((d['host'], d['port']))
     if value['activeDeviceId'] and value['activeDeviceId'] not in ids:
+        return False
+    archived = value.get('archivedDeviceIds', [])
+    if not isinstance(archived, list) or any(not isinstance(i, str) or i not in ids for i in archived):
+        return False
+    if len(archived) != len(set(archived)) or value['activeDeviceId'] in archived:
         return False
     profiles = set()
     names = set()

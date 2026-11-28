@@ -1,4 +1,4 @@
-import json, os, sqlite3, uuid
+import json, os, sqlite3, time, uuid
 from contextlib import closing, contextmanager
 from pathlib import Path
 from PySide6.QtCore import QObject, Property, Signal, Slot
@@ -83,6 +83,8 @@ class Devices(QObject):
                 d.execute('ALTER TABLE devices ADD COLUMN identity_json TEXT NOT NULL DEFAULT "{}"')
             if 'last_observed_at' not in cols:
                 d.execute('ALTER TABLE devices ADD COLUMN last_observed_at INTEGER NOT NULL DEFAULT 0')
+            if 'archived_at' not in cols:
+                d.execute('ALTER TABLE devices ADD COLUMN archived_at INTEGER NOT NULL DEFAULT 0')
             d.execute(
                 'CREATE TABLE IF NOT EXISTS streams(id TEXT PRIMARY KEY,device_id TEXT NOT NULL,name TEXT NOT NULL,kind TEXT NOT NULL,port INTEGER NOT NULL,path TEXT NOT NULL,protocol TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 1)'
             )
@@ -90,7 +92,7 @@ class Devices(QObject):
     def _load(self):
         with self._connect() as d:
             rows = d.execute(
-                'SELECT id,name,type,host,port,connection,notes,active,identity_json,last_observed_at FROM devices ORDER BY name'
+                'SELECT id,name,type,host,port,connection,notes,active,identity_json,last_observed_at,archived_at FROM devices ORDER BY name'
             ).fetchall()
             srows = d.execute(
                 'SELECT id,device_id,name,kind,port,path,protocol,enabled FROM streams ORDER BY name'
@@ -115,6 +117,8 @@ class Devices(QObject):
                 'openipcIdentity': identity,
                 'onboardingState': onboarding_state,
                 'lastObservedAt': r[9],
+                'archived': bool(r[10]),
+                'archivedAt': r[10],
             }
             item.update(device_center_fields(item))
             self._items.append(item)
@@ -141,11 +145,40 @@ class Devices(QObject):
 
     @Property('QVariantList', notify=changed)
     def homeItems(self):
-        return [item for item in self._items if item.get('onboardingState') == 'ready']
+        return [item for item in self._items if item.get('onboardingState') == 'ready' and not item.get('archived')]
+
+    @Property('QVariantList', notify=changed)
+    def archivedItems(self):
+        return sorted(
+            (item for item in self._items if item.get('archived')), key=lambda item: -int(item.get('archivedAt') or 0)
+        )
 
     @Property(int, notify=changed)
     def pendingCount(self):
-        return sum(item.get('onboardingState') != 'ready' for item in self._items)
+        return sum(item.get('onboardingState') != 'ready' and not item.get('archived') for item in self._items)
+
+    @Slot(str, result=bool)
+    def archiveDevice(self, did):
+        """Hide a camera from the home screen and stop using it; it can be restored or deleted later."""
+        if not any(x['id'] == did and not x.get('archived') for x in self._items):
+            return False
+        with self._connect() as d:
+            d.execute("UPDATE devices SET archived_at=strftime('%s','now'),active=0 WHERE id=?", (did,))
+        self._load()
+        self.changed.emit()
+        self.streamsChanged.emit()
+        return True
+
+    @Slot(str, result=bool)
+    def restoreDevice(self, did):
+        if not any(x['id'] == did and x.get('archived') for x in self._items):
+            return False
+        with self._connect() as d:
+            d.execute('UPDATE devices SET archived_at=0 WHERE id=?', (did,))
+        self._load()
+        self.changed.emit()
+        self.streamsChanged.emit()
+        return True
 
     @Property('QVariantList', notify=streamsChanged)
     def streams(self):
@@ -236,7 +269,9 @@ class Devices(QObject):
 
     @Slot(str)
     def setActive(self, did):
-        if not any(x['id'] == did and x.get('onboardingState') == 'ready' for x in self._items):
+        if not any(
+            x['id'] == did and x.get('onboardingState') == 'ready' and not x.get('archived') for x in self._items
+        ):
             return
         with self._connect() as d:
             d.execute('UPDATE devices SET active=0')
@@ -377,17 +412,14 @@ class Devices(QObject):
             'videoProfiles': [],
             'openipcIdentities': identities,
             'activeDeviceId': self._active,
+            'archivedDeviceIds': [x['id'] for x in self._items if x.get('archived')],
         }
 
     @Slot('QVariantMap', result=bool)
     def validateSnapshot(self, value):
-        if not isinstance(value, dict) or set(value) != {
-            'devices',
-            'streams',
-            'videoProfiles',
-            'openipcIdentities',
-            'activeDeviceId',
-        }:
+        required = {'devices', 'streams', 'videoProfiles', 'openipcIdentities', 'activeDeviceId'}
+        # 'archivedDeviceIds' is optional so backups made before the archive still restore.
+        if not isinstance(value, dict) or not required <= set(value) <= required | {'archivedDeviceIds'}:
             return False
         if not all(
             isinstance(value[k], list) for k in ('devices', 'streams', 'videoProfiles', 'openipcIdentities')
@@ -405,6 +437,9 @@ class Devices(QObject):
                 return False
             ids.append(d['id'])
         if len(ids) != len(set(ids)) or (value['activeDeviceId'] and value['activeDeviceId'] not in ids):
+            return False
+        archived = value.get('archivedDeviceIds', [])
+        if not isinstance(archived, list) or any(not isinstance(i, str) or i not in ids for i in archived):
             return False
         stream_ids = []
         for s in value['streams']:
@@ -432,8 +467,9 @@ class Devices(QObject):
                 for item in value['devices']:
                     active = int(item['id'] == value['activeDeviceId'])
                     identity = next((x for x in value['openipcIdentities'] if x.get('device_id') == item['id']), {})
+                    archived_at = int(time.time()) if item['id'] in value.get('archivedDeviceIds', []) else 0
                     d.execute(
-                        'INSERT INTO devices(id,name,type,host,port,connection,notes,active,identity_json) VALUES(?,?,?,?,?,?,?,?,?)',
+                        'INSERT INTO devices(id,name,type,host,port,connection,notes,active,identity_json,archived_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
                         (
                             item['id'],
                             item['name'],
@@ -442,8 +478,9 @@ class Devices(QObject):
                             int(item['port']),
                             item['connection'],
                             item['notes'],
-                            active,
+                            0 if archived_at else active,
                             json.dumps({k: v for k, v in identity.items() if k != 'device_id'}, ensure_ascii=False),
+                            archived_at,
                         ),
                     )
                 for s in value['streams']:

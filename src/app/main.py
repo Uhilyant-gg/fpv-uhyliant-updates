@@ -2,6 +2,9 @@ import argparse, json, os, sys, time, traceback
 from pathlib import Path
 
 PROCESS_STARTED_AT = time.monotonic()
+# FFmpeg in Qt Multimedia opens only whitelisted protocols. Video pushed by the camera
+# ("Static IP") arrives as RTP over UDP described by a local SDP file.
+os.environ.setdefault('QT_FFMPEG_PROTOCOL_WHITELIST', 'file,crypto,data,rtsp,rtp,udp,tcp')
 from version import VERSION, WINDOW_TITLE
 
 DATA = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'FPV-Uhyliant'
@@ -134,6 +137,10 @@ def main():
     from flight_alerts_runtime import FlightAlertsRuntime
     from presets_runtime import PresetsRuntime
     from dvr_runtime import DvrRuntime
+    from connection_profiles import ConnectionStore
+    from connections_runtime import ConnectionsRuntime
+    from zerotier_local import ZeroTierLocal
+    import camera_setup
     from settings_presets import PresetStore
 
     harness.mark('application-imports-complete')
@@ -250,8 +257,30 @@ def main():
     presets = PresetsRuntime(preset_store, s)
     backup.restored.connect(presets.reload)
     dvr_runtime = DvrRuntime()
+
+    def configure_camera(host, address, port):
+        session = [(credentials.username or 'root', credentials.secret())]
+        return camera_setup.configure_push(
+            host,
+            address,
+            port,
+            session + list(camera_setup.DEFAULT_CREDENTIALS),
+            lambda h, u, p: camera_setup.CameraShell(h, u, p, DATA / 'camera_known_hosts'),
+        )
+
+    connections = ConnectionsRuntime(
+        d,
+        ConnectionStore(DATA / 'connections.json'),
+        camera_setup=configure_camera,
+        zerotier=ZeroTierLocal(),
+        listen=not x.first_run_acceptance_smoke,
+        sdp_folder=DATA / 'push-video',
+    )
+    v.host_resolver = connections.host_for
+    secondary.host_resolver = connections.host_for
+    v.push_resolver = connections.push_url_for
     dvr_runtime.recordingChanged.connect(lambda: s.setRecordingActive(dvr_runtime.recording))
-    app._runtime_refs = app._runtime_refs + (flight_alerts, presets, dvr_runtime)
+    app._runtime_refs = app._runtime_refs + (flight_alerts, presets, dvr_runtime, connections)
     ctx = e.rootContext()
     for name, obj in [
         ('station', s),
@@ -285,6 +314,7 @@ def main():
         ('flightAlerts', flight_alerts),
         ('presetsRuntime', presets),
         ('dvrRuntime', dvr_runtime),
+        ('connectionsRuntime', connections),
     ]:
         ctx.setContextProperty(name, obj)
     ctx.setContextProperty('appWindowTitle', WINDOW_TITLE)
@@ -296,6 +326,7 @@ def main():
         hardware_e2e.reset()
         credentials.clear()
         dvr_runtime.shutdown()
+        connections.stop()
         video.stopAll()
         links.clear()
         pairing.clearPending()
@@ -324,6 +355,7 @@ def main():
                 },
             )
             return
+        connections.start()
         try:
             d.discoverOpenIPC()
             harness.mark('discovery', detail={'started': True, 'savedDevices': d.count})

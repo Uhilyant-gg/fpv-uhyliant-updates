@@ -42,6 +42,8 @@ Any action that can be determined and completed safely from trustworthy observed
 
 Ask the user only for decisions the application cannot safely make, including session credentials, genuinely ambiguous choices, destructive confirmation and recovery decisions.
 
+**Owner directive: maximum automation across the whole project.** The station does by itself everything it can determine or perform safely: it detects, configures, checks and repairs, and shows what it did and what is left. The operator is asked only for what the station cannot know (a password it does not have, a choice only a person can make, consent to something destructive). A manual field is a fallback that sits next to the automatic result, never a required step. Every new feature is reviewed against this before it is merged.
+
 ## Principle 3: Zero Config First
 Any parameter that can be discovered or derived safely must not be requested in the normal flow.
 

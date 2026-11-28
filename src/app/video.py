@@ -1,4 +1,6 @@
 import socket, time
+
+from connection_profiles import url_host
 from datetime import datetime, timezone
 from PySide6.QtCore import QObject, Property, Signal, Slot
 
@@ -22,6 +24,11 @@ class VideoRuntime(QObject):
         self._profile = {}
         self._device = {}
         self._check_ms = None
+        # Optional: picks the address by the connection type the pilot selected.
+        self.host_resolver = None
+        # Optional: URL of video the camera pushes to this PC ("Static IP"), else "".
+        self.push_resolver = None
+        self._push = False
 
     @Property(str, notify=changed)
     def state(self):
@@ -82,6 +89,7 @@ class VideoRuntime(QObject):
         self.changed.emit()
 
     def _clear_selection(self):
+        self._push = False
         self._stream_id = ''
         self._url = ''
         self._host = ''
@@ -169,7 +177,22 @@ class VideoRuntime(QObject):
             port = int(stream.get('port'))
         except (TypeError, ValueError):
             port = 0
-        host = str(device.get('host', '')).strip()
+        push_url = self.push_resolver(device) if self.push_resolver else ''
+        if push_url:
+            # The camera sends the video here; there is no endpoint on the camera to check.
+            self._stream = self._canonical_stream(stream)
+            self._device = dict(device)
+            self._profile = dict(profile)
+            self._host = 'push'
+            self._port = 1
+            self._stream_id = stream_id
+            self._url = push_url
+            self._push = True
+            self._attempts = 1
+            self._set('ready')
+            return True
+        self._push = False
+        host = str(self.host_resolver(device) if self.host_resolver else device.get('host', '')).strip()
         canonical = self._canonical_stream(stream)
         path = canonical.get('path', '')
         if not host or port < 1 or port > 65535 or not path:
@@ -184,7 +207,7 @@ class VideoRuntime(QObject):
         self._host = host
         self._port = port
         self._stream_id = stream_id
-        self._url = f'rtsp://{self._host}:{self._port}{path}'
+        self._url = f'rtsp://{url_host(self._host)}:{self._port}{path}'
         self._attempts = 1
         self._set('checking')
         if not self._check_endpoint():
@@ -203,7 +226,7 @@ class VideoRuntime(QObject):
             return False
         self._attempts += 1
         self._set('reconnecting')
-        if not self._check_endpoint():
+        if not getattr(self, '_push', False) and not self._check_endpoint():
             return False
         self._set('ready')
         return True

@@ -14,7 +14,9 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
         self.assertEqual(
             set(self.qml),
             {
+                "ArchiveDialog.qml",
                 "BackupPanel.qml",
+                "CameraSettingsDialog.qml",
                 "ControllerPanel.qml",
                 "DevicesPanel.qml",
                 "DiagnosticsPanel.qml",
@@ -33,6 +35,7 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
                 "RecordingPanel.qml",
                 "TabbedHub.qml",
                 "TimelinePanel.qml",
+                "ZeroTierPanel.qml",
                 "UpdatePanel.qml",
             },
         )
