@@ -69,8 +69,12 @@ class ConnectionsRuntime(QObject):
         camera_setup=None,
         camera_inspect=None,
         camera_inspect_close=None,
+        relay=None,
     ):
         super().__init__()
+        # Pushed video passes through the station on its way to the player (see rtp_relay).
+        self._relay_factory = relay
+        self._relays: dict[str, object] = {}
         self._camera_inspect = camera_inspect
         self._camera_inspect_close = camera_inspect_close
         self._inspect_busy: set[str] = set()
@@ -177,6 +181,7 @@ class ConnectionsRuntime(QObject):
     def stop(self):
         self._timer.stop()
         self._close_listeners()
+        self._stop_relays()
 
     @Slot()
     def pauseListening(self):
@@ -189,7 +194,25 @@ class ConnectionsRuntime(QObject):
     @Slot()
     def resumeListening(self):
         self._listening_paused = False
+        self._stop_relays()
         self._sync_listeners()
+
+    def _stop_relays(self):
+        for relay in self._relays.values():
+            relay.stop()
+        self._relays.clear()
+
+    def relay_window(self, device_id):
+        """Stream counters of the last window for pushed video, or None without a relay."""
+        relay = self._relays.get(device_id)
+        return relay.window() if relay is not None else None
+
+    @Slot(str)
+    def probeSelected(self, device_id):
+        """In flight, when the video is lost: is the camera itself reachable right now?"""
+        kind = self._selected.get(device_id)
+        if kind in ("local", "starlink", "cloud") and device_id in self._statuses:
+            self._probe(device_id, kind)
 
     @Slot(str, result=int)
     def pushPortFor(self, device_id):
@@ -341,8 +364,19 @@ class ConnectionsRuntime(QObject):
         if self._selected.get(device_id) != "static" or not port or self._sdp_folder is None:
             return ""
         addresses = self._addresses[device_id]
+        player_port = port
+        if self._relay_factory is not None:
+            self.pauseListening()  # the relay takes the push port from the pre-flight listener
+            relay = self._relays.pop(device_id, None)
+            if relay is not None:
+                relay.stop()
+            forward = pv.free_loopback_port()
+            relay = self._relay_factory(port, forward) if forward else None
+            if relay is not None and relay.start():
+                self._relays[device_id] = relay
+                player_port = forward
         path = pv.write_sdp(
-            self._sdp_folder, device_id, port, addresses.get("pushCodec", "h265"), addresses.get("pushPayload")
+            self._sdp_folder, device_id, player_port, addresses.get("pushCodec", "h265"), addresses.get("pushPayload")
         )
         return path.as_uri()
 

@@ -42,6 +42,11 @@ Item {
   if (telemetry.satellites !== undefined && telemetry.satellites !== null) parts.push("супутників " + telemetry.satellites)
   return parts.join(" · ")
  }
+ function streamText() {
+  var d = linkDoctor.details
+  if (!d.hasStream) return ""
+  return "втрачено " + String(d.lossPct).replace(".", ",") + "% пакетів · нерівність " + Math.round(d.jitterMs) + " мс · " + (d.kbps / 1000).toFixed(1).replace(".", ",") + " Мбіт/с"
+ }
  function controllerColor(health) { return health === "ready" ? green : (health === "problem" ? red : (health === "attention" ? amber : grey)) }
 
  component Row_: RowLayout {
@@ -88,9 +93,17 @@ Item {
   Row_ {
    objectName: "hardwareLink"
    title: "Канал зв’язку · " + root.kindLabel(root.kind)
-   value: root.link.label ? (root.link.state === "available" ? "затримка " + root.link.label : root.link.label) : "немає даних"
+   value: root.link.state === "available" && root.link.latencyMs !== null && root.link.latencyMs !== undefined ? "затримка " + root.link.label : (root.link.label || "немає даних")
    dot: root.stateColor(root.link.state)
+   detail: root.streamText()
    LinkGraph { width: Math.min(parent.width, 480); height: 36; values: linkMonitor.history }
+  }
+  Row_ {
+   objectName: "hardwareInternet"
+   visible: root.kind !== "" && root.kind !== "local"
+   title: "Інтернет на цьому ПК"
+   value: linkDoctor.details.internet === true ? "є" : (linkDoctor.details.internet === false ? "немає · перевірте роутер або провайдера" : "перевіряю…")
+   dot: linkDoctor.details.internet === true ? root.green : (linkDoctor.details.internet === false ? root.red : root.amber)
   }
   Row_ {
    objectName: "hardwareFlightController"

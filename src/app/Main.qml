@@ -37,7 +37,8 @@ ApplicationWindow {
  onConnectedChanged: { if (!connected) { dvrRuntime.stop(); connectionsRuntime.resumeListening() } else connectionsRuntime.pauseListening() }
  function attachDvrSink(){var sink=player.videoOutput ? player.videoOutput.videoSink : null;dvrRuntime.setVideoSink(sink);linkMonitor.setVideoSink(sink)}
  property bool linkWatchActive: connected && !simulation && !serviceMode
- onLinkWatchActiveChanged: linkMonitor.setActive(linkWatchActive)
+ onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive)}
+ Connections{target:linkDoctor;function onRetryNeeded(){w.recoverPrimary()}}
  Connections{target:linkMonitor;function onRetryNeeded(){if(!videoRecovery.running)w.recoverPrimary()}}
  Connections{target:player;function onVideoOutputChanged(){w.attachDvrSink()}}
  property string dvrCameraName: devicesModel.activeName
@@ -139,18 +140,28 @@ ApplicationWindow {
     }
    }
    Rectangle {
+    id: linkBanner
     objectName: "linkBanner"
-    visible: linkMonitor.text !== "" && !w.simulation
+    // Red: lost, with the cause below. Amber: the video plays but the link is getting worse.
+    // Green: back again.
+    readonly property bool warning: !linkMonitor.lost && !linkMonitor.justRestored && linkDoctor.level === "warning"
+    visible: (linkMonitor.text !== "" || warning) && !w.simulation
     z: 26
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.top: parent.top
     anchors.topMargin: flightAlerts.active ? 72 : 16
-    width: Math.min(parent.width - 32, linkBannerText.implicitWidth + 40)
-    height: 52
+    width: Math.min(parent.width - 32, linkBannerColumn.implicitWidth + 40)
+    height: linkBannerColumn.implicitHeight + 22
     radius: 10
-    color: linkMonitor.lost ? "#e6b3263a" : "#e6146b4a"
-    border.color: linkMonitor.lost ? red : green
-    Text { id: linkBannerText; anchors.centerIn: parent; text: linkMonitor.text; color: "white"; font.pixelSize: 19; font.bold: true }
+    color: linkMonitor.lost ? "#e6b3263a" : (warning ? "#e6a8730f" : "#e6146b4a")
+    border.color: linkMonitor.lost ? red : (warning ? amber : green)
+    Column {
+     id: linkBannerColumn
+     anchors.centerIn: parent
+     spacing: 3
+     Text { objectName: "linkBannerText"; anchors.horizontalCenter: parent.horizontalCenter; text: linkBanner.warning ? linkDoctor.text : linkMonitor.text; color: "white"; font.pixelSize: 19; font.bold: true }
+     Text { objectName: "linkBannerCause"; anchors.horizontalCenter: parent.horizontalCenter; visible: linkMonitor.lost && linkDoctor.text !== ""; text: linkDoctor.text; color: "white"; font.pixelSize: 15 }
+    }
    }
    Rectangle {
     objectName: "flightAlertBanner"
@@ -167,7 +178,7 @@ ApplicationWindow {
     Text { id: flightAlertText; anchors.centerIn: parent; text: flightAlerts.text; color: "white"; font.pixelSize: 18; font.bold: true }
    }
    Rectangle { visible:w.displayFallbackNotice!==""&&!w.simulation; z:20; anchors.top:parent.top; anchors.horizontalCenter:parent.horizontalCenter; anchors.topMargin:16; width:Math.min(parent.width-32,620); height:48; radius:10; color:"#e60b1522"; border.color:amber; Text{anchors.fill:parent;anchors.margins:10;text:w.displayFallbackNotice;color:fg;horizontalAlignment:Text.AlignHCenter;verticalAlignment:Text.AlignVCenter;wrapMode:Text.WordWrap} }
-   Column { visible:!w.simulation&&player.playbackState!==MediaPlayer.PlayingState&&!primaryDetached; anchors.centerIn:parent; spacing:8; Text{text:stateUa(videoRuntime.state);color:fg;font.pixelSize:20;font.bold:true} Text{text:videoRuntime.error;color:red;visible:text!==""} Button{text:"Запустити відео";enabled:selectedStreamId!=="";onClicked:startSelected()} }
+   Column { objectName:"videoStartOverlay"; visible:!w.simulation&&player.playbackState!==MediaPlayer.PlayingState&&!primaryDetached&&!linkMonitor.lost; anchors.centerIn:parent; spacing:8; Text{text:stateUa(videoRuntime.state);color:fg;font.pixelSize:20;font.bold:true} Text{text:videoRuntime.error;color:red;visible:text!==""} Button{text:"Запустити відео";enabled:selectedStreamId!=="";onClicked:startSelected()} }
    Column { visible:!w.simulation&&primaryDetached; anchors.centerIn:parent; spacing:8; Text{text:"Основний потік відкрито в окремому вікні";color:fg;font.pixelSize:18} Button{text:"Повернути до основного екрана";onClicked:primaryDetached=false} }
    Rectangle { visible:!w.simulation&&pipEnabled&&streamWorkspace.state.pipAvailable&&!secondaryDetached; z:5; width:Math.min(parent.width*0.32,480); height:width*9/16; anchors.right:parent.right; anchors.top:parent.top; anchors.margins:12; color:"black"; border.color:secondaryVideoRuntime.state==="playing"?green:amber; border.width:2; radius:8; clip:true; VideoOutput{id:secondaryVideoOut;anchors.fill:parent;fillMode:VideoOutput.PreserveAspectFit} Text{anchors.centerIn:parent;visible:secondaryPlayer.playbackState!==MediaPlayer.PlayingState;text:stateUa(secondaryVideoRuntime.state);color:fg;font.bold:true} }
    OsdOverlay {
