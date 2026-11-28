@@ -169,3 +169,34 @@ def test_static_ip_is_judged_by_packets_not_by_an_old_status():
     doctor.evaluate()
     assert doctor.text == "Від камери не надходить жодного пакета відео"
     assert connections.probes == [], "nothing to ping with a static IP"
+
+
+class Starlink:
+    def __init__(self):
+        self.asked = []
+        self.text = ""
+
+    def warning(self):
+        return self.text
+
+    def explainOutage(self, seconds):
+        self.asked.append(seconds)
+
+
+def test_starlink_warns_while_flying_and_is_asked_after_a_dropout():
+    monitor, connections, clock = Monitor(), Connections("starlink"), Clock()
+    starlink = Starlink()
+    doctor = LinkDoctor(
+        monitor, Devices(), connections, internet_check=lambda: True, run_async=False, clock=clock, starlink=starlink
+    )
+    doctor.setActive(True)
+    starlink.text = "Starlink: перешкода в небі зараз"
+    doctor.evaluate()
+    assert doctor.level == "warning" and doctor.text == "Starlink: перешкода в небі зараз"
+    starlink.text = ""
+    monitor.lost = True
+    doctor.evaluate()
+    clock.now += 7
+    monitor.lost = False
+    doctor.evaluate()
+    assert starlink.asked == [7], "asked about the 7 seconds without video"

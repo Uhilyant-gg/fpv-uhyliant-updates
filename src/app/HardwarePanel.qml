@@ -131,6 +131,14 @@ Item {
    LinkGraph { width: Math.min(parent.width, 480); height: 36; values: linkMonitor.history }
   }
   Row_ {
+   objectName: "hardwareStarlinkDish"
+   visible: root.kind === "starlink" || starlinkDish.available
+   title: "Антена Starlink на дроні"
+   value: starlinkDish.available ? starlinkDish.status.stateText + " · " + starlinkDish.status.latencyMs + " мс · небо закрите на " + String(starlinkDish.status.obstructedPct).replace(".", ",") + "%" : (starlinkDish.reason || "дані ще не отримано")
+   detail: starlinkDish.available && (starlinkDish.status.alerts || []).length ? "Увага: " + starlinkDish.status.alerts.join(", ") : (starlinkDish.lastOutageCause ? "Останній обрив: " + starlinkDish.lastOutageCause : "")
+   dot: !starlinkDish.available ? root.grey : ((starlinkDish.status.alerts || []).length || starlinkDish.status.currentlyObstructed ? root.amber : root.green)
+  }
+  Row_ {
    objectName: "hardwareInternet"
    visible: root.kind !== "" && root.kind !== "local"
    title: "Інтернет на цьому ПК"

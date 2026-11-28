@@ -85,8 +85,11 @@ class LinkDoctor(QObject):
         run_async=True,
         clock=time.monotonic,
         tick_ms=1000,
+        starlink=None,
     ):
         super().__init__()
+        self._starlink = starlink
+        self._lost_at = None
         self._monitor = link_monitor
         self._devices = devices
         self._connections = connections
@@ -178,6 +181,16 @@ class LinkDoctor(QObject):
                 self._connections.probeSelected(device_id)
         reachable = self._camera_reachable(device_id, kind) if kind else None
         self._verdict = diagnose(kind, lost, self._stream, self._internet, reachable)
+        if self._starlink is not None:
+            if lost and self._lost_at is None:
+                self._lost_at = now
+            elif not lost and self._lost_at is not None:
+                # Back again: the dish can be asked now what happened while it was gone.
+                self._starlink.explainOutage(int(now - self._lost_at))
+                self._lost_at = None
+            warning = self._starlink.warning()
+            if warning and self._verdict["level"] == "ok":
+                self._verdict = {"code": "starlink", "level": "warning", "text": warning}
         self.changed.emit()
 
     def _check_internet(self, now):

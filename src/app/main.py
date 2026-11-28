@@ -294,7 +294,15 @@ def main():
         sdp_folder=DATA / 'push-video',
         relay=RtpRelay,
     )
-    link_doctor = LinkDoctor(link_monitor, d, connections)
+    from starlink_runtime import StarlinkRuntime
+
+    def dish_shell(host):
+        logins = [(u, p) for u, p in [(credentials.username or 'root', credentials.secret())] if p]
+        username, password = (logins + list(camera_setup.DEFAULT_CREDENTIALS))[0]
+        return camera_setup.CameraShell(host, username, password, DATA / 'camera_known_hosts')
+
+    starlink_dish = StarlinkRuntime(d, connections, dish_shell)
+    link_doctor = LinkDoctor(link_monitor, d, connections, starlink=starlink_dish)
     camera_logins = lambda: (
         [(credentials.username or 'root', credentials.secret())]
         + list(  # noqa: E731
@@ -335,6 +343,7 @@ def main():
 
     link_doctor.changed.connect(feed_auto)
     app._runtime_refs = app._runtime_refs + (
+        starlink_dish,
         flight_alerts,
         presets,
         dvr_runtime,
@@ -377,6 +386,7 @@ def main():
         ('dvrRuntime', dvr_runtime),
         ('linkMonitor', link_monitor),
         ('linkDoctor', link_doctor),
+        ('starlinkDish', starlink_dish),
         ('controllerActions', controller_actions),
         ('videoPresets', video_preset_runtime),
         ('connectionsRuntime', connections),

@@ -58,7 +58,45 @@ Item {
    }
   }
 
+  Rectangle {
+   objectName: "starlinkDishSection"
+   Layout.fillWidth: true
+   implicitHeight: dishColumn.implicitHeight + 20
+   radius: 8
+   color: "#0f1c2b"
+   border.color: "#2f4860"
+   ColumnLayout {
+    id: dishColumn
+    anchors.fill: parent
+    anchors.margins: 10
+    spacing: 4
+    Text { text: "Антена на дроні"; color: root.sub; font.pixelSize: 12 }
+    Text {
+     objectName: "starlinkDishState"
+     text: starlinkDish.available ? starlinkDish.status.stateText + " · затримка до мережі Starlink " + starlinkDish.status.latencyMs + " мс · втрати " + String(starlinkDish.status.dropPct).replace(".", ",") + "%" : (starlinkDish.reason || "дані ще не отримано")
+     color: root.fg; font.pixelSize: 15; font.bold: true; wrapMode: Text.Wrap; Layout.fillWidth: true
+    }
+    Text {
+     visible: starlinkDish.available
+     text: "небо закрите на " + String(starlinkDish.status.obstructedPct).replace(".", ",") + "%" + (starlinkDish.status.currentlyObstructed ? " · ЗАРАЗ перешкода" : "") + " · ↓ " + String(starlinkDish.status.downMbps).replace(".", ",") + " Мбіт/с · ↑ " + String(starlinkDish.status.upMbps).replace(".", ",") + " Мбіт/с"
+     color: starlinkDish.status.currentlyObstructed ? root.amber : root.sub; wrapMode: Text.Wrap; Layout.fillWidth: true
+    }
+    Text {
+     objectName: "starlinkDishAlerts"
+     visible: starlinkDish.available && (starlinkDish.status.alerts || []).length > 0
+     text: "Увага: " + (starlinkDish.status.alerts || []).join(", ")
+     color: root.red; wrapMode: Text.Wrap; Layout.fillWidth: true
+    }
+    Text {
+     objectName: "starlinkLastOutage"
+     visible: starlinkDish.lastOutageCause !== ""
+     text: "Останній обрив: " + starlinkDish.lastOutageCause
+     color: root.sub; wrapMode: Text.Wrap; Layout.fillWidth: true
+    }
+   }
+  }
+
   Item { Layout.fillHeight: true }
-  Button { objectName: "starlinkCheckNow"; text: "Перевірити зараз"; onClicked: connectionsRuntime.refresh() }
+  Button { objectName: "starlinkCheckNow"; text: "Перевірити зараз"; onClicked: { connectionsRuntime.refresh(); starlinkDish.poll() } }
  }
 }

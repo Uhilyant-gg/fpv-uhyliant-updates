@@ -642,7 +642,4 @@ def test_control_host_reaches_the_camera_by_any_working_way(runtime):
     runtime.prober.reachable["2001:db8::10"] = 61
     runtime.setAddress("c1", "starlink", "2001:db8::10")
     runtime.select("c1", "starlink")
-    assert runtime.control_host("c1") == "2001:db8::10", "the selected connection first"
-    runtime.prober.reachable.pop("2001:db8::10")
-    runtime.refresh()
-    assert runtime.control_host("c1") == "192.168.1.10", "falls back to another working way"
+    assert runtime.control_host("c1") == "192.168.1.10", "never over Starlink's public address"
