@@ -121,3 +121,24 @@ def test_video_is_reopened_again_and_again_while_lost():
         clock.now += 1
         monitor.evaluate()
     assert len(retries) == 11, "no re-opening once video is back"
+
+
+class Frame:
+    def __init__(self, valid):
+        self.valid = valid
+
+    def isValid(self):
+        return self.valid
+
+
+def test_an_empty_frame_from_reopening_the_player_is_not_video():
+    monitor, sink, clock = make()
+    monitor.setActive(True)
+    sink.videoFrameChanged.emit(Frame(True))
+    clock.now += LOST_AFTER_S + 0.1
+    monitor.evaluate()
+    assert monitor.lost
+    sink.videoFrameChanged.emit(Frame(False))
+    assert monitor.lost, "the player was only re-opened, video is not back yet"
+    sink.videoFrameChanged.emit(Frame(True))
+    assert not monitor.lost and monitor.justRestored
