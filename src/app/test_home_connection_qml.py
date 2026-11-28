@@ -112,12 +112,33 @@ def single_shot(delay, callback):
         one(window, 'cameraSettings').clicked.emit()
         app.processEvents()
         assert dialog.property('visible')
-        window.findChild(QObject, 'cameraRemove').clicked.emit()
+        window.findChild(QObject, 'cameraArchive').clicked.emit()
         app.processEvents()
-        window.findChild(QObject, 'cameraRemoveConfirm').clicked.emit()
+        assert not dialog.property('visible')
+        devices = runtime._devices
+        assert devices.homeItems == [] and [d['id'] for d in devices.archivedItems] == ['c1']
+        assert find_all(window.contentItem(), 'cameraCard', []) == [], 'archived camera leaves the home screen'
+        archive_button = one(window, 'homeArchive')
+        assert archive_button.property('text') == 'Архів (1)'
+        archive_button.clicked.emit()
         app.processEvents()
-        assert runtime._devices.items == [], 'camera removed'
-        assert find_all(window.contentItem(), 'cameraCard', []) == []
+        archive = window.findChild(QObject, 'archiveDialog')
+        assert archive.property('visible')
+        rows = find_all(archive.property('contentItem'), 'archiveRestore', [])
+        assert len(rows) == 1
+        rows[0].clicked.emit()
+        app.processEvents()
+        assert [d['id'] for d in devices.homeItems] == ['c1'] and devices.archivedItems == []
+        assert len(find_all(window.contentItem(), 'cameraCard', [])) == 1
+
+        devices.archiveDevice('c1')
+        app.processEvents()
+        find_all(archive.property('contentItem'), 'archiveDelete', [])[0].clicked.emit()
+        app.processEvents()
+        assert devices.archivedItems != [], 'delete asks for confirmation first'
+        find_all(archive.property('contentItem'), 'archiveDeleteConfirm', [])[0].clicked.emit()
+        app.processEvents()
+        assert devices.items == [], 'camera deleted from the archive'
         (root / 'home-connection-tested').write_text('ok')
         app.quit()
     return original_single_shot(delay, verify)

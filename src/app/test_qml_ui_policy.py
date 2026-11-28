@@ -14,6 +14,7 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
         self.assertEqual(
             set(self.qml),
             {
+                "ArchiveDialog.qml",
                 "BackupPanel.qml",
                 "CameraSettingsDialog.qml",
                 "ControllerPanel.qml",

@@ -17,10 +17,14 @@ class HomeDashboard(QObject):
         super().__init__()
         self._devices = devices
         self._controller = None
-        self._model = home_dashboard(devices.items, devices.streams)
+        self._model = home_dashboard(self._current_items(), devices.streams)
         devices.changed.connect(self.refresh)
         devices.streamsChanged.connect(self.refresh)
         devices.discoveryChanged.connect(self.refresh)
+
+    def _current_items(self):
+        # Archived cameras are out of use and do not affect the home state.
+        return [item for item in self._devices.items if not item.get('archived')]
 
     def setController(self, controller):
         """Include an observed RC controller in the Home next action."""
@@ -30,7 +34,7 @@ class HomeDashboard(QObject):
 
     def refresh(self):
         controller = self._controller.evidence() if self._controller is not None else None
-        self._model = home_dashboard(self._devices.items, self._devices.streams, controller)
+        self._model = home_dashboard(self._current_items(), self._devices.streams, controller)
         self.changed.emit()
 
     @Property(str, notify=changed)

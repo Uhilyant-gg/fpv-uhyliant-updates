@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // Settings of one camera from the home screen: name, addresses for every
-// connection type, firmware and removal.
+// connection type, firmware and moving to the archive.
 Popup {
  id: root
  objectName: "cameraSettingsDialog"
@@ -11,7 +11,6 @@ Popup {
  property string deviceId: ""
  property var camera: ({})
  property string error: ""
- property bool confirmRemove: false
  property color fg: "#f4f7fb"
  property color sub: "#b7c8da"
  property color red: "#ff6678"
@@ -29,7 +28,6 @@ Popup {
   staticField.text = connectionsRuntime.addressFor(device.id, "static")
   starlinkField.text = connectionsRuntime.addressFor(device.id, "starlink")
   error = ""
-  confirmRemove = false
   open()
   if (focusKind === "starlink") starlinkField.forceActiveFocus()
   else if (focusKind === "static") staticField.forceActiveFocus()
@@ -86,22 +84,13 @@ Popup {
    Layout.fillWidth: true
    spacing: 8
    Button { objectName: "cameraFirmware"; text: "Прошивка камери"; onClicked: { var id = root.deviceId; root.close(); root.openFirmware(id) } }
-   Button { objectName: "cameraRemove"; text: "Видалити камеру"; visible: !root.confirmRemove; onClicked: root.confirmRemove = true }
-   Item { Layout.fillWidth: true }
-  }
-
-  RowLayout {
-   visible: root.confirmRemove
-   Layout.fillWidth: true
-   Text { text: "Видалити «" + (root.camera.name || "") + "» зі станції?"; color: root.red; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-   Button { text: "Ні"; onClicked: root.confirmRemove = false }
    Button {
-    objectName: "cameraRemoveConfirm"
-    text: "Так, видалити"
-    onClicked: { devicesModel.removeDevice(root.deviceId); root.close() }
-    contentItem: Text { text: parent.text; font: parent.font; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-    background: Rectangle { radius: 7; color: "#b3263a" }
+    objectName: "cameraArchive"
+    text: "В архів"
+    onClicked: { if (devicesModel.archiveDevice(root.deviceId)) root.close() }
+    HoverHint { text: "Камера зникне з головного екрана. Повернути або остаточно видалити її можна в архіві." }
    }
+   Item { Layout.fillWidth: true }
   }
 
   RowLayout {

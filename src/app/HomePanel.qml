@@ -216,6 +216,7 @@ Item {
    Text { text: "МОЇ КАМЕРИ"; color: root.fg; font.bold: true; font.pixelSize: 15; font.letterSpacing: 1 }
    Text { visible: devicesModel.homeItems.length > 0; text: devicesModel.homeItems.length; color: root.sub; font.pixelSize: 15; font.bold: true }
    Item { Layout.fillWidth: true }
+   Button { objectName: "homeArchive"; visible: devicesModel.archivedItems.length > 0; text: "Архів (" + devicesModel.archivedItems.length + ")"; font.pixelSize: 14; onClicked: archiveDialog.open() }
    Button { objectName: "homeAddCamera"; visible: devicesModel.homeItems.length > 0; text: "+ Додати камеру"; font.pixelSize: 14; onClicked: root.openDevices() }
    Button { objectName: "homeSimulation"; visible: devicesModel.homeItems.length > 0; text: "▣ Симуляція"; font.pixelSize: 14; onClicked: root.openSimulation() }
   }
@@ -388,7 +389,7 @@ Item {
      Text { Layout.alignment: Qt.AlignHCenter; text: "◉"; color: root.sub; font.pixelSize: 40 }
      Text {
       Layout.alignment: Qt.AlignHCenter
-      text: devicesModel.pendingCount ? "Камера проходить перевірку" : "Камер ще не додано"
+      text: devicesModel.pendingCount ? "Камера проходить перевірку" : (devicesModel.archivedItems.length ? "Усі камери в архіві" : "Камер ще не додано")
       color: root.fg; font.pixelSize: 21; font.bold: true
      }
      Text {
@@ -504,6 +505,8 @@ Item {
    }
   }
  }
+
+ ArchiveDialog { id: archiveDialog }
 
  CameraSettingsDialog {
   id: cameraSettings
