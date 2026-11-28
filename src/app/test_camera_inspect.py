@@ -42,6 +42,8 @@ def full():
         "cli -g .video0.fps": "60\n",
         "cli -g .video0.bitrate": "4096\n",
         "cli -g .video0.gopSize": "1\n",
+        "ipcinfo --chip-name": "gk7205v300\n",
+        "ipcinfo --short-sensor": "imx307\n",
     }
 
 
@@ -58,6 +60,8 @@ def test_reads_every_fact():
         "firmware": "OpenIPC",
         "variant": "fpv",
         "version": "2.5.06.12",
+        "platform": "gk7205v300",
+        "sensor": "imx307",
         "video": {"codec": "h265", "size": "1920x1080", "fps": 60, "bitrateKbps": 4096, "gopS": 1},
     }
     assert set(session.commands) == set(ci.READ_ONLY_COMMANDS.values()), "only the read-only commands"
@@ -200,3 +204,9 @@ def test_video_settings_tolerate_odd_answers():
         "gopS": 0.5,
     }
     assert ci.parse_video("mjpeg", "big", "x", "-1", "") == {}
+
+
+def test_hardware_names_are_checked():
+    assert ci.parse_token("gk7205v300\n") == "gk7205v300"
+    assert ci.parse_token("rm -rf /; echo") == ""
+    assert ci.parse_token("") == ""

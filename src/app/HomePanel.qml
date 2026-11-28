@@ -244,6 +244,17 @@ Item {
     required property var modelData
     readonly property string cameraId: modelData.id
     readonly property string selectedKind: connectionsRuntime.selected[cameraId] || ""
+    // Only connections that are set up (or chosen) are shown; the rest wait behind "＋".
+    property bool showAllConnections: false
+    function connectionShown(key) {
+     var state = ((connectionsRuntime.statuses[cameraId] || {})[key] || {}).state || ""
+     return showAllConnections || selectedKind === key || state === "available" || state === "unavailable" || state === "checking"
+    }
+    readonly property int hiddenConnections: {
+     var n = 0
+     for (var i = 0; i < connectionsRuntime.types.length; i++) if (!connectionShown(connectionsRuntime.types[i].key)) n++
+     return n
+    }
     width: list.cellWidth
     height: list.cellHeight
     Rectangle {
@@ -309,6 +320,7 @@ Item {
          readonly property var status: (connectionsRuntime.statuses[cameraCell.cameraId] || {})[modelData.key] || ({})
          readonly property bool chosen: cameraCell.selectedKind === modelData.key
          objectName: "connection-" + modelData.key
+         visible: cameraCell.connectionShown(modelData.key)
          Layout.fillWidth: true
          Layout.preferredWidth: 1
          Layout.preferredHeight: 34
@@ -341,6 +353,19 @@ Item {
           }
          }
         }
+       }
+       Button {
+        objectName: "connectionMore"
+        visible: cameraCell.hiddenConnections > 0 || cameraCell.showAllConnections
+        Layout.fillWidth: true
+        Layout.preferredWidth: 1
+        Layout.preferredHeight: 34
+        text: cameraCell.showAllConnections ? "Сховати зайві" : "＋ Інші з’єднання"
+        font.pixelSize: 12
+        onClicked: cameraCell.showAllConnections = !cameraCell.showAllConnections
+        contentItem: Text { text: parent.text; font: parent.font; color: root.sub; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+        background: Rectangle { radius: 6; color: parent.hovered ? "#22364b" : "transparent"; border.color: "#2f4860" }
+        HoverHint { text: "ZeroTier, Starlink, статичний IP: показати, щоб налаштувати або вибрати." }
        }
       }
       Item { Layout.fillHeight: true }

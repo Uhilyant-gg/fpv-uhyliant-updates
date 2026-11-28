@@ -90,6 +90,17 @@ class FlightAlertsRuntimeTests(unittest.TestCase):
         telemetry.set(connected=False)
         self.assertEqual(runtime.text, "Телеметрію втрачено")
 
+    def test_no_lost_banner_for_telemetry_that_never_came(self):
+        telemetry = Telemetry()
+        runtime = FlightAlertsRuntime(telemetry, Station(Settings()))
+        telemetry.set(connected=False)
+        self.assertFalse(runtime.active, "a drone without a flight-controller link is not an emergency")
+        telemetry.set(connected=True)
+        telemetry.set(connected=False)
+        self.assertEqual(runtime.text, "Телеметрію втрачено")
+        runtime.resetSession()
+        self.assertFalse(runtime.active, "a new flight starts clean")
+
 
 if __name__ == "__main__":
     unittest.main()

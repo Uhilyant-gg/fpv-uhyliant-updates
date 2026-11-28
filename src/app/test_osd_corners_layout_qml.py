@@ -20,7 +20,9 @@ assert overlay is not None, [e.toString() for e in component.errors()]
 assert overlay.property("corner") == "corners"
 window = QQuickWindow()
 overlay.setParentItem(window.contentItem())
-overlay.setProperty("enabledElements", {"homeDistance": True})
+overlay.setProperty("enabledElements", {"homeDistance": True, "video": True})
+overlay.setProperty("telemetry", {"connected": True, "armed": False, "flightMode": "ACRO", "batteryVoltage": 16.1,
+                                  "gpsFix": 3, "altitude": 12, "groundSpeed": 3, "heading": 90, "homeDistance": 40})
 window.show()
 
 def tiles():
@@ -49,7 +51,7 @@ for width, height in ((1920, 1080), (1280, 720), (1024, 768)):
         assert not (item.x() > width / 2 and item.y() > height / 2), "bottom-right stays free: " + item.objectName()
 
 # A hidden tile leaves no gap in its corner.
-overlay.setProperty("enabledElements", {"homeDistance": True, "arm": False})
+overlay.setProperty("enabledElements", {"homeDistance": True, "video": True, "arm": False})
 app.processEvents()
 t = tiles()
 assert "arm" not in t
@@ -67,6 +69,19 @@ overlay.setProperty("corner", "top-left")
 app.processEvents()
 t = tiles()
 assert abs(t["battery"].x() - t["link"].x()) < 1
+# Without a flight controller there are no empty "—" tiles; arranging the OSD shows them all.
+overlay.setProperty("telemetry", {"connected": False})
+overlay.setProperty("positions", {})
+app.processEvents()
+assert set(tiles()) <= {"video"}, set(tiles())
+overlay.setProperty("editing", True)
+app.processEvents()
+assert {"link", "battery", "altitude"} <= set(tiles())
+overlay.setProperty("editing", False)
+overlay.setProperty("enabledElements", {})
+overlay.setProperty("telemetry", {"connected": True, "batteryVoltage": 15.9})
+app.processEvents()
+assert set(tiles()) == {"link", "battery"}, set(tiles())
 print("ok")
 """
 
