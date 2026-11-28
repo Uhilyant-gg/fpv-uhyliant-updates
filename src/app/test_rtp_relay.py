@@ -152,3 +152,54 @@ def test_full_frame_interval_for_h264_and_unknown_before_two_keyframes():
     stats.feed(h264(1, 0, 1), 0.6)
     stats.feed(h264(2, 0, 5, fu_start=True), 2.0)
     assert stats.window(2.5)["keyframeS"] == 2.0
+
+
+def test_smoother_releases_on_the_cameras_clock_within_the_cap():
+    from rtp_relay import Smoother
+
+    smoother = Smoother(max_ms=40)
+    smoother.set_jitter(10)
+    assert smoother.delay_ms == 20
+    smoother.set_jitter(100)
+    assert smoother.delay_ms == 40, "never more than the cap"
+    smoother.set_jitter(10)
+    # frames every 1/30 s (3000 ticks); the second arrives 15 ms late, the third early
+    first = smoother.release_at(10.0, 0, 1)
+    second = smoother.release_at(10.0 + 1 / 30 + 0.015, 3000, 1)
+    third = smoother.release_at(10.0 + 2 / 30 - 0.005, 6000, 1)
+    assert abs(first - 10.02) < 1e-6
+    assert abs(second - (10.02 + 1 / 30)) < 1e-6, "an evenly spaced release"
+    assert abs(third - (10.02 + 2 / 30)) < 1e-6
+
+
+def test_smoother_starts_again_after_a_long_gap_or_a_new_stream():
+    from rtp_relay import Smoother
+
+    smoother = Smoother()
+    smoother.set_jitter(5)
+    smoother.release_at(1.0, 0, 1)
+    late = smoother.release_at(3.0, 3000, 1)
+    assert abs(late - 3.01) < 1e-9, "after a gap: from now on, not the old schedule"
+    assert abs(smoother.release_at(3.5, 999999, 2) - 3.51) < 1e-9, "a new stream from the camera"
+
+
+def test_relay_with_smoothing_still_delivers_everything_in_order():
+    listen, forward = free_udp_port(), free_udp_port()
+    player = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    player.bind(("127.0.0.1", forward))
+    player.settimeout(2)
+    relay = RtpRelay(listen, forward)
+    relay._smoother.delay_ms = 30
+    assert relay.start()
+    try:
+        camera = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        started = time.monotonic()
+        for seq in range(10):
+            camera.sendto(packet(seq, seq * 3000), ("127.0.0.1", listen))
+        received = [parse_rtp(player.recv(2048))[0] for _ in range(10)]
+        assert received == list(range(10))
+        assert time.monotonic() - started >= 0.025, "held for the smoothing delay"
+    finally:
+        relay.stop()
+        player.close()
+        camera.close()

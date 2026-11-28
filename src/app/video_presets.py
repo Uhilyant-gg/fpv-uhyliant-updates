@@ -26,12 +26,54 @@ GOPS = (0.5, 1, 2)
 MIN_KBPS, MAX_KBPS = 256, 20000
 BITRATE_STEPS = (512, 1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384)
 
-DEFAULTS = {
-    "2": {"name": "Слабкий канал", "size": "1280x720", "fps": 30, "bitrateKbps": 1024, "gopS": 0.5},
-    "3": {"name": "Економ", "size": "1280x720", "fps": 30, "bitrateKbps": 2048, "gopS": 1},
-    "4": {"name": "Баланс", "size": "1920x1080", "fps": 30, "bitrateKbps": 4096, "gopS": 1},
-    "5": {"name": "Якість", "size": "1920x1080", "fps": 60, "bitrateKbps": 8192, "gopS": 1},
-}
+# The automatic ladder: nine bitrates for the keys 2…0. For each, the largest picture
+# that still gets enough data per pixel to stay clean (no blocks), never below 30 fps,
+# 60 fps as soon as the bitrate carries it: smoothness and detail together.
+LADDER_KBPS = (1024, 1536, 2048, 3072, 4096, 5120, 6144, 8192, 10240)
+LADDER_NAMES = (
+    "Мінімум",
+    "Дуже слабкий канал",
+    "Слабкий канал",
+    "Нижче середнього",
+    "Середній",
+    "Добрий канал",
+    "Високий",
+    "Дуже високий",
+    "Максимум",
+)
+# H.265 bits per pixel per frame below which fast FPV motion turns into blocks.
+MIN_BITS_PER_PIXEL = 0.05
+# From the least to the most wanted picture for FPV: smoothness before size.
+PICTURES = (("960x540", 30), ("1280x720", 30), ("1280x720", 60), ("1920x1080", 60))
+
+
+def picture_for(kbps: int) -> tuple[str, int]:
+    best = PICTURES[0]
+    for size, fps in PICTURES:
+        w, h = (int(x) for x in size.split("x"))
+        if kbps * 1000 >= w * h * fps * MIN_BITS_PER_PIXEL:
+            best = (size, fps)
+    return best
+
+
+def build_ladder() -> dict:
+    """The camera's presets built by the station: no manual filling needed."""
+    ladder = {}
+    for key, kbps, name in zip(KEYS, LADDER_KBPS, LADDER_NAMES):
+        size, fps = picture_for(kbps)
+        # Short full-frame interval on weak links: a dropout heals faster there.
+        ladder[key] = {
+            "name": name,
+            "size": size,
+            "fps": fps,
+            "bitrateKbps": kbps,
+            "gopS": 0.5 if kbps <= 2048 else 1,
+            "auto": True,
+        }
+    return ladder
+
+
+DEFAULTS = build_ladder()
 
 MESSAGES = {
     "applied": "Пресет {key} «{name}» застосовано в камері",
@@ -55,12 +97,16 @@ def validate(preset) -> dict:
     gop = float(preset.get("gopS", 0))
     if not name or size not in SIZES or fps not in FPS or not MIN_KBPS <= kbps <= MAX_KBPS or gop not in GOPS:
         raise ValueError("preset")
-    return {"name": name, "size": size, "fps": fps, "bitrateKbps": kbps, "gopS": int(gop) if gop == int(gop) else gop}
+    clean = {"name": name, "size": size, "fps": fps, "bitrateKbps": kbps, "gopS": int(gop) if gop == int(gop) else gop}
+    if preset.get("auto"):
+        clean["auto"] = True
+    return clean
 
 
 def commands(preset: dict) -> list[str]:
     """majestic settings for a validated preset, then a reload of the video service."""
     return [
+        "cli -s .video0.rcMode cbr",  # an even stream: no bursts that choke the link
         f"cli -s .video0.size {preset['size']}",
         f"cli -s .video0.fps {int(preset['fps'])}",
         f"cli -s .video0.bitrate {int(preset['bitrateKbps'])}",
@@ -75,13 +121,17 @@ def bitrate_commands(kbps: int) -> list[str]:
     return [f"cli -s .video0.bitrate {int(kbps)}", "killall -1 majestic"]
 
 
+# A reload's exit code, or a setting an older majestic does not know, is not a failure.
+OPTIONAL_COMMANDS = ("killall", "cli -s .video0.rcMode")
+
+
 def run_on_camera(host, credentials, shell, lines) -> dict:
     """Send the commands; never raises. The reload's own exit code is not an error."""
 
     def action(session):
         for line in lines:
             code, _ = session.run(line)
-            if code != 0 and not line.startswith("killall"):
+            if code != 0 and not line.startswith(OPTIONAL_COMMANDS):
                 return {"state": "failed", "message": cs.MESSAGES["failed"]}
         return {"state": "applied"}
 
@@ -320,11 +370,27 @@ class VideoPresetsRuntime(QObject):
         except (ValueError, TypeError):
             self._say(MESSAGES["invalid"], False)
             return False
+        clean.pop("auto", None)  # edited by the pilot: the station leaves it as it is
         camera = self._camera()
         camera["slots"][key] = clean
         self._data[device_id] = camera
         self._store.save(self._data)
         self._say(f"Слот {key} збережено", True)
+        return True
+
+    @Slot(result=bool)
+    def rebuildLadder(self):
+        """Back to the station's own presets for this camera (edited ones are replaced too)."""
+        device_id = self._device_id()
+        if not device_id:
+            return False
+        camera = self._camera()
+        camera["slots"] = build_ladder()
+        if camera.get("active") not in camera["slots"]:
+            camera["active"] = ""
+        self._data[device_id] = camera
+        self._store.save(self._data)
+        self._say("Пресети побудовано заново", True)
         return True
 
     @Slot(str, result=bool)
@@ -372,26 +438,34 @@ class AutoDecider:
     DOWN_GAP_S = 10
     UP_GAP_S = 30
 
+    # Camera encoding plus decoding and showing on the PC, on top of the one-way network delay.
+    PIPELINE_MS = 60
+
     def __init__(self, target_ms=150):
         self.target_ms = target_ms
         self._bad = 0
         self._good = 0
         self._changed_at = None
 
+    def glass_to_glass(self, s):
+        """Estimated delay from the camera to the pilot's screen, from the round trip."""
+        rtt = s.get("latencyMs")
+        return None if rtt is None else rtt / 2 + self.PIPELINE_MS + float(s.get("smoothingMs") or 0)
+
     def bad(self, s):
-        latency = s.get("latencyMs")
+        delay = self.glass_to_glass(s)
         return (
             float(s.get("lossPct") or 0) >= 2
             or float(s.get("jitterMs") or 0) >= 30
-            or (latency is not None and latency > self.target_ms)
+            or (delay is not None and delay > self.target_ms)
         )
 
     def good(self, s):
-        latency = s.get("latencyMs")
+        delay = self.glass_to_glass(s)
         return (
             float(s.get("lossPct") or 0) < 0.5
             and float(s.get("jitterMs") or 0) < 15
-            and (latency is None or latency < self.target_ms * 0.7)
+            and (delay is None or delay < self.target_ms * 0.8)
         )
 
     def update(self, sample: dict, now: float) -> int:

@@ -16,7 +16,7 @@ Item {
 
  function mbps(kbps) { return (Math.round(kbps / 102.4) / 10).toString().replace(".", ",") }
  function describe(slot) {
-  return slot.empty ? "порожній" : slot.size.replace("x", "×") + " · " + slot.fps + " к/с · " + mbps(slot.bitrateKbps) + " Мбіт/с · повний кадр кожні " + String(slot.gopS).replace(".", ",") + " с"
+  return slot.empty ? "порожній" : slot.size.replace("x", "×") + " · " + slot.fps + " к/с · " + mbps(slot.bitrateKbps) + " Мбіт/с · повний кадр кожні " + String(slot.gopS).replace(".", ",") + " с" + (slot.auto ? "" : " · змінено вручну")
  }
  function startEdit(slot) {
   editKey = slot.key
@@ -37,14 +37,19 @@ Item {
    Button { objectName: "closeVideoPresets"; text: "Закрити"; onClicked: root.closeRequested() }
   }
   Text {
-   text: "Клавіша 1 — «Авто», клавіші 2…0 — пресети від найслабшого каналу (2). Пресет записується в саму камеру, відео відновиться саме за секунду-дві. Вибір пресету пілотом вимикає «Авто»."
+   text: "Пресети будує станція: для кожного бітрейту — найбільша картинка без «квадратів», не менше 30 к/с, 60 к/с щойно канал дозволяє. Клавіша 1 — «Авто» (тримає затримку до екрана ≤150 мс), клавіші 2…0 — від мінімуму до максимуму. Вибір пресету пілотом вимикає «Авто»."
    color: root.sub; wrapMode: Text.Wrap; Layout.fillWidth: true
   }
+  RowLayout {
+   Layout.fillWidth: true
   Switch {
    objectName: "videoPresetsAuto"
    text: "1 · Авто: станція сама перемикає ці пресети за станом каналу"
    checked: videoPresets.auto
    onToggled: checked ? videoPresets.choose("1") : videoPresets.setAuto(false)
+   Layout.fillWidth: true
+  }
+  Button { objectName: "videoPresetsRebuild"; text: "Побудувати заново"; onClicked: videoPresets.rebuildLadder() }
   }
   Text {
    objectName: "videoPresetsMessage"

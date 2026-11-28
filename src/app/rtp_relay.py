@@ -8,6 +8,7 @@ restarted its stream (a new source id), so the video can be re-opened at once.
 
 from __future__ import annotations
 
+import heapq
 import socket
 import struct
 import threading
@@ -117,6 +118,76 @@ class RtpStats:
         return result
 
 
+# Smoothing: packets are released on the camera's own clock (RTP timestamps), a little
+# later than they arrived, so uneven arrival does not reach the picture. The hold
+# follows the measured unevenness and never exceeds this, keeping the whole delay
+# from the camera to the screen within the 150 ms target.
+SMOOTHING_MAX_MS = 40.0
+RESYNC_LATE_S = 0.03
+
+
+class Smoother:
+    """When to hand each packet to the player."""
+
+    def __init__(self, max_ms=SMOOTHING_MAX_MS):
+        self.max_ms = max_ms
+        self.delay_ms = 0.0
+        self._base = None  # (arrival, rtp timestamp, source id)
+
+    def set_jitter(self, jitter_ms: float):
+        self.delay_ms = max(0.0, min(self.max_ms, 2.0 * float(jitter_ms)))
+
+    def release_at(self, arrival: float, ts: int, ssrc: int) -> float:
+        delay = self.delay_ms / 1000
+        if self._base is None or self._base[2] != ssrc:
+            self._base = (arrival, ts, ssrc)
+        base_at, base_ts, _ = self._base
+        offset = ((ts - base_ts + 0x80000000) & 0xFFFFFFFF) - 0x80000000
+        ideal = base_at + offset / CLOCK_HZ
+        if arrival - (ideal + delay) > RESYNC_LATE_S or (ideal + delay) - arrival > delay + RESYNC_LATE_S:
+            # The camera's clock and ours drifted apart, or a long gap: start again from here.
+            self._base = (arrival, ts, ssrc)
+            ideal = arrival
+        return max(arrival, ideal + delay)
+
+
+class _PacedSender:
+    """Sends queued packets at their release time on its own thread."""
+
+    def __init__(self, send, clock):
+        self._send = send
+        self._clock = clock
+        self._heap: list = []
+        self._order = 0
+        self._cv = threading.Condition()
+        self._stopped = False
+        self._thread = threading.Thread(target=self._run, name="rtp-pacer", daemon=True)
+        self._thread.start()
+
+    def schedule(self, at: float, data: bytes):
+        with self._cv:
+            self._order += 1
+            heapq.heappush(self._heap, (at, self._order, data))
+            self._cv.notify()
+
+    def _run(self):
+        while True:
+            with self._cv:
+                while not self._stopped and (not self._heap or self._heap[0][0] > self._clock()):
+                    wait = (self._heap[0][0] - self._clock()) if self._heap else None
+                    self._cv.wait(timeout=wait)
+                if self._stopped:
+                    return
+                _, _, data = heapq.heappop(self._heap)
+            self._send(data)
+
+    def stop(self):
+        with self._cv:
+            self._stopped = True
+            self._cv.notify()
+        self._thread.join(timeout=1)
+
+
 class RtpRelay:
     """Listens on the camera's push port and forwards every packet to the player."""
 
@@ -125,6 +196,7 @@ class RtpRelay:
         self.forward_port = forward_port
         self._clock = clock
         self._stats = RtpStats(codec)
+        self._smoother = Smoother()
         self._lock = threading.Lock()
         self._sock = None
         self._thread = None
@@ -151,26 +223,42 @@ class RtpRelay:
         sock = self._sock
         out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         target = ("127.0.0.1", self.forward_port)
+
+        def send(data):
+            try:
+                out.sendto(data, target)
+            except OSError:
+                pass
+
+        pacer = _PacedSender(send, self._clock)
         try:
             while True:
                 try:
                     data = sock.recv(65536)
                 except OSError:
                     break
-                if parse_rtp(data) is None:
+                header = parse_rtp(data)
+                if header is None:
                     continue  # the port is open to the internet: only RTP video goes on to the player
-                try:
-                    out.sendto(data, target)
-                except OSError:
-                    pass
+                now = self._clock()
                 with self._lock:
-                    self._stats.feed(data, self._clock())
+                    self._stats.feed(data, now)
+                    at = self._smoother.release_at(now, header[1], header[2])
+                if at <= now:
+                    send(data)
+                else:
+                    pacer.schedule(at, data)
         finally:
+            pacer.stop()
             out.close()
 
     def window(self) -> dict:
         with self._lock:
-            return self._stats.window(self._clock())
+            result = self._stats.window(self._clock())
+            # The hold follows the unevenness measured over the last second.
+            self._smoother.set_jitter(result["jitterMs"])
+            result["smoothingMs"] = round(self._smoother.delay_ms)
+            return result
 
     def stop(self):
         sock, self._sock = self._sock, None
