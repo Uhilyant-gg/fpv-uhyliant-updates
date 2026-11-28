@@ -61,6 +61,7 @@ MODELS = {
     "flightAlerts": ("flight_alerts_runtime", "FlightAlertsRuntime"),
     "presetsRuntime": ("presets_runtime", "PresetsRuntime"),
     "dvrRuntime": ("dvr_runtime", "DvrRuntime"),
+    "linkMonitor": ("link_monitor", "LinkMonitor"),
     "connectionsRuntime": ("connections_runtime", "ConnectionsRuntime"),
 }
 
