@@ -199,6 +199,21 @@ Introduce only after diagnostic evidence and privacy boundaries are stable. Do n
 ### P2.5 Profile system
 Synchronize eligible non-secret user preferences only after local identity, restore and conflict behavior are deterministic.
 
+### P2.6 Additional and third-party video streams (deferred by the owner, 2026-11-28)
+Owner's direction: later features may need other RTSP (or other protocol) streams, so the stream model
+stays open for that; the work itself waits until the owner returns to it. Proposal on record:
+- a dashed "+" tile under the video streams of the flight side panel: the pilot pastes a link, the
+  station detects the protocol (RTSP, SRT, HLS, RTMP, MJPEG/HTTP, UDP/RTP), tries it for a few seconds
+  and explains a failure in plain words;
+- a login inside a link goes to the Windows secret store, not to plain settings;
+- a "globe" icon and a number like the other sources; the tile is shown only while the stream is
+  reachable (checked about every 30 s); "Сторонні відеопотоки" in the home menu lists, edits and
+  deletes them;
+- these streams go over the PC's internet, not the drone's link; their own delay is measured and
+  shown on the window; the station only watches them and never changes the far side;
+- later: "share a stream" — one station gives its video to another station or a commander by a link.
+Open questions for the owner: which services first (own MediaMTX server, YouTube, others).
+
 ## Release readiness
 After the integrated operator journey is stable:
 - finalize video-first UX and remove duplicated/dead normal workflows;

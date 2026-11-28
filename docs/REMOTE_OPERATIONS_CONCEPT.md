@@ -130,6 +130,11 @@ Order: 1+2+6, then 3, then 4+5 with telemetry forwarding, then 8+9, then 7 on re
   ~120 ms buffered, mutes with M or the "Звук" tile (a muted sound is not fetched, no bitrate), and
   sets the camera's microphone (on/off, sensitivity, 8/16/48 kHz) from the sound panel.
 
+- Streams from other sources (deferred, 2026-11-28): later features may need other RTSP streams or
+  streams from third-party services; the side panel and the stream list stay open for that. The
+  proposal ("+" tile, a link, checked automatically, shown only while reachable) is kept in
+  DELIVERY_ROADMAP.md, P2.6.
+
 ## Map and wind
 - Satellite base map (Esri World Imagery); download a selected area in advance, or automatically
   around the drone. Orientation: north-up, track-up or follow the drone. Picture-in-picture (movable,
