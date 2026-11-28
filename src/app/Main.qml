@@ -19,6 +19,12 @@ ApplicationWindow {
  function stateUa(value){if(value===undefined||value===null||value==="")return "недоступно";var states={"idle":"очікування","stopped":"зупинено","checking":"перевірка","ready":"готово","playing":"відтворення","reconnecting":"перепідключення","stalled":"зупинка потоку","error":"помилка","blocked":"заблоковано","executing":"виконання","installing":"встановлення","reboot-pending":"очікується перезапуск","verified":"перевірено","hardware-validation-pending":"очікується перевірка на обладнанні","applied-pending-verification":"застосовано, очікується перевірка","unavailable":"недоступно","unknown":"ще не визначено","connected":"підключено","disconnected":"відключено","stale":"дані давно не оновлювалися","degraded":"працює нестабільно","attention":"потребує уваги","traffic-no-heartbeat":"є передавання без підтвердження зв’язку","ok":"справно"};return states[value]||"потрібна перевірка"}
  function stopPrimary(){videoRecovery.stop();player.stop();player.source="";videoRuntime.stop();videoRecoveryCount=0}
  function stopSecondary(){secondaryRecovery.stop();secondaryPlayer.stop();secondaryPlayer.source="";secondaryVideoRuntime.stop();secondaryRecoveryCount=0}
+ // The small window and the big picture change places at once: each player keeps drawing into
+ // its own output and the outputs swap their size and place, so nothing is re-opened. Without the small window the streams swap roles.
+ property bool pipSwapped:false
+ property int pipCorner:1
+ property real pipScale:0.32
+ function swapWindows(){if(pipEnabled&&!primaryDetached&&!secondaryDetached){pipSwapped=!pipSwapped}else if(streamWorkspace.state.pipAvailable){streamWorkspace.swap();rebuildPlayback()}}
  function setPip(enabled){var requested=enabled&&streamWorkspace.state.pipAvailable;videoWorkspaceRuntime.setPipEnabled(requested);if(!requested)stopSecondary();else startSecondary()}
  function connectDevice(id){var item=null;for(var i=0;i<devicesModel.items.length;i++){if(devicesModel.items[i].id===id){item=devicesModel.items[i];break}}if(!item||item.onboardingState!=="ready")return;serviceMode=false;stopPrimary();setPip(false);devicesModel.setActive(id);timelineRuntime.recordEvent("camera-selected");streamWorkspace.autoSelect();if(devicesModel.activeName!==""&&streamWorkspace.state.primaryId!=="")startSelected()}
  function disconnectDevice(){serviceMode=false;primaryDetached=false;secondaryDetached=false;stopPrimary();setPip(false);videoWorkspaceRuntime.stopAll();devicesModel.clearActive();streamWorkspace.autoSelect()}
@@ -30,7 +36,7 @@ ApplicationWindow {
  function rebuildPlayback(){var wasPlaying=player.playbackState===MediaPlayer.PlayingState||videoRuntime.streamId!=="";var keepPip=pipEnabled&&streamWorkspace.state.pipAvailable;stopPrimary();stopSecondary();if(wasPlaying)startSelected();if(keepPip&&streamWorkspace.state.pipAvailable){videoWorkspaceRuntime.setPipEnabled(true);startSecondary()}}
  function recoverPrimary(){if(!connected||videoRuntime.url==="")return;videoRecoveryCount++;videoRecovery.interval=videoRecoveryCount<10?1000:2000;player.stop();if(videoRuntime.reconnect()){player.source="";player.source=videoRuntime.url;player.play()}else videoRecovery.start()}
  function recoverSecondary(){if(!pipEnabled||secondaryVideoRuntime.url==="")return;secondaryRecoveryCount++;secondaryRecovery.interval=secondaryRecoveryCount<10?1000:2000;secondaryPlayer.stop();if(secondaryVideoRuntime.reconnect()){secondaryPlayer.source="";secondaryPlayer.source=secondaryVideoRuntime.url;secondaryPlayer.play()}else secondaryRecovery.start()}
- onPipEnabledChanged:if(!pipEnabled){secondaryDetached=false;secondaryRecovery.stop();secondaryPlayer.stop();secondaryPlayer.source="";secondaryRecoveryCount=0}
+ onPipEnabledChanged:if(!pipEnabled){pipSwapped=false;secondaryDetached=false;secondaryRecovery.stop();secondaryPlayer.stop();secondaryPlayer.source="";secondaryRecoveryCount=0}
  MediaPlayer{id:player;videoOutput:primaryDetached?detachedPrimaryVideoOut:videoOut;onPlayingChanged:{timelineRuntime.observe("primary-video",playing?"playing":"stopped");if(playing){videoRecovery.stop();videoRecoveryCount=0;videoRuntime.markPlaying()}else if(videoRuntime.state==="playing"){videoRuntime.markStalled("Основний відеопотік несподівано зупинився.");videoRecovery.restart()}}onErrorOccurred:function(error,errorString){videoRuntime.playbackError(errorString);if(videoRuntime.streamId!=="")videoRecovery.restart()}}
  property bool dvrVideoAvailable: !simulation && connected && player.playbackState === MediaPlayer.PlayingState
  onDvrVideoAvailableChanged: dvrRuntime.setVideoAvailable(dvrVideoAvailable)
@@ -38,7 +44,7 @@ ApplicationWindow {
  function attachDvrSink(){var sink=player.videoOutput ? player.videoOutput.videoSink : null;dvrRuntime.setVideoSink(sink);linkMonitor.setVideoSink(sink)}
  property bool linkWatchActive: connected && !simulation && !serviceMode
  onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive);controllerActions.setActive(linkWatchActive);starlinkDish.setActive(linkWatchActive)}
- Connections{target:controllerActions;function onSwapRequested(){if(streamWorkspace.state.pipAvailable){streamWorkspace.swap();w.rebuildPlayback()}}}
+ Connections{target:controllerActions;function onSwapRequested(){w.swapWindows()}}
  Connections{target:linkDoctor;function onRetryNeeded(){w.recoverPrimary()}}
  Connections{target:linkMonitor;function onRetryNeeded(){if(!videoRecovery.running)w.recoverPrimary()}}
  Connections{target:player;function onVideoOutputChanged(){w.attachDvrSink()}}
@@ -79,6 +85,9 @@ ApplicationWindow {
  Shortcut{sequence:"8";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("8")}
  Shortcut{sequence:"9";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("9")}
  Shortcut{sequence:"0";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("0")}
+ Shortcut{sequence:"Tab";enabled:pages.currentIndex===1&&!w.simulation;onActivated:w.swapWindows()}
+ Shortcut{sequence:"F1";enabled:pages.currentIndex===1&&!w.simulation;onActivated:w.setPip(false)}
+ Shortcut{sequence:"F2";enabled:pages.currentIndex===1&&!w.simulation;onActivated:w.setPip(true)}
  Shortcut{sequence:"F10";enabled:pages.currentIndex===1;onActivated:w.flightBarHidden=!w.flightBarHidden}
  Shortcut{sequence:"F9";enabled:connected&&!serviceMode&&!simulation;onActivated:dvrRuntime.toggle()}
  Shortcut{sequence:"F2";enabled:connected&&!serviceMode&&!simulation;onActivated:startSelected()} Shortcut{sequence:"F11";onActivated:w.visibility=w.visibility===Window.FullScreen?Window.Maximized:Window.FullScreen}
@@ -108,6 +117,9 @@ ApplicationWindow {
     onOpenVehicle: videoPresetsPopup.open()
     onOpenHardware: hardwarePopup.open()
     onOpenStarlink: starlinkPopup.open()
+    pipAvailable: streamWorkspace.state.pipAvailable === true
+    pipOn: w.pipEnabled
+    onTogglePip: w.setPip(!w.pipEnabled)
     onOpenMenu: flightMenu.open()
     onHideRequested: w.flightBarHidden = true
     onLeaveFlight: { if (w.simulation) w.simulation = false; else if (t.armed === true) leaveFlightConfirm.open(); else disconnectDevice() }
@@ -119,7 +131,41 @@ ApplicationWindow {
    anchors.top: flightBar.visible ? flightBar.bottom : parent.top
    clip: true
    Rectangle { anchors.fill: parent; visible: !w.simulation; color: "black" }
-   VideoOutput { id:videoOut; objectName:"mainFlightVideoOutput"; anchors.fill:parent; visible:!w.simulation; fillMode:VideoOutput.PreserveAspectFit }
+   VideoOutput {
+    id: videoOut
+    objectName: "mainFlightVideoOutput"
+    readonly property bool small: w.pipSwapped && pipWindow.visible
+    x: small ? pipWindow.x : 0
+    y: small ? pipWindow.y : 0
+    width: small ? pipWindow.width : parent.width
+    height: small ? pipWindow.height : parent.height
+    z: small ? 6 : 0
+    visible: !w.simulation
+    fillMode: VideoOutput.PreserveAspectFit
+   }
+   Text {
+    objectName: "bigSecondaryNoSignal"
+    // The additional stream is on the big screen but sends nothing: say so, the main one is in the small window.
+    visible: w.pipSwapped && pipWindow.visible && secondaryPlayer.playbackState !== MediaPlayer.PlayingState
+    anchors.centerIn: parent
+    z: 1
+    text: "Додаткове відео: немає сигналу · основне у віконці (Tab — поміняти)"
+    color: fg
+    font.pixelSize: 18
+    font.bold: true
+   }
+   VideoOutput {
+    id: secondaryVideoOut
+    objectName: "secondaryFlightVideoOutput"
+    readonly property bool big: w.pipSwapped && pipWindow.visible
+    x: big ? 0 : pipWindow.x
+    y: big ? 0 : pipWindow.y
+    width: big ? parent.width : pipWindow.width
+    height: big ? parent.height : pipWindow.height
+    z: big ? 0 : 6
+    visible: pipWindow.visible
+    fillMode: VideoOutput.PreserveAspectFit
+   }
    Item {
     id: simulationWorld
     objectName: "simulationWorld"
@@ -191,7 +237,46 @@ ApplicationWindow {
    Rectangle { visible:w.displayFallbackNotice!==""&&!w.simulation; z:20; anchors.top:parent.top; anchors.horizontalCenter:parent.horizontalCenter; anchors.topMargin:16; width:Math.min(parent.width-32,620); height:48; radius:10; color:"#e60b1522"; border.color:amber; Text{anchors.fill:parent;anchors.margins:10;text:w.displayFallbackNotice;color:fg;horizontalAlignment:Text.AlignHCenter;verticalAlignment:Text.AlignVCenter;wrapMode:Text.WordWrap} }
    Column { objectName:"videoStartOverlay"; visible:!w.simulation&&player.playbackState!==MediaPlayer.PlayingState&&!primaryDetached&&!linkMonitor.lost; anchors.centerIn:parent; spacing:8; Text{text:stateUa(videoRuntime.state);color:fg;font.pixelSize:20;font.bold:true} Text{text:videoRuntime.error;color:red;visible:text!==""} Button{text:"Запустити відео";enabled:selectedStreamId!=="";onClicked:startSelected()} }
    Column { visible:!w.simulation&&primaryDetached; anchors.centerIn:parent; spacing:8; Text{text:"Основний потік відкрито в окремому вікні";color:fg;font.pixelSize:18} Button{text:"Повернути до основного екрана";onClicked:primaryDetached=false} }
-   Rectangle { visible:!w.simulation&&pipEnabled&&streamWorkspace.state.pipAvailable&&!secondaryDetached; z:5; width:Math.min(parent.width*0.32,480); height:width*9/16; anchors.right:parent.right; anchors.top:parent.top; anchors.margins:12; color:"black"; border.color:secondaryVideoRuntime.state==="playing"?green:amber; border.width:2; radius:8; clip:true; VideoOutput{id:secondaryVideoOut;anchors.fill:parent;fillMode:VideoOutput.PreserveAspectFit} Text{anchors.centerIn:parent;visible:secondaryPlayer.playbackState!==MediaPlayer.PlayingState;text:stateUa(secondaryVideoRuntime.state);color:fg;font.bold:true} }
+   Rectangle { visible: pipWindow.visible; x: pipWindow.x; y: pipWindow.y; width: pipWindow.width; height: pipWindow.height; radius: 8; color: "black"; z: 5 }
+   Rectangle {
+    id: pipWindow
+    objectName: "pipWindow"
+    // The pilot places it: drag to any corner, mouse wheel for the size, click to swap with the big picture.
+    visible: !w.simulation && pipEnabled && streamWorkspace.state.pipAvailable && !secondaryDetached
+    z: 7
+    width: Math.min(parent.width * w.pipScale, 640)
+    height: width * 9 / 16
+    readonly property real margin: 12
+    x: (w.pipCorner === 0 || w.pipCorner === 3) ? margin : parent.width - width - margin
+    y: (w.pipCorner === 0 || w.pipCorner === 1) ? margin : parent.height - height - margin
+    color: "transparent"
+    border.color: (w.pipSwapped ? player.playbackState === MediaPlayer.PlayingState : secondaryVideoRuntime.state === "playing") ? green : amber
+    border.width: 2
+    radius: 8
+    Text { anchors.centerIn: parent; visible: (w.pipSwapped ? player : secondaryPlayer).playbackState !== MediaPlayer.PlayingState; text: "немає сигналу · відновлюю"; color: fg; font.bold: true }
+    MouseArea {
+     objectName: "pipMouse"
+     anchors.fill: parent
+     property point pressedAt
+     property bool dragged: false
+     onPressed: function(mouse) { pressedAt = Qt.point(mouse.x, mouse.y); dragged = false }
+     onPositionChanged: function(mouse) {
+      if (Math.abs(mouse.x - pressedAt.x) + Math.abs(mouse.y - pressedAt.y) > 12) dragged = true
+     }
+     onReleased: function(mouse) {
+      if (!dragged) { w.swapWindows(); return }
+      var p = mapToItem(pipWindow.parent, mouse.x, mouse.y)
+      var left = p.x < pipWindow.parent.width / 2, top = p.y < pipWindow.parent.height / 2
+      w.pipCorner = top ? (left ? 0 : 1) : (left ? 3 : 2)
+     }
+     onWheel: function(wheel) {
+      var sizes = [0.22, 0.32, 0.42]
+      var i = sizes.indexOf(w.pipScale)
+      i = Math.max(0, Math.min(sizes.length - 1, (i < 0 ? 1 : i) + (wheel.angleDelta.y > 0 ? 1 : -1)))
+      w.pipScale = sizes[i]
+     }
+    }
+   }
    OsdOverlay {
     objectName: "flightOsdOverlay"
     anchors.fill:parent; anchors.margins:12
