@@ -142,6 +142,9 @@ ApplicationWindow {
    Item {
    id: flightArea
    objectName: "flightVideoArea"
+   // The additional windows are kept apart and on screen for this shape of the video area.
+   readonly property real windowsAspect: width > 0 && height > 0 ? width / height : 1.8
+   onWindowsAspectChanged: extraWindows.setAspect(windowsAspect)
    anchors.left: streamsSidebar.right; anchors.right: parent.right; anchors.bottom: parent.bottom
    anchors.top: flightBar.visible ? flightBar.bottom : parent.top
    clip: true

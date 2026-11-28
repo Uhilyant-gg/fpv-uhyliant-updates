@@ -155,3 +155,38 @@ def test_an_older_file_with_only_the_last_arrangement_still_restores(tmp_path):
     (tmp_path / "windows.json").write_text(json.dumps({"c1": [{"streamId": "sub", "x": 0.1, "y": 0.1, "w": 0.3}]}))
     rt, _ = make(tmp_path)
     assert rt.canRestore and rt.restoreLast() == 1
+
+
+def overlap(a, b, aspect):
+    ah, bh = a["w"] * 9 / 16 * aspect, b["w"] * 9 / 16 * aspect
+    return a["x"] < b["x"] + b["w"] and b["x"] < a["x"] + a["w"] and a["y"] < b["y"] + bh and b["y"] < a["y"] + ah
+
+
+def no_overlaps(rt):
+    shown = [w for w in rt.windows if w["open"]]
+    return all(not overlap(a, b, rt._aspect) for i, a in enumerate(shown) for b in shown[i + 1 :])
+
+
+def test_windows_never_lie_over_each_other(tmp_path):
+    rt, _ = make(tmp_path)
+    rt.open("sub")
+    rt.open("thermal")
+    rt.open("cam2")
+    assert rt.openCount == 3 and no_overlaps(rt), "opened next to each other"
+    first = dict(rt.windows[0])
+    rt.place(1, first["x"] + 0.02, first["y"] + 0.02, 0.3)
+    assert no_overlaps(rt), "dropped onto another: it stops next to it"
+    rt.place(2, 0.0, 0.0, 0.7)
+    assert no_overlaps(rt), "made too big: it gets smaller instead of covering"
+    rt.setAspect(1.3)
+    assert no_overlaps(rt), "a taller screen: still apart"
+    assert all(w["y"] + w["w"] * 9 / 16 * 1.3 <= 1.0 + 1e-9 for w in rt.windows if w["open"]), "and on screen"
+
+
+def test_a_window_with_room_stays_where_the_pilot_put_it(tmp_path):
+    rt, _ = make(tmp_path)
+    rt.open("sub")
+    rt.open("thermal")
+    rt.place(1, 0.05, 0.5, 0.25)
+    w = rt.windows[1]
+    assert (round(w["x"], 3), round(w["y"], 3), w["w"]) == (0.05, 0.5, 0.25)

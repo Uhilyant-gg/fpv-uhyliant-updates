@@ -105,6 +105,8 @@ Order: 1+2+6, then 3, then 4+5 with telemetry forwarding, then 8+9, then 7 on re
   window is moved by dragging and resized from its bottom-left corner; a click on its picture swaps
   it with the main video. Layout presets: "only the main video", "as last time", and arrangements
   the pilot saved; nothing opens unless the pilot presses it.
+  Windows over the main video never lie over each other: a dropped or enlarged window stops next to
+  its neighbour, shrinks if it must, or stays where it was.
 - Delay target: at most 150 ms from the camera to the pilot's screen. A small smoothing buffer on
   the PC is allowed inside that budget.
 - Additional camera (thermal) on the camera's USB through UVC or a capture card: first tried on the

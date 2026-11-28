@@ -19,6 +19,8 @@ from video import VideoRuntime
 MAX_WINDOWS = 3
 DEFAULT_WIDTH = 0.3
 MIN_WIDTH, MAX_WIDTH = 0.12, 0.7
+# Windows never lie over each other (owner's rule): this gap stays between them.
+GAP = 0.006
 
 
 def _clamp(value, low, high):
@@ -41,6 +43,7 @@ class ExtraWindowsRuntime(QObject):
             runtime.changed.connect(self.changed)
         self._slots = [self._empty() for _ in range(MAX_WINDOWS)]
         self._last_used = -1
+        self._aspect = 1366 / 724  # width / height of the flight area; QML keeps it current
         for signal_name in ("changed", "streamsChanged"):
             signal = getattr(devices, signal_name, None)
             if signal is not None:
@@ -160,12 +163,62 @@ class ExtraWindowsRuntime(QObject):
         self._last_used = -1
         self.changed.emit()
 
+    def _height(self, w):
+        """A 16:9 window's height as a fraction of the flight area's height."""
+        return w * 9 / 16 * self._aspect
+
+    def _others(self, index):
+        return [
+            (s["x"], s["y"], s["w"], self._height(s["w"]))
+            for j, s in enumerate(self._slots)
+            if j != index and s["open"] and not s["detached"]
+        ]
+
+    def _free(self, index, x, y, w):
+        h = self._height(w)
+        return all(
+            not (x < ox + ow + GAP and ox < x + w + GAP and y < oy + oh + GAP and oy < y + h + GAP)
+            for ox, oy, ow, oh in self._others(index)
+        )
+
+    def _fit(self, index, x, y, w):
+        """The free place nearest to where the pilot wanted it; a bit smaller if nothing is free."""
+        w = _clamp(w, MIN_WIDTH, min(MAX_WIDTH, 1 / (9 / 16 * self._aspect)))
+        while True:
+            h = self._height(w)
+            spots = [(x, y), (0, 0), (1 - w, 0), (0, 1 - h), (1 - w, 1 - h)]
+            for ox, oy, ow, oh in self._others(index):
+                for cx in (x, ox, ox + ow + GAP, ox - w - GAP):
+                    for cy in (y, oy, oy + oh + GAP, oy - h - GAP):
+                        spots.append((cx, cy))
+            spots = [(_clamp(cx, 0.0, 1.0 - w), _clamp(cy, 0.0, 1.0 - h)) for cx, cy in spots]
+            free = [p for p in spots if self._free(index, p[0], p[1], w)]
+            if free:
+                fx, fy = min(free, key=lambda p: (p[0] - x) ** 2 + (p[1] - y) ** 2)
+                return fx, fy, w
+            if w <= MIN_WIDTH + 1e-9:
+                return None
+            w = max(MIN_WIDTH, w * 0.85)
+
     def _place(self, index, x, y, w):
-        w = _clamp(w, MIN_WIDTH, MAX_WIDTH)
         slot = self._slots[index]
-        slot["w"] = w
-        slot["x"] = _clamp(x, 0.0, 1.0 - w)
-        slot["y"] = _clamp(y, 0.0, 0.98)
+        spot = self._fit(index, x, y, w)
+        if spot is None:
+            if slot["w"] and self._free(index, slot["x"], slot["y"], slot["w"]):
+                return False  # no room there: the window stays where it was
+            spot = (_clamp(x, 0.0, 1.0 - MIN_WIDTH), _clamp(y, 0.0, 1.0), MIN_WIDTH)
+        slot["x"], slot["y"], slot["w"] = spot
+        return True
+
+    @Slot(float)
+    def setAspect(self, aspect):
+        """The flight area changed its shape: keep the windows apart and on screen."""
+        if aspect > 0 and abs(aspect - self._aspect) > 1e-3:
+            self._aspect = float(aspect)
+            for index, slot in enumerate(self._slots):
+                if slot["open"]:
+                    self._place(index, slot["x"], slot["y"], slot["w"])
+            self.changed.emit()
 
     @Slot(int, float, float, float)
     def place(self, index, x, y, w):
