@@ -111,6 +111,35 @@ Item {
    }
   }
   Rectangle {
+   objectName: "linkTestBox"
+   Layout.fillWidth: true
+   implicitHeight: linkTestColumn.implicitHeight + 20
+   radius: 10
+   color: "#0b1420"
+   border.color: linkTest.running ? root.line : (linkTest.result.level === "ok" ? root.green : (linkTest.result.level === "bad" ? root.red : (linkTest.result.level ? root.amber : root.line)))
+   ColumnLayout {
+    id: linkTestColumn
+    anchors.fill: parent
+    anchors.margins: 10
+    spacing: 4
+    RowLayout {
+     Layout.fillWidth: true
+     Text {
+      objectName: "linkTestTitle"
+      text: linkTest.running ? "Тест зв’язку: ще " + linkTest.secondsLeft + " с" : (linkTest.result.title || "Тест зв’язку (20 с)")
+      color: linkTest.result.level === "ok" ? root.green : (linkTest.result.level === "bad" ? root.red : (linkTest.result.level ? root.amber : root.foreground))
+      font.pixelSize: 14; font.bold: true; wrapMode: Text.Wrap; Layout.fillWidth: true
+     }
+     Button { objectName: "linkTestStart"; text: linkTest.running ? "Зупинити" : (linkTest.result.level ? "Повторити" : "Почати"); enabled: root.cameraName !== ""; onClicked: linkTest.running ? linkTest.stop() : linkTest.start() }
+    }
+    ProgressBar { visible: linkTest.running; value: linkTest.progress; Layout.fillWidth: true }
+    Repeater {
+     model: linkTest.running ? [] : (linkTest.result.lines || [])
+     delegate: Text { required property string modelData; text: "• " + modelData; color: root.secondary; font.pixelSize: 12; wrapMode: Text.Wrap; Layout.fillWidth: true }
+    }
+   }
+  }
+  Rectangle {
    Layout.fillWidth: true
    Layout.fillHeight: true
    radius: 10

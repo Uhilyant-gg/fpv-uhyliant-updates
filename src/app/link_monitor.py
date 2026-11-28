@@ -94,6 +94,11 @@ class LinkMonitor(QObject):
         if sink is not None:
             sink.videoFrameChanged.connect(self._frame)
 
+    @property
+    def watching(self):
+        """True while the flight screen watches the video."""
+        return self._active
+
     @Slot(bool)
     def setActive(self, active):
         """In flight the link is watched; on the home screen it is not."""

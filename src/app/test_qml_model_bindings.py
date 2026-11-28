@@ -68,6 +68,7 @@ MODELS = {
     "cameraFeatures": ("camera_features", "CameraFeaturesRuntime"),
     "cameraAudio": ("camera_audio", "AudioRuntime"),
     "blackBox": ("flight_log", "BlackBoxRuntime"),
+    "linkTest": ("link_test", "LinkTestRuntime"),
     "controllerActions": ("controller_actions", "ControllerActions"),
     "videoPresets": ("video_presets", "VideoPresetsRuntime"),
     "connectionsRuntime": ("connections_runtime", "ConnectionsRuntime"),

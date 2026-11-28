@@ -77,6 +77,9 @@ in plain words, and the station fixes what it can by itself.
    (video, link, Starlink, flight controller, preset every second), `events.jsonl`, `summary.json`
    and `Підсумок.txt`; after a flight of 20 s or more the pilot sees the summary. Last 200 flights.
 9. A 20-second link test in Preflight before take-off.
+   Done: starts by itself when Preflight opens; checks once a second whether the camera answers and
+   how fast, and on the flight screen also frames, dropouts and packet loss; then says "можна
+   летіти" / "зверніть увагу" / "краще не летіти" with advice (e.g. the "Авто" preset).
 Order: 1+2+6, then 3, then 4+5 with telemetry forwarding, then 8+9, then 7 on real hardware.
 
 ## Video presets, streams and controls (agreed 2026-11-28)

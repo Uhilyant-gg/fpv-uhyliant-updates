@@ -409,11 +409,32 @@ def main():
         return {'camera': d.activeName, 'link': label, 'station': WINDOW_TITLE}
 
     black_box = BlackBoxRuntime(flight_sample, flight_header)
+    from link_test import LinkTestRuntime
+
+    def link_test_sample():
+        device_id = d.activeId
+        kind = connections.selected.get(device_id, '')
+        status = connections.statuses.get(device_id, {}).get(kind, {})
+        sample = {'reachable': status.get('state') == 'available', 'latencyMs': status.get('latencyMs')}
+        if link_monitor.watching:
+            details = link_doctor.details
+            sample.update(video=True, fps=link_monitor.fps, lost=link_monitor.lost)
+            # Video that arrives is an answer too (a camera that pushes to a static IP is not pinged).
+            sample['reachable'] = sample['reachable'] or (not link_monitor.lost and link_monitor.fps > 0)
+            if kind == 'static':
+                sample.update(latencyMs=None, pushed=True)
+            for key in ('lossPct', 'jitterMs', 'smoothingMs'):
+                if key in details:
+                    sample[key] = details[key]
+        return sample
+
+    link_test = LinkTestRuntime(link_test_sample, probe=lambda: connections.probeSelected(d.activeId))
     app._runtime_refs = app._runtime_refs + (
         starlink_dish,
         camera_features,
         camera_audio,
         black_box,
+        link_test,
         flight_alerts,
         presets,
         dvr_runtime,
@@ -461,6 +482,7 @@ def main():
         ('cameraFeatures', camera_features),
         ('cameraAudio', camera_audio),
         ('blackBox', black_box),
+        ('linkTest', link_test),
         ('controllerActions', controller_actions),
         ('videoPresets', video_preset_runtime),
         ('connectionsRuntime', connections),
