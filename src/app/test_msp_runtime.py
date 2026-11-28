@@ -50,6 +50,7 @@ class MspRuntimeTests(unittest.TestCase):
         self.assertEqual(telemetry['roll'], 12.5)
         self.assertEqual(telemetry['pitch'], -3.5)
         self.assertEqual(telemetry['groundSpeed'], 4.5)
+        self.assertEqual((telemetry['latitude'], telemetry['longitude']), (50.0, 30.0))
         self.assertIsNone(telemetry['armed'])
         now[0] += runtime.STALE_SECONDS + 0.1
         stale = runtime.telemetry

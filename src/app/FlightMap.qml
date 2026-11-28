@@ -1,15 +1,33 @@
 import QtQuick
+import QtQuick.Controls
 import QtCore
 import QtLocation
 import QtPositioning
 
 // Satellite map (Esri World Imagery) for a flight window. Mouse wheel zooms, dragging pans.
-// Tiles are kept on this PC, so places already seen open without the internet; downloading
-// whole areas in advance comes with the map stage. The drone's own position will be drawn
-// here once the flight controller's or Starlink's coordinates reach the station.
+// Tiles are kept on this PC, so places already seen open without the internet.
+// The drone is drawn from its flight controller's GPS: an arrow along its heading, the trail it
+// flew, its home point and a line home. "Follow" keeps it in the middle (dragging the map turns
+// following off); "Course up" turns the map so the drone flies up the screen.
 Item {
  id: root
  clip: true
+ property var telemetry: (typeof telemetryRuntime !== "undefined" && telemetryRuntime) ? telemetryRuntime.telemetry : ({})
+ readonly property bool hasDrone: telemetry.connected === true && isFinite(Number(telemetry.latitude)) && isFinite(Number(telemetry.longitude))
+                                  && telemetry.latitude !== null && telemetry.longitude !== null
+ readonly property var drone: hasDrone ? QtPositioning.coordinate(Number(telemetry.latitude), Number(telemetry.longitude)) : QtPositioning.coordinate()
+ readonly property bool hasHome: isFinite(Number(telemetry.homeLatitude)) && telemetry.homeLatitude !== null && telemetry.homeLatitude !== undefined
+ readonly property var home: hasHome ? QtPositioning.coordinate(Number(telemetry.homeLatitude), Number(telemetry.homeLongitude)) : QtPositioning.coordinate()
+ readonly property real heading: isFinite(Number(telemetry.heading)) && telemetry.heading !== null ? Number(telemetry.heading) : 0
+ property var trail: []
+ // For checks: where the map looks and how it is turned.
+ readonly property real centerLatitude: view.map.center.latitude
+ readonly property real centerLongitude: view.map.center.longitude
+ readonly property real mapBearing: view.map.bearing
+ readonly property int trailLength: trail.length
+ readonly property real zoom: view.map.zoomLevel
+ function panTo(lat, lon) { view.map.center = QtPositioning.coordinate(lat, lon) }
+ readonly property int trailMax: 600  // ten minutes at one point a second
 
  Settings {
   id: saved
@@ -19,6 +37,8 @@ Item {
   property real lat: 48.5
   property real lon: 31.2
   property real zoom: 6
+  property bool follow: true
+  property bool courseUp: false
  }
 
  Plugin {
@@ -30,6 +50,21 @@ Item {
   PluginParameter { name: "osm.useragent"; value: "FPV-Uhyliant-ground-station" }
  }
 
+ // Once a second: a point of the trail, and the map follows the drone.
+ Timer {
+  interval: 1000
+  repeat: true
+  running: root.hasDrone
+  triggeredOnStart: true
+  onTriggered: {
+   var points = root.trail.slice(Math.max(0, root.trail.length - root.trailMax + 1))
+   var last = points.length ? points[points.length - 1] : null
+   if (!last || last.distanceTo(root.drone) > 2) points.push(root.drone)
+   root.trail = points
+   if (saved.follow) root.centreOnDrone()
+  }
+ }
+
  MapView {
   id: view
   objectName: "flightMapView"
@@ -38,8 +73,150 @@ Item {
   map.activeMapType: map.supportedMapTypes.length > 0 ? map.supportedMapTypes[map.supportedMapTypes.length - 1] : null
   map.center: QtPositioning.coordinate(saved.lat, saved.lon)
   map.zoomLevel: saved.zoom
+  map.bearing: saved.courseUp && root.hasDrone ? root.heading : 0
   map.copyrightsVisible: false
   Component.onDestruction: { saved.lat = map.center.latitude; saved.lon = map.center.longitude; saved.zoom = map.zoomLevel }
+
+  MapPolyline {
+   objectName: "flightMapTrail"
+   parent: view.map
+   line.width: 3
+   line.color: "#ccffb84d"
+   path: root.trail
+  }
+  MapPolyline {
+   objectName: "flightMapHomeLine"
+   parent: view.map
+   visible: root.hasDrone && root.hasHome
+   line.width: 2
+   line.color: "#cc27d59a"
+   path: root.hasDrone && root.hasHome ? [root.drone, root.home] : []
+  }
+  MapQuickItem {
+   objectName: "flightMapHome"
+   parent: view.map
+   visible: root.hasHome
+   coordinate: root.home
+   anchorPoint.x: homeMark.width / 2
+   anchorPoint.y: homeMark.height / 2
+   sourceItem: Rectangle {
+    id: homeMark
+    width: 22; height: 22; radius: 11
+    color: "#e627d59a"; border.color: "white"; border.width: 2
+    Text { anchors.centerIn: parent; text: "H"; color: "#06130d"; font.bold: true; font.pixelSize: 12 }
+   }
+  }
+  MapQuickItem {
+   objectName: "flightMapDrone"
+   parent: view.map
+   visible: root.hasDrone
+   coordinate: root.drone
+   anchorPoint.x: arrow.width / 2
+   anchorPoint.y: arrow.height / 2
+   sourceItem: Canvas {
+    id: arrow
+    width: 30; height: 30
+    // Turned along the heading, against the map's own turn.
+    rotation: root.heading - view.map.bearing
+    onPaint: {
+     var ctx = getContext("2d")
+     ctx.reset()
+     ctx.beginPath()
+     ctx.moveTo(15, 2); ctx.lineTo(27, 27); ctx.lineTo(15, 21); ctx.lineTo(3, 27); ctx.closePath()
+     ctx.fillStyle = "#ffb84d"; ctx.fill()
+     ctx.lineWidth = 2; ctx.strokeStyle = "#0b1420"; ctx.stroke()
+    }
+   }
+  }
+ }
+
+ // Zoom with the mouse wheel or the laptop touchpad while the pointer is over the map: the place
+ // under the pointer stays where it is; while following, the map zooms around the drone.
+ // (Qt's own map takes only a mouse wheel on Windows, not a touchpad.)
+ Item {
+  objectName: "flightMapWheel"
+  anchors.fill: parent
+  z: 1
+  WheelHandler {
+   acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+   target: null
+   onWheel: function(event) {
+    var steps = event.angleDelta.y !== 0 ? event.angleDelta.y / 120 : event.pixelDelta.y / 60
+    if (steps === 0) return
+    root.zoomAt(steps, point.position)
+    event.accepted = true
+   }
+  }
+ }
+ function zoomAt(steps, position) {
+  var map = view.map
+  var level = Math.max(map.minimumZoomLevel, Math.min(map.maximumZoomLevel, map.zoomLevel + steps))
+  if (saved.follow && root.hasDrone) {
+   map.zoomLevel = level
+   centreOnDrone()
+   return
+  }
+  var under = map.toCoordinate(position, false)
+  map.zoomLevel = level
+  if (under.isValid) { centring = true; map.alignCoordinateToPoint(under, position); centring = false }
+ }
+
+ // Panning by hand turns following off; the pilot turns it back on with the button.
+ // A move of the centre that the station did not make and that is not a zoom is the pilot's pan.
+ property bool centring: false
+ property real zoomedAt: 0
+ function centreOnDrone() {
+  centring = true
+  // From a country-wide view straight to where the drone is: streets and fields.
+  if (view.map.zoomLevel < 13) view.map.zoomLevel = 16
+  view.map.center = root.drone
+  centring = false
+ }
+ Connections {
+  target: view.map
+  function onZoomLevelChanged() { root.zoomedAt = Date.now() }
+  function onCenterChanged() { if (!root.centring && saved.follow) Qt.callLater(root.checkPan) }
+ }
+ function checkPan() { if (Date.now() - zoomedAt > 300) saved.follow = false }
+
+ Column {
+  z: 2
+  anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 6
+  anchors.topMargin: 28  // below the window's own handle strip
+  spacing: 4
+  component MapButton: Button {
+   property bool on: false
+   width: 34; height: 30; padding: 0
+   font.pixelSize: 14
+   background: Rectangle { radius: 6; color: parent.on ? "#e01d3a2f" : (parent.hovered ? "#e040566e" : "#cc132235"); border.color: parent.on ? "#27d59a" : "#5f7f9e" }
+   contentItem: Text { text: parent.text; font: parent.font; color: "#f4f7fb"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+  }
+  MapButton {
+   objectName: "flightMapFollow"
+   text: "⌖"
+   on: saved.follow
+   enabled: root.hasDrone
+   opacity: enabled ? 1 : 0.5
+   onClicked: { saved.follow = !saved.follow; if (saved.follow) root.centreOnDrone() }
+   HoverHint { text: saved.follow ? "Карта стежить за дроном. Перетягніть карту, щоб роздивитися інше місце." : "Стежити за дроном"; delay: 500 }
+  }
+  MapButton {
+   objectName: "flightMapCourseUp"
+   text: saved.courseUp ? "↑" : "N"
+   on: saved.courseUp
+   onClicked: saved.courseUp = !saved.courseUp
+   HoverHint { text: saved.courseUp ? "Карта повертається за курсом дрона. Натисніть — північ угорі." : "Північ угорі. Натисніть — карта за курсом дрона."; delay: 500 }
+  }
+ }
+
+ Rectangle {
+  objectName: "flightMapNoDrone"
+  visible: !root.hasDrone
+  anchors.horizontalCenter: parent.horizontalCenter
+  anchors.bottom: parent.bottom; anchors.bottomMargin: 18
+  width: noDrone.implicitWidth + 16; height: noDrone.implicitHeight + 8; radius: 6
+  color: "#cc0b1420"
+  Text { id: noDrone; anchors.centerIn: parent; text: "Чекаю координати від польотника"; color: "#dddddd"; font.pixelSize: 11 }
  }
 
  Rectangle {

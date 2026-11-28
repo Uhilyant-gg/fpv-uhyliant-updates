@@ -61,6 +61,8 @@ class Tests(unittest.TestCase):
         self.assertAlmostEqual(snapshot['homeBearing'], 0.0, places=1)
         self.assertAlmostEqual(snapshot['homeDistance'], 1112, delta=5)
         self.assertEqual(snapshot['heading'], 90.0)
+        self.assertEqual((snapshot['latitude'], snapshot['longitude']), (49.99, 30.0))
+        self.assertEqual((snapshot['homeLatitude'], snapshot['homeLongitude']), (50.0, 30.0))
 
     def test_battery_message_without_voltage_does_not_refresh_old_voltage(self):
         worker = MavlinkWorker('udpin:0.0.0.0:14550', 115200)

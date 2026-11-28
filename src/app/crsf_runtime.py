@@ -126,8 +126,12 @@ class CrsfRuntime(QObject):
                 }
             )
         elif frame_type == CRSF_FRAMETYPE_GPS and len(payload) >= 15:
+            lat = int.from_bytes(payload[0:4], 'big', signed=True) / 1e7
+            lon = int.from_bytes(payload[4:8], 'big', signed=True) / 1e7
             self._set(
                 {
+                    'latitude': lat if (lat or lon) else None,
+                    'longitude': lon if (lat or lon) else None,
                     'groundSpeed': int.from_bytes(payload[8:10], 'big') / 10.0,
                     'heading': int.from_bytes(payload[10:12], 'big') / 100.0,
                     'altitude': float(int.from_bytes(payload[12:14], 'big') - 1000),
