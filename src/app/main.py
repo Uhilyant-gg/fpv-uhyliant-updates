@@ -316,6 +316,23 @@ def main():
     secondary.host_resolver = connections.host_for
     v.push_resolver = connections.push_url_for
     dvr_runtime.recordingChanged.connect(lambda: s.setRecordingActive(dvr_runtime.recording))
+
+    def feed_auto():
+        # Once a second in flight: how the link behaves, for the "Auto" video preset.
+        device_id = d.activeId
+        kind = connections.selected.get(device_id, '')
+        status = connections.statuses.get(device_id, {}).get(kind, {})
+        details = link_doctor.details
+        video_preset_runtime.observe(
+            {
+                'lost': link_monitor.lost,
+                'lossPct': details.get('lossPct', 0),
+                'jitterMs': details.get('jitterMs', 0),
+                'latencyMs': status.get('latencyMs'),
+            }
+        )
+
+    link_doctor.changed.connect(feed_auto)
     app._runtime_refs = app._runtime_refs + (
         flight_alerts,
         presets,

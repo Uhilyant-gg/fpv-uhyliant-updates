@@ -1,4 +1,5 @@
-"""Video presets of each camera: ten slots on the keys 1…0, from the weakest link (1) up.
+"""Video presets of each camera. Key 1 is "Auto"; nine slots on the keys 2…0 go from the
+weakest link (2) up.
 
 A preset is written into the camera itself (majestic's settings) and the video
 service reloads; the station re-opens the video by itself. In flight this goes
@@ -17,7 +18,8 @@ from PySide6.QtCore import Property, QObject, Signal, Slot
 
 import camera_setup as cs
 
-KEYS = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
+AUTO_KEY = "1"
+KEYS = ("2", "3", "4", "5", "6", "7", "8", "9", "0")
 SIZES = ("960x540", "1280x720", "1920x1080")
 FPS = (30, 60, 90)
 GOPS = (0.5, 1, 2)
@@ -25,10 +27,10 @@ MIN_KBPS, MAX_KBPS = 256, 20000
 BITRATE_STEPS = (512, 1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384)
 
 DEFAULTS = {
-    "1": {"name": "Слабкий канал", "size": "1280x720", "fps": 30, "bitrateKbps": 1024, "gopS": 0.5},
-    "2": {"name": "Економ", "size": "1280x720", "fps": 30, "bitrateKbps": 2048, "gopS": 1},
-    "3": {"name": "Баланс", "size": "1920x1080", "fps": 30, "bitrateKbps": 4096, "gopS": 1},
-    "4": {"name": "Якість", "size": "1920x1080", "fps": 60, "bitrateKbps": 8192, "gopS": 1},
+    "2": {"name": "Слабкий канал", "size": "1280x720", "fps": 30, "bitrateKbps": 1024, "gopS": 0.5},
+    "3": {"name": "Економ", "size": "1280x720", "fps": 30, "bitrateKbps": 2048, "gopS": 1},
+    "4": {"name": "Баланс", "size": "1920x1080", "fps": 30, "bitrateKbps": 4096, "gopS": 1},
+    "5": {"name": "Якість", "size": "1920x1080", "fps": 60, "bitrateKbps": 8192, "gopS": 1},
 }
 
 MESSAGES = {
@@ -108,8 +110,12 @@ class VideoPresetsRuntime(QObject):
     changed = Signal()
     _done = Signal(str, object, object)  # device id, what was applied, result
 
-    def __init__(self, store, devices, connections, apply, run_async=True):
+    def __init__(self, store, devices, connections, apply, run_async=True, clock=None):
         super().__init__()
+        import time
+
+        self._clock = clock or time.monotonic
+        self._auto = AutoDecider()
         self._store = store
         self._devices = devices
         self._connections = connections
@@ -163,10 +169,44 @@ class VideoPresetsRuntime(QObject):
         key = self.activeKey
         preset = self._slot(key) if key else None
         if preset is None:
-            return "Пресет відео не вибрано"
+            return "Авто · пресет ще не вибрано" if self.auto else "Пресет відео не вибрано"
         kbps = self.bitrateKbps or preset["bitrateKbps"]
         mark = "*" if kbps != preset["bitrateKbps"] else ""
-        return f"{key} · {preset['name']}{mark} · {mbps(kbps)} Мбіт/с"
+        head = f"Авто · {key}" if self.auto else key
+        return f"{head} · {preset['name']}{mark} · {mbps(kbps)} Мбіт/с"
+
+    @Property(bool, notify=changed)
+    def auto(self):
+        return bool(self._camera().get("auto")) if self._device_id() else False
+
+    @Slot(bool)
+    def setAuto(self, on):
+        """The "Auto" preset: the station moves between this camera's own presets by itself."""
+        device_id = self._device_id()
+        if not device_id:
+            return
+        camera = self._camera()
+        camera["auto"] = bool(on)
+        self._data[device_id] = camera
+        self._store.save(self._data)
+        self._auto = AutoDecider()
+        self._say("Авто: станція сама перемикає пресети цієї камери за станом каналу" if on else "Авто вимкнено", True)
+
+    @Slot("QVariantMap")
+    def observe(self, sample):
+        """Once a second in flight: how the link behaves. In Auto, may step one preset."""
+        if not self.auto or self._busy:
+            return
+        step = self._auto.update(dict(sample), self._clock())
+        if not step:
+            return
+        filled = [k for k in KEYS if self._slot(k) is not None]
+        if not filled:
+            return
+        current = self.activeKey if self.activeKey in filled else filled[-1]
+        index = max(0, min(len(filled) - 1, filled.index(current) + step))
+        if filled[index] != current or self.activeKey not in filled:
+            self.apply(filled[index])
 
     @Property(bool, notify=changed)
     def busy(self):
@@ -212,6 +252,19 @@ class VideoPresetsRuntime(QObject):
         else:
             work()
         return True
+
+    @Slot(str, result=bool)
+    def choose(self, key):
+        """A key or a click by the pilot. 1 turns Auto on; any preset key turns it off."""
+        if key == AUTO_KEY:
+            self.setAuto(True)
+            filled = [k for k in KEYS if self._slot(k) is not None]
+            if filled and self.activeKey not in filled:
+                return self.apply(filled[len(filled) // 2])  # start from the middle
+            return True
+        if self.auto:
+            self.setAuto(False)
+        return self.apply(key)
 
     @Slot(str, result=bool)
     def apply(self, key):
@@ -304,3 +357,54 @@ class VideoPresetsRuntime(QObject):
 def mbps(kbps) -> str:
     value = round(int(kbps) / 1024, 1)
     return (f"{value:g}").replace(".", ",")
+
+
+class AutoDecider:
+    """Chooses one preset step down or up from how the link behaves, with patience.
+
+    Down: the link has been bad for 3 s in a row (loss, uneven arrival or latency over
+    the target) and the last change was at least 10 s ago. Up: good for 30 s. Never while
+    the video is lost (the camera may not be reachable then, and the cause is elsewhere).
+    """
+
+    BAD_FOR_S = 3
+    GOOD_FOR_S = 30
+    DOWN_GAP_S = 10
+    UP_GAP_S = 30
+
+    def __init__(self, target_ms=150):
+        self.target_ms = target_ms
+        self._bad = 0
+        self._good = 0
+        self._changed_at = None
+
+    def bad(self, s):
+        latency = s.get("latencyMs")
+        return (
+            float(s.get("lossPct") or 0) >= 2
+            or float(s.get("jitterMs") or 0) >= 30
+            or (latency is not None and latency > self.target_ms)
+        )
+
+    def good(self, s):
+        latency = s.get("latencyMs")
+        return (
+            float(s.get("lossPct") or 0) < 0.5
+            and float(s.get("jitterMs") or 0) < 15
+            and (latency is None or latency < self.target_ms * 0.7)
+        )
+
+    def update(self, sample: dict, now: float) -> int:
+        if sample.get("lost"):
+            self._bad = self._good = 0
+            return 0
+        self._bad = self._bad + 1 if self.bad(sample) else 0
+        self._good = self._good + 1 if self.good(sample) else 0
+        since = now - self._changed_at if self._changed_at is not None else 1e9
+        if self._bad >= self.BAD_FOR_S and since >= self.DOWN_GAP_S:
+            self._changed_at, self._bad, self._good = now, 0, 0
+            return -1
+        if self._good >= self.GOOD_FOR_S and since >= self.UP_GAP_S:
+            self._changed_at, self._bad, self._good = now, 0, 0
+            return 1
+        return 0

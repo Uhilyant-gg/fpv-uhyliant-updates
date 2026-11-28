@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Video presets of the camera in flight: ten slots on the keys 1…0, from the weakest link (1) up.
+// Video presets of the camera in flight: key 1 is Auto, nine slots on the keys 2…0 from the weakest link (2) up.
 // Applying one writes it into the camera; the station re-opens the video by itself.
 Item {
  id: root
@@ -37,8 +37,14 @@ Item {
    Button { objectName: "closeVideoPresets"; text: "Закрити"; onClicked: root.closeRequested() }
   }
   Text {
-   text: "Клавіші 1…0 перемикають пресети і в польоті: 1 — найслабший канал. Пресет записується в саму камеру, відео відновиться саме за секунду-дві."
+   text: "Клавіша 1 — «Авто», клавіші 2…0 — пресети від найслабшого каналу (2). Пресет записується в саму камеру, відео відновиться саме за секунду-дві. Вибір пресету пілотом вимикає «Авто»."
    color: root.sub; wrapMode: Text.Wrap; Layout.fillWidth: true
+  }
+  Switch {
+   objectName: "videoPresetsAuto"
+   text: "1 · Авто: станція сама перемикає ці пресети за станом каналу"
+   checked: videoPresets.auto
+   onToggled: checked ? videoPresets.choose("1") : videoPresets.setAuto(false)
   }
   Text {
    objectName: "videoPresetsMessage"
@@ -74,7 +80,7 @@ Item {
       Text { text: modelData.empty ? "—" : modelData.name; color: root.fg; font.pixelSize: 14; font.bold: true }
       Text { text: root.describe(modelData); color: root.sub; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
      }
-     Button { objectName: "videoPresetApply"; text: "Застосувати"; enabled: !modelData.empty && !videoPresets.busy; onClicked: videoPresets.apply(modelData.key) }
+     Button { objectName: "videoPresetApply"; text: "Застосувати"; enabled: !modelData.empty && !videoPresets.busy; onClicked: videoPresets.choose(modelData.key) }
      Button { objectName: "videoPresetEdit"; text: "Змінити"; onClicked: root.startEdit(modelData) }
     }
    }

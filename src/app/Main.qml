@@ -69,16 +69,16 @@ ApplicationWindow {
   OsdOverlay{anchors.fill:parent;anchors.margins:12;visible:station.osdEnabled;positions:station.osdElements;enabledElements:station.osdEnabledElements;corner:station.osdPosition;opacityValue:station.osdOpacity;scaleFactor:station.osdScale;telemetry:t;video:sd}
  }
  property bool flightBarHidden: false
- Shortcut{sequence:"1";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.apply("1")}
- Shortcut{sequence:"2";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.apply("2")}
- Shortcut{sequence:"3";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.apply("3")}
- Shortcut{sequence:"4";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.apply("4")}
- Shortcut{sequence:"5";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.apply("5")}
- Shortcut{sequence:"6";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.apply("6")}
- Shortcut{sequence:"7";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.apply("7")}
- Shortcut{sequence:"8";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.apply("8")}
- Shortcut{sequence:"9";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.apply("9")}
- Shortcut{sequence:"0";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.apply("0")}
+ Shortcut{sequence:"1";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("1")}
+ Shortcut{sequence:"2";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("2")}
+ Shortcut{sequence:"3";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("3")}
+ Shortcut{sequence:"4";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("4")}
+ Shortcut{sequence:"5";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("5")}
+ Shortcut{sequence:"6";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("6")}
+ Shortcut{sequence:"7";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("7")}
+ Shortcut{sequence:"8";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("8")}
+ Shortcut{sequence:"9";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("9")}
+ Shortcut{sequence:"0";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("0")}
  Shortcut{sequence:"F10";enabled:pages.currentIndex===1;onActivated:w.flightBarHidden=!w.flightBarHidden}
  Shortcut{sequence:"F9";enabled:connected&&!serviceMode&&!simulation;onActivated:dvrRuntime.toggle()}
  Shortcut{sequence:"F2";enabled:connected&&!serviceMode&&!simulation;onActivated:startSelected()} Shortcut{sequence:"F11";onActivated:w.visibility=w.visibility===Window.FullScreen?Window.Maximized:Window.FullScreen}

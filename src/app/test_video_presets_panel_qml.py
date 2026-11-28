@@ -65,21 +65,28 @@ def all_named(name):
     return found
 
 applies = all_named('videoPresetApply')
-assert len(applies) == 10, len(applies)
+assert len(applies) == 9, len(applies)
 assert [a.property('enabled') for a in applies[:5]] == [True, True, True, True, False], 'empty slots cannot be applied'
 applies[2].clicked.emit()
 app.processEvents()
-assert runtime.activeKey == '3' and sent[0][2] == 'cli -s .video0.bitrate 4096'
+assert runtime.activeKey == '4' and sent[0][2] == 'cli -s .video0.bitrate 4096'
 message = all_named('videoPresetsMessage')[0]
-assert message.property('text') == 'Пресет 3 «Баланс» застосовано в камері'
+assert message.property('text') == 'Пресет 4 «Баланс» застосовано в камері'
 
-all_named('videoPresetEdit')[8].clicked.emit()
+auto = all_named('videoPresetsAuto')[0]
+auto.toggle(); auto.toggled.emit()
+app.processEvents()
+assert runtime.auto and runtime.label.startswith('Авто · 4')
+applies[1].clicked.emit()
+app.processEvents()
+assert not runtime.auto and runtime.activeKey == '3', 'a click by the pilot turns Auto off'
+all_named('videoPresetEdit')[7].clicked.emit()
 app.processEvents()
 assert all_named('videoPresetEditor')[0].property('visible')
 all_named('videoPresetName')[0].setProperty('text', 'Ніч')
 all_named('videoPresetSave')[0].clicked.emit()
 app.processEvents()
-assert runtime.slots[8]['name'] == 'Ніч' and runtime.slots[8]['size'] == '1280x720'
+assert runtime.slots[7]['name'] == 'Ніч' and runtime.slots[7]['size'] == '1280x720'
 assert not all_named('videoPresetEditor')[0].property('visible')
 print('ok')
 """

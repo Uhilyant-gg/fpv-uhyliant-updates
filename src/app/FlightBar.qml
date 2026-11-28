@@ -106,7 +106,7 @@ Rectangle {
    caption: root.simulation ? "Симуляція" : (root.cameraName || "Камера")
    value: root.compact ? (root.cameraName || "Камера") : (root.presetName ? root.presetName : "Пресет не вибрано")
    onClicked: root.openVehicle()
-   HoverHint { text: "Пресет відео камери. Клавіші 1…0 перемикають пресети, − і + змінюють бітрейт." }
+   HoverHint { text: "Пресет відео камери. Клавіша 1 — «Авто», 2…0 — пресети, − і + змінюють бітрейт." }
   }
   BarButton {
    objectName: "flightBarBitrateDown"
