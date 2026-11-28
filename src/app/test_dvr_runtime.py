@@ -357,3 +357,25 @@ def test_shutdown_returns_as_soon_as_the_file_is_finished(make):
     runtime.shutdown(timeout_ms=5000)
     assert time.monotonic() - started < 2
     assert runtime.status == "Запис збережено: " + pipeline.path.name
+
+
+def test_link_loss_leaves_a_gap_but_never_stops_the_recording(make):
+    """The pilot's wish: record everything, the outage too; the file just has a gap."""
+    runtime = make()
+    sink = FakeSink()
+    runtime.setVideoSink(sink)
+    runtime.setVideoAvailable(True)
+    assert runtime.start()
+    pipeline = FakePipeline.instances[0]
+    sink.videoFrameChanged.emit(FakeFrame())
+    runtime.clock.value += 1
+    # Link lost: the player is re-opened again and again, video looks unavailable.
+    runtime.setVideoAvailable(False)
+    sink.videoFrameChanged.emit(FakeFrame(valid=False))
+    runtime.clock.value += 20
+    runtime._tick()
+    assert runtime.recording and not pipeline.stopped
+    runtime.setVideoAvailable(True)
+    sink.videoFrameChanged.emit(FakeFrame())
+    assert runtime.recording
+    assert pipeline.frames == [0, 21_000_000], "the outage stays in the file as a gap in time"

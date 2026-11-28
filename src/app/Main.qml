@@ -28,14 +28,17 @@ ApplicationWindow {
  function startSelected(){stopPrimary();if(connected&&selectedStreamId!==""&&videoWorkspaceRuntime.preparePrimary(selectedStreamId)){player.source=videoRuntime.url;player.play()}if(pipEnabled)startSecondary()}
  function startSecondary(){stopSecondary();if(pipEnabled&&connected&&secondaryStreamId!==""&&videoWorkspaceRuntime.prepareSecondary(secondaryStreamId)){secondaryPlayer.source=secondaryVideoRuntime.url;secondaryPlayer.play()}}
  function rebuildPlayback(){var wasPlaying=player.playbackState===MediaPlayer.PlayingState||videoRuntime.streamId!=="";var keepPip=pipEnabled&&streamWorkspace.state.pipAvailable;stopPrimary();stopSecondary();if(wasPlaying)startSelected();if(keepPip&&streamWorkspace.state.pipAvailable){videoWorkspaceRuntime.setPipEnabled(true);startSecondary()}}
- function recoverPrimary(){if(!connected||videoRuntime.url==="")return;if(videoRecoveryCount>=5){videoRuntime.markStalled("Не вдалося автоматично відновити основний відеопотік.");return}videoRecoveryCount++;player.stop();if(videoRuntime.reconnect()){player.source="";player.source=videoRuntime.url;player.play()}else videoRecovery.start()}
- function recoverSecondary(){if(!pipEnabled||secondaryVideoRuntime.url==="")return;if(secondaryRecoveryCount>=5){secondaryVideoRuntime.markStalled("Не вдалося автоматично відновити додатковий відеопотік.");return}secondaryRecoveryCount++;secondaryPlayer.stop();if(secondaryVideoRuntime.reconnect()){secondaryPlayer.source="";secondaryPlayer.source=secondaryVideoRuntime.url;secondaryPlayer.play()}else secondaryRecovery.start()}
+ function recoverPrimary(){if(!connected||videoRuntime.url==="")return;videoRecoveryCount++;videoRecovery.interval=videoRecoveryCount<10?1000:2000;player.stop();if(videoRuntime.reconnect()){player.source="";player.source=videoRuntime.url;player.play()}else videoRecovery.start()}
+ function recoverSecondary(){if(!pipEnabled||secondaryVideoRuntime.url==="")return;secondaryRecoveryCount++;secondaryRecovery.interval=secondaryRecoveryCount<10?1000:2000;secondaryPlayer.stop();if(secondaryVideoRuntime.reconnect()){secondaryPlayer.source="";secondaryPlayer.source=secondaryVideoRuntime.url;secondaryPlayer.play()}else secondaryRecovery.start()}
  onPipEnabledChanged:if(!pipEnabled){secondaryDetached=false;secondaryRecovery.stop();secondaryPlayer.stop();secondaryPlayer.source="";secondaryRecoveryCount=0}
  MediaPlayer{id:player;videoOutput:primaryDetached?detachedPrimaryVideoOut:videoOut;onPlayingChanged:{timelineRuntime.observe("primary-video",playing?"playing":"stopped");if(playing){videoRecovery.stop();videoRecoveryCount=0;videoRuntime.markPlaying()}else if(videoRuntime.state==="playing"){videoRuntime.markStalled("Основний відеопотік несподівано зупинився.");videoRecovery.restart()}}onErrorOccurred:function(error,errorString){videoRuntime.playbackError(errorString);if(videoRuntime.streamId!=="")videoRecovery.restart()}}
  property bool dvrVideoAvailable: !simulation && connected && player.playbackState === MediaPlayer.PlayingState
  onDvrVideoAvailableChanged: dvrRuntime.setVideoAvailable(dvrVideoAvailable)
  onConnectedChanged: { if (!connected) { dvrRuntime.stop(); connectionsRuntime.resumeListening() } else connectionsRuntime.pauseListening() }
- function attachDvrSink(){dvrRuntime.setVideoSink(player.videoOutput ? player.videoOutput.videoSink : null)}
+ function attachDvrSink(){var sink=player.videoOutput ? player.videoOutput.videoSink : null;dvrRuntime.setVideoSink(sink);linkMonitor.setVideoSink(sink)}
+ property bool linkWatchActive: connected && !simulation && !serviceMode
+ onLinkWatchActiveChanged: linkMonitor.setActive(linkWatchActive)
+ Connections{target:linkMonitor;function onRetryNeeded(){if(!videoRecovery.running)w.recoverPrimary()}}
  Connections{target:player;function onVideoOutputChanged(){w.attachDvrSink()}}
  property string dvrCameraName: devicesModel.activeName
  onDvrCameraNameChanged: dvrRuntime.setCameraName(dvrCameraName)
@@ -128,6 +131,20 @@ ApplicationWindow {
       }
      }
     }
+   }
+   Rectangle {
+    objectName: "linkBanner"
+    visible: linkMonitor.text !== "" && !w.simulation
+    z: 26
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.top: parent.top
+    anchors.topMargin: flightAlerts.active ? 72 : 16
+    width: Math.min(parent.width - 32, linkBannerText.implicitWidth + 40)
+    height: 52
+    radius: 10
+    color: linkMonitor.lost ? "#e6b3263a" : "#e6146b4a"
+    border.color: linkMonitor.lost ? red : green
+    Text { id: linkBannerText; anchors.centerIn: parent; text: linkMonitor.text; color: "white"; font.pixelSize: 19; font.bold: true }
    }
    Rectangle {
     objectName: "flightAlertBanner"

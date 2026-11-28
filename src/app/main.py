@@ -137,6 +137,7 @@ def main():
     from flight_alerts_runtime import FlightAlertsRuntime
     from presets_runtime import PresetsRuntime
     from dvr_runtime import DvrRuntime
+    from link_monitor import LinkMonitor
     from connection_profiles import ConnectionStore
     from connections_runtime import ConnectionsRuntime
     from zerotier_local import ZeroTierLocal
@@ -258,6 +259,7 @@ def main():
     presets = PresetsRuntime(preset_store, s)
     backup.restored.connect(presets.reload)
     dvr_runtime = DvrRuntime()
+    link_monitor = LinkMonitor()
 
     def configure_camera(host, address, port):
         session = [(credentials.username or 'root', credentials.secret())]
@@ -288,7 +290,7 @@ def main():
     secondary.host_resolver = connections.host_for
     v.push_resolver = connections.push_url_for
     dvr_runtime.recordingChanged.connect(lambda: s.setRecordingActive(dvr_runtime.recording))
-    app._runtime_refs = app._runtime_refs + (flight_alerts, presets, dvr_runtime, connections)
+    app._runtime_refs = app._runtime_refs + (flight_alerts, presets, dvr_runtime, connections, link_monitor)
     ctx = e.rootContext()
     for name, obj in [
         ('station', s),
@@ -322,6 +324,7 @@ def main():
         ('flightAlerts', flight_alerts),
         ('presetsRuntime', presets),
         ('dvrRuntime', dvr_runtime),
+        ('linkMonitor', link_monitor),
         ('connectionsRuntime', connections),
     ]:
         ctx.setContextProperty(name, obj)
