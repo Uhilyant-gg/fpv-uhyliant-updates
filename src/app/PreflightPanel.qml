@@ -72,17 +72,33 @@ Item {
    : fixLabel + satellites + " · оновлено " + age.toFixed(1) + " с тому"
  }
 
- property var checks: [
-  {label: "Камера", state: cameraName ? "ready" : "unavailable", detail: cameraName || "Не вибрано"},
-  {label: "Відео", state: video.state || "unavailable", detail: video.streamId ? stateLabel(video.state) : "Потік не запущено"},
-  {label: "Телеметрія", state: telemetry.connected === true ? "connected" : (telemetry.connected === false ? "disconnected" : "unavailable"), detail: (telemetry.provider || "Джерело не вибране") + " · " + (telemetry.health || "стан невідомий")},
-  {label: "GPS-дані польотника", state: gpsState(), detail: gpsDetail()},
-  {label: "Мережа", state: network.state || "unavailable", detail: network.transport || "З’єднання не підтверджене"},
-  {label: "Зовнішня навігація", state: navigation.state || "unavailable", detail: navigation.source || "Джерело не підтверджене"},
-  {label: "OSD станції", state: osdEnabled ? "ready" : "unavailable", detail: osdEnabled ? "Додається поверх відео; зображення камери не змінюється" : "Не додається; OSD камери залишається частиною відео"},
-  {label: "Пульт", state: controllerHealth === "ready" ? "ready" : (controllerHealth === "problem" ? "error" : (controllerHealth === "attention" ? "attention" : "unavailable")), detail: controllerDetail || "Не перевірено"},
-  {label: "Керування польотом", state: "not-integrated", detail: "Канал керування не інтегрований"}
- ]
+ // The selected link of the camera, as the camera card shows it (given by the main window).
+ property string linkKind: ""
+ property string linkLabel: ""
+ property var linkStatus: ({})
+
+ // Only what is useful before take-off; a flight controller that is not connected is one calm line.
+ property var checks: {
+  var list = [
+   {label: "Камера", state: cameraName ? "ready" : "unavailable", detail: cameraName || "Не вибрано"},
+   {label: "Відео", state: video.state || "unavailable", detail: video.streamId ? stateLabel(video.state) : "Потік не запущено"},
+   // A camera pushing to a static IP is not pinged: its video arriving is the answer.
+   linkKind === "static" && video.state === "playing"
+    ? {label: "Зв’язок", state: "ready", detail: linkLabel + " · камера надсилає відео"}
+    : {label: "Зв’язок", state: linkStatus.state === "available" ? "ready" : (linkKind === "" ? "unavailable" : (linkStatus.state === "unavailable" ? "error" : "degraded")),
+       detail: linkKind === "" ? "Тип з’єднання не вибрано" : linkLabel + (linkStatus.label ? " · " + linkStatus.label : "")}
+  ]
+  if (telemetry.connected === true) {
+   list.push({label: "Польотник", state: "connected", detail: telemetry.provider || ""})
+   list.push({label: "GPS", state: gpsState(), detail: gpsDetail()})
+  } else {
+   list.push({label: "Польотник", state: "unavailable", detail: "Дані польотника не надходять"})
+  }
+  list.push({label: "Пульт", state: controllerHealth === "ready" ? "ready" : (controllerHealth === "problem" ? "error" : (controllerHealth === "attention" ? "attention" : "unavailable")), detail: controllerDetail || "Не перевірено"})
+  if (navigation.state === "ready" || navigation.state === "degraded")
+   list.push({label: "Зовнішня навігація", state: navigation.state, detail: navigation.source || ""})
+  return list
+ }
 
  ColumnLayout {
   anchors.fill: parent
@@ -95,19 +111,32 @@ Item {
    Button { text: "Закрити"; onClicked: root.closeRequested() }
   }
   Rectangle {
+   objectName: "linkTestBox"
    Layout.fillWidth: true
-   radius: 8
-   color: "#332d1b"
-   border.color: root.amber
-   implicitHeight: notice.implicitHeight + 20
-   Text {
-    id: notice
+   implicitHeight: linkTestColumn.implicitHeight + 20
+   radius: 10
+   color: "#0b1420"
+   border.color: linkTest.running ? root.line : (linkTest.result.level === "ok" ? root.green : (linkTest.result.level === "bad" ? root.red : (linkTest.result.level ? root.amber : root.line)))
+   ColumnLayout {
+    id: linkTestColumn
     anchors.fill: parent
     anchors.margins: 10
-    text: "Це зведення показує лише отримані дані й не підтверджує готовність до польоту. Застосунок наразі не керує польотом."
-    color: root.foreground
-    wrapMode: Text.WordWrap
-    font.pixelSize: 12
+    spacing: 4
+    RowLayout {
+     Layout.fillWidth: true
+     Text {
+      objectName: "linkTestTitle"
+      text: linkTest.running ? "Тест зв’язку: ще " + linkTest.secondsLeft + " с" : (linkTest.result.title || "Тест зв’язку (20 с)")
+      color: linkTest.result.level === "ok" ? root.green : (linkTest.result.level === "bad" ? root.red : (linkTest.result.level ? root.amber : root.foreground))
+      font.pixelSize: 14; font.bold: true; wrapMode: Text.Wrap; Layout.fillWidth: true
+     }
+     Button { objectName: "linkTestStart"; text: linkTest.running ? "Зупинити" : (linkTest.result.level ? "Повторити" : "Почати"); enabled: root.cameraName !== ""; onClicked: linkTest.running ? linkTest.stop() : linkTest.start() }
+    }
+    ProgressBar { visible: linkTest.running; value: linkTest.progress; Layout.fillWidth: true }
+    Repeater {
+     model: linkTest.running ? [] : (linkTest.result.lines || [])
+     delegate: Text { required property string modelData; text: "• " + modelData; color: root.secondary; font.pixelSize: 12; wrapMode: Text.Wrap; Layout.fillWidth: true }
+    }
    }
   }
   Rectangle {
@@ -155,19 +184,14 @@ Item {
     }
    }
   }
+  Text {
+   text: "Тут лише те, що станція бачить сама; рішення про політ — за пілотом."
+   color: root.secondary; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true
+  }
   RowLayout {
    Layout.fillWidth: true
-   Text {
-    visible: nextAction.available === true
-    text: visible ? "Наступна дія: " + (nextAction.label || "") : "Потрібні додаткові спостереження"
-    color: root.secondary
-    font.pixelSize: 12
-    wrapMode: Text.WordWrap
-    Layout.fillWidth: true
-   }
-   Button { text: "Діагностика"; onClicked: root.openDiagnostics() }
-   Button { text: "Налаштувати OSD"; onClicked: root.openOsdSettings() }
-   Button { text: "Симуляція"; onClicked: root.openSimulation() }
+   Item { Layout.fillWidth: true }
+   Button { objectName: "preflightDiagnostics"; text: "Діагностика мережі"; onClicked: root.openDiagnostics() }
   }
  }
 }

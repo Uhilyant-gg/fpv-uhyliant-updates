@@ -23,6 +23,7 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
                 "ExtraVideoWindow.qml",
                 "FlightBar.qml",
                 "AudioPanel.qml",
+                "FlightLogPanel.qml",
                 "FlightMap.qml",
                 "SidebarIcon.qml",
                 "FirmwareCenter.qml",

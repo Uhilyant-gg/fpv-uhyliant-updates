@@ -618,6 +618,9 @@ class ConnectionsRuntime(QObject):
         self._inspect_at[device_id] = (self._clock(), True)
         addresses = self._addresses.setdefault(device_id, {})
         addresses["facts"] = {k: result[k] for k in cp.FACT_KEYS if k in result}
+        fill = getattr(self._devices, "fillIdentity", None)
+        if fill is not None:
+            fill(device_id, {k: result.get(k) for k in ("platform", "sensor")})
         network, node = ci.valid_zt(result)
         zt_changed = False
         if network and (not addresses.get("ztNetwork") or addresses.get("ztSource") == "camera"):

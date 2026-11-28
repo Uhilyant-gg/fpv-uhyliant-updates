@@ -37,13 +37,13 @@ ApplicationWindow {
  function recoverPrimary(){if(!connected||videoRuntime.url==="")return;videoRecoveryCount++;videoRecovery.interval=videoRecoveryCount<10?1000:2000;player.stop();if(videoRuntime.reconnect()){player.source="";player.source=videoRuntime.url;player.play()}else videoRecovery.start()}
  function recoverSecondary(){if(!pipEnabled||secondaryVideoRuntime.url==="")return;secondaryRecoveryCount++;secondaryRecovery.interval=secondaryRecoveryCount<10?1000:2000;secondaryPlayer.stop();if(secondaryVideoRuntime.reconnect()){secondaryPlayer.source="";secondaryPlayer.source=secondaryVideoRuntime.url;secondaryPlayer.play()}else secondaryRecovery.start()}
  onPipEnabledChanged:if(!pipEnabled){secondaryDetached=false;secondaryRecovery.stop();secondaryPlayer.stop();secondaryPlayer.source="";secondaryRecoveryCount=0}
- MediaPlayer{id:player;videoOutput:primaryDetached?detachedPrimaryVideoOut:videoOut;onPlayingChanged:{timelineRuntime.observe("primary-video",playing?"playing":"stopped");if(playing){videoRecovery.stop();videoRecoveryCount=0;videoRuntime.markPlaying()}else if(videoRuntime.state==="playing"){videoRuntime.markStalled("Основний відеопотік несподівано зупинився.");videoRecovery.restart()}}onErrorOccurred:function(error,errorString){videoRuntime.playbackError(errorString);if(videoRuntime.streamId!=="")videoRecovery.restart()}}
+ MediaPlayer{id:player;videoOutput:primaryDetached?detachedPrimaryVideoOut:videoOut;onPlayingChanged:{timelineRuntime.observe("primary-video",player.playing?"playing":"stopped");if(player.playing){videoRecovery.stop();videoRecoveryCount=0;videoRuntime.markPlaying()}else if(videoRuntime.state==="playing"){videoRuntime.markStalled("Основний відеопотік несподівано зупинився.");videoRecovery.restart()}}onErrorOccurred:function(error,errorString){videoRuntime.playbackError(errorString);if(videoRuntime.streamId!=="")videoRecovery.restart()}}
  property bool dvrVideoAvailable: !simulation && connected && player.playbackState === MediaPlayer.PlayingState
  onDvrVideoAvailableChanged: dvrRuntime.setVideoAvailable(dvrVideoAvailable)
  onConnectedChanged: { if (!connected) { dvrRuntime.stop(); extraWindows.closeAll(); w.mainSource = -1; connectionsRuntime.resumeListening() } else connectionsRuntime.pauseListening() }
  function attachDvrSink(){var sink=player.videoOutput ? player.videoOutput.videoSink : null;dvrRuntime.setVideoSink(sink);linkMonitor.setVideoSink(sink)}
  property bool linkWatchActive: connected && !simulation && !serviceMode
- onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive);controllerActions.setActive(linkWatchActive);starlinkDish.setActive(linkWatchActive);cameraAudio.setActive(linkWatchActive)}
+ onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive);controllerActions.setActive(linkWatchActive);starlinkDish.setActive(linkWatchActive);cameraAudio.setActive(linkWatchActive);blackBox.setActive(linkWatchActive);if(linkWatchActive)flightAlerts.resetSession()}
  Connections{target:controllerActions;function onSwapRequested(){w.swapWindows()}}
  Connections{target:linkDoctor;function onRetryNeeded(){w.recoverPrimary()}}
  Connections{target:linkMonitor;function onRetryNeeded(){if(!videoRecovery.running)w.recoverPrimary()}}
@@ -92,7 +92,7 @@ ApplicationWindow {
  Shortcut{sequence:"F9";enabled:connected&&!serviceMode&&!simulation;onActivated:dvrRuntime.toggle()}
  Shortcut{sequence:"F2";enabled:connected&&!serviceMode&&!simulation;onActivated:startSelected()} Shortcut{sequence:"F11";onActivated:w.visibility=w.visibility===Window.FullScreen?Window.Maximized:Window.FullScreen}
  StackLayout{id:pages;objectName:"mainPages";currentIndex:simulation?1:(!connected?0:(serviceMode?2:1));anchors.fill:parent
-  HomePanel{onOpenFirmwareFor:function(deviceId){w.openFirmwareFor(deviceId)};onOpenPreflightFor:function(deviceId){devicesModel.setActive(deviceId);streamWorkspace.autoSelect();preflightPopup.open()};onOpenStationSettings:w.openStationSettings("");onOpenVehicleSettings:w.openVehicleSettings("");onOpenService:w.openService("");onOpenPresets:w.openVehicleSettings("presets");onOpenRecording:w.openStationSettings("recording");onOpenController:w.openStationSettings("controller");onOpenSimulation:simulation=true;onOpenDevices:devices.open();onOpenFirmware:w.openService("firmware");onOpenUpdate:updatePopup.open();onOpenDiagnostics:w.openService("diagnostics");onOpenPreflight:preflightPopup.open();onOpenTimeline:w.openService("timeline");onOpenOsdSettings:w.openVehicleSettings("osd");onOpenBackup:w.openStationSettings("backup");onConnectDevice:function(deviceId){w.connectDevice(deviceId)};onRunNextAction:function(action){if(action==="calibrate-controller"){w.openStationSettings("controller")}else if(action==="diagnose"){w.openService("diagnostics")}else if(action==="review-firmware"){w.openService("firmware")}else if(action==="find-camera"){devices.open()}else if(action==="show-video"||action==="connect-camera"){var activeId="";for(var i=0;i<devicesModel.items.length;i++){if(devicesModel.items[i].active&&devicesModel.items[i].onboardingState==="ready"){activeId=devicesModel.items[i].id;break}}if(activeId===""){activeId=devicesModel.homeItems.length>0?devicesModel.homeItems[0].id:""}if(activeId!=="")w.connectDevice(activeId);else devices.open()}else{devices.open()}}}
+  HomePanel{onOpenFirmwareFor:function(deviceId){w.openFirmwareFor(deviceId)};onOpenPreflightFor:function(deviceId){devicesModel.setActive(deviceId);streamWorkspace.autoSelect();preflightPopup.open()};onOpenStationSettings:w.openStationSettings("");onOpenVehicleSettings:w.openVehicleSettings("");onOpenService:w.openService("");onOpenPresets:w.openVehicleSettings("presets");onOpenRecording:w.openStationSettings("recording");onOpenFlights:flightsPopup.open();onOpenController:w.openStationSettings("controller");onOpenSimulation:simulation=true;onOpenDevices:devices.open();onOpenFirmware:w.openService("firmware");onOpenUpdate:updatePopup.open();onOpenDiagnostics:w.openService("diagnostics");onOpenPreflight:preflightPopup.open();onOpenTimeline:w.openService("timeline");onOpenOsdSettings:w.openVehicleSettings("osd");onOpenBackup:w.openStationSettings("backup");onConnectDevice:function(deviceId){w.connectDevice(deviceId)};onRunNextAction:function(action){if(action==="calibrate-controller"){w.openStationSettings("controller")}else if(action==="diagnose"){w.openService("diagnostics")}else if(action==="review-firmware"){w.openService("firmware")}else if(action==="find-camera"){devices.open()}else if(action==="show-video"||action==="connect-camera"){var activeId="";for(var i=0;i<devicesModel.items.length;i++){if(devicesModel.items[i].active&&devicesModel.items[i].onboardingState==="ready"){activeId=devicesModel.items[i].id;break}}if(activeId===""){activeId=devicesModel.homeItems.length>0?devicesModel.homeItems[0].id:""}if(activeId!=="")w.connectDevice(activeId);else devices.open()}else{devices.open()}}}
   Item {
    objectName: "flightPage"
    FlightBar {
@@ -275,7 +275,7 @@ ApplicationWindow {
     Text { id: flightAlertText; anchors.centerIn: parent; text: flightAlerts.text; color: "white"; font.pixelSize: 18; font.bold: true }
    }
    Rectangle { visible:w.displayFallbackNotice!==""&&!w.simulation; z:20; anchors.top:parent.top; anchors.horizontalCenter:parent.horizontalCenter; anchors.topMargin:16; width:Math.min(parent.width-32,620); height:48; radius:10; color:"#e60b1522"; border.color:amber; Text{anchors.fill:parent;anchors.margins:10;text:w.displayFallbackNotice;color:fg;horizontalAlignment:Text.AlignHCenter;verticalAlignment:Text.AlignVCenter;wrapMode:Text.WordWrap} }
-   Column { objectName:"videoStartOverlay"; visible:!w.simulation&&player.playbackState!==MediaPlayer.PlayingState&&!primaryDetached&&!linkMonitor.lost; anchors.centerIn:parent; spacing:8; Text{text:stateUa(videoRuntime.state);color:fg;font.pixelSize:20;font.bold:true} Text{text:videoRuntime.error;color:red;visible:text!==""} Button{text:"Запустити відео";enabled:selectedStreamId!=="";onClicked:startSelected()} }
+   Column { objectName:"videoStartOverlay"; visible:!w.simulation&&player.playbackState!==MediaPlayer.PlayingState&&!primaryDetached&&!linkMonitor.lost; anchors.centerIn:parent; spacing:8; Text{objectName:"videoStartText";anchors.horizontalCenter:parent.horizontalCenter;text:videoRuntime.state==="stopped"||videoRuntime.state===""?"Відео не запущено":(videoRuntime.state==="error"?"Відео не відкрилося":(videoRuntime.state==="reconnecting"||videoRuntime.state==="stalled"?"Відновлюю відео…":"Підключаю відео…"));color:fg;font.pixelSize:20;font.bold:true} Text{anchors.horizontalCenter:parent.horizontalCenter;text:videoRuntime.error;color:red;visible:text!==""&&videoRuntime.state==="error"} Button{anchors.horizontalCenter:parent.horizontalCenter;visible:videoRuntime.state==="stopped"||videoRuntime.state==="error"||videoRuntime.state==="";text:"Запустити відео";enabled:selectedStreamId!=="";onClicked:startSelected()} }
    Column { visible:!w.simulation&&primaryDetached; anchors.centerIn:parent; spacing:8; Text{text:"Основний потік відкрито в окремому вікні";color:fg;font.pixelSize:18} Button{text:"Повернути до основного екрана";onClicked:primaryDetached=false} }
    OsdOverlay {
     objectName: "flightOsdOverlay"
@@ -340,7 +340,8 @@ ApplicationWindow {
   x: w.width - width - 12
   y: flightBar.visible ? flightBar.height + 6 : 12
   width: Math.min(360, w.width - 24)
-  height: Math.min(640, w.height - 24)
+  // As tall as its items, never taller than the window (then it scrolls).
+  height: Math.min(flightMenuContentColumn.implicitHeight + 16, w.height - (flightBar.visible ? flightBar.height + 18 : 24))
   padding: 0
   background: Rectangle { color: "#f20a1420"; border.color: "#71879c"; radius: 12 }
   contentItem: ScrollView {
@@ -349,6 +350,7 @@ ApplicationWindow {
    contentWidth: availableWidth
    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
    ColumnLayout {
+    id: flightMenuContentColumn
     objectName: "flightMenuContent"
     width: flightMenuScroll.availableWidth
     spacing: 5
@@ -404,7 +406,7 @@ ApplicationWindow {
     }
     Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
     Text {
-     text: "ВІДЕО ТА OSD"
+     text: "ВІДЕО І ЗВУК"
      color: sub
      font.pixelSize: 12
      font.bold: true
@@ -426,15 +428,7 @@ ApplicationWindow {
      Layout.leftMargin: 8
      checked: station.osdEnabled
      onToggled: station.setOSDEnabled(checked)
-    }
-    Text {
-     text: "Відео камери залишається без змін. Якщо її OSD вбудоване в зображення, прибрати його тут неможливо."
-     color: sub
-     wrapMode: Text.WordWrap
-     Layout.fillWidth: true
-     Layout.leftMargin: 14
-     Layout.rightMargin: 14
-     font.pixelSize: 12
+     HoverHint { text: "Відео камери залишається без змін. Якщо її OSD вбудоване в зображення, прибрати його тут неможливо." }
     }
     Button {
      text: "Налаштувати розташування OSD"
@@ -446,42 +440,16 @@ ApplicationWindow {
      onClicked: { flightMenu.close(); openOsdSettings() }
      background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
     }
-    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
-    Text {
-     text: "ВІКНА ТА ПОТОКИ"
-     color: sub
-     font.pixelSize: 12
-     font.bold: true
-     Layout.fillWidth: true
-     Layout.leftMargin: 14
-     Layout.topMargin: 5
-    }
     Button {
-     text: primaryDetached ? "Повернути основне відео" : "Відкрити основне відео окремо"
+     objectName: "flightMenuDetach"
+     visible: primaryDetached || Qt.application.screens.length > 1
+     text: primaryDetached ? "Повернути основне відео" : "Основне відео — на другий екран"
      font.pixelSize: 14
      Layout.fillWidth: true
      Layout.preferredHeight: 46
      enabled: !w.simulation && (primaryDetached || player.playbackState === MediaPlayer.PlayingState)
      onClicked: { primaryDetached = !primaryDetached; flightMenu.close() }
      background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
-    }
-    Button {
-     text: "Вибрати відеопотоки"
-     enabled: !w.simulation
-     font.pixelSize: 14
-     Layout.fillWidth: true
-     Layout.preferredHeight: 46
-     onClicked: { flightMenu.close(); streamsPopup.open() }
-     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
-    }
-    Text {
-     text: "Від’єднання екрана поверне відео сюди."
-     color: sub
-     wrapMode: Text.WordWrap
-     Layout.fillWidth: true
-     Layout.leftMargin: 14
-     Layout.rightMargin: 14
-     font.pixelSize: 12
     }
     Text {
      visible: w.simulation
@@ -511,7 +479,7 @@ ApplicationWindow {
      background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
     }
     Button {
-     text: "Hardware E2E"; font.pixelSize: 14; Layout.fillWidth: true; Layout.preferredHeight: 46
+     text: "Перевірка обладнання (Hardware E2E)"; font.pixelSize: 14; Layout.fillWidth: true; Layout.preferredHeight: 46
      visible: !w.simulation
      onClicked: { flightMenu.close(); hardwareE2EPopup.open() }
      background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
@@ -628,12 +596,40 @@ ApplicationWindow {
  Popup{id:recordingPopup;objectName:"recordingPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(720,w.width-40);height:Math.min(420,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:recordingContent.active=true;contentItem:Loader{id:recordingContent;objectName:"recordingContent";anchors.fill:parent;active:false;sourceComponent:Component{RecordingPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:recordingPopup.close()}}}}
  Popup{id:presetsPopup;objectName:"presetsPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(820,w.width-40);height:Math.min(620,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:presetsContent.active=true;contentItem:Loader{id:presetsContent;objectName:"presetsContent";anchors.fill:parent;active:false;sourceComponent:Component{PresetsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:presetsPopup.close()}}}}
  Popup{id:controllerPopup;objectName:"controllerPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(720,w.width-40);height:Math.min(560,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:controllerContent.active=true;onClosed:controllerContent.active=false;contentItem:Loader{id:controllerContent;objectName:"controllerContent";anchors.fill:parent;active:false;sourceComponent:Component{ControllerPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:controllerPopup.close()}}}}
+ Popup{id:flightsPopup;objectName:"flightsPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(1000,w.width-40);height:Math.min(700,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:flightsContent.active=true;onClosed:flightsContent.active=false;contentItem:Loader{id:flightsContent;objectName:"flightsContent";anchors.fill:parent;active:false;sourceComponent:Component{FlightLogPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:flightsPopup.close()}}}}
  Popup{id:timelinePopup;objectName:"timelinePopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(760,w.width-40);height:Math.min(560,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:timelineContent.active=true;contentItem:Loader{id:timelineContent;objectName:"timelineContent";anchors.fill:parent;active:false;sourceComponent:Component{TimelinePanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:timelinePopup.close()}}}}
  Popup{id:backupPopup;objectName:"backupPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(700,w.width-40);height:Math.min(600,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:backupContent.active=true;onClosed:if(backupContent.item)backupContent.item.clearSensitiveFields();contentItem:Loader{id:backupContent;objectName:"backupContent";anchors.fill:parent;active:false;sourceComponent:Component{BackupPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:backupPopup.close()}}}}
  Popup{id:osdSettingsPopup;objectName:"osdSettingsPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(1180,w.width-40);height:Math.min(900,w.height-48);background:Rectangle{color:"#f00d1725";border.color:blue;radius:14}onAboutToShow:osdSettingsLoader.active=true;contentItem:Loader{id:osdSettingsLoader;objectName:"osdSettingsLoader";anchors.fill:parent;active:false;sourceComponent:Component{OsdSettingsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:osdSettingsPopup.close()}}}}
- Popup{id:preflightPopup;objectName:"preflightPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#f00d1725";border.color:amber;radius:14}onAboutToShow:{preflightContent.active=true;controllerRuntime.observe()}contentItem:Loader{id:preflightContent;objectName:"preflightContent";anchors.fill:parent;active:false;sourceComponent:Component{PreflightPanel{anchors.fill:parent;anchors.margins:16;cameraName:devicesModel.activeName;video:vd;telemetry:t;network:net;navigation:ext;nextAction:homeDashboard.nextAction;osdEnabled:station.osdEnabled;controllerHealth:controllerRuntime.health;controllerDetail:controllerRuntime.summary;onCloseRequested:preflightPopup.close();onOpenOsdSettings:function(){preflightPopup.close();w.openOsdSettings()}onOpenSimulation:function(){preflightPopup.close();simulation=true}onOpenDiagnostics:function(){preflightPopup.close();diagnostics.open()}}}}}
+ Popup{id:preflightPopup;objectName:"preflightPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#f00d1725";border.color:amber;radius:14}onAboutToShow:{preflightContent.active=true;controllerRuntime.observe();if(devicesModel.activeId!==""&&!linkTest.running)linkTest.start()}onClosed:{linkTest.stop()}contentItem:Loader{id:preflightContent;objectName:"preflightContent";anchors.fill:parent;active:false;sourceComponent:Component{PreflightPanel{anchors.fill:parent;anchors.margins:16;cameraName:devicesModel.activeName;linkKind:flightBar.linkKind;linkLabel:flightBar.linkKindLabel;linkStatus:flightBar.linkStatus;video:vd;telemetry:t;network:net;navigation:ext;nextAction:homeDashboard.nextAction;osdEnabled:station.osdEnabled;controllerHealth:controllerRuntime.health;controllerDetail:controllerRuntime.summary;onCloseRequested:preflightPopup.close();onOpenOsdSettings:function(){preflightPopup.close();w.openOsdSettings()}onOpenSimulation:function(){preflightPopup.close();simulation=true}onOpenDiagnostics:function(){preflightPopup.close();diagnostics.open()}}}}}
  Dialog{id:leaveFlightConfirm;objectName:"leaveFlightConfirm";modal:true;anchors.centerIn:Overlay.overlay;title:"Дрон озброєний. Вийти з польоту?";standardButtons:Dialog.Yes|Dialog.No;onAccepted:disconnectDevice();Text{text:"Відео і телеметрія на станції зупиняться. На сам дрон це не впливає.";color:fg;wrapMode:Text.Wrap;width:360}}
  Popup{id:videoPresetsPopup;objectName:"videoPresetsPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#f00d1725";border.color:"#2f4860";radius:14}onAboutToShow:videoPresetsContent.active=true;contentItem:Loader{id:videoPresetsContent;objectName:"videoPresetsContent";anchors.fill:parent;active:false;sourceComponent:Component{VideoPresetsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:videoPresetsPopup.close()}}}}
+ Connections { target: blackBox; function onFinished() { flightSummaryPopup.open() } }
+ Popup {
+  id: flightSummaryPopup
+  objectName: "flightSummaryPopup"
+  modal: true
+  anchors.centerIn: Overlay.overlay
+  width: Math.min(560, w.width - 40)
+  padding: 18
+  background: Rectangle { color: "#f00d1725"; border.color: "#2f4860"; radius: 14 }
+  contentItem: ColumnLayout {
+   spacing: 8
+   Text { text: "Підсумок польоту"; color: "#f4f7fb"; font.pixelSize: 20; font.bold: true }
+   Text { text: (blackBox.lastSummary.camera || "") + (blackBox.lastSummary.started ? " · " + blackBox.lastSummary.started : ""); color: "#b7c8da"; font.pixelSize: 13 }
+   Repeater {
+    model: blackBox.lastSummaryLines
+    delegate: Text { required property string modelData; text: "• " + modelData; color: "#f4f7fb"; font.pixelSize: 15; wrapMode: Text.Wrap; Layout.fillWidth: true }
+   }
+   Text { text: "Усі деталі польоту записано в чорну скриньку."; color: "#b7c8da"; font.pixelSize: 12; Layout.topMargin: 4 }
+   RowLayout {
+    Layout.fillWidth: true
+    Button { objectName: "flightSummaryOpen"; text: "Відкрити папку польоту"; onClicked: blackBox.openLastFlight() }
+    Button { objectName: "flightSummaryJournal"; text: "Журнал польотів"; onClicked: { flightSummaryPopup.close(); flightsPopup.open() } }
+    Item { Layout.fillWidth: true }
+    Button { objectName: "flightSummaryClose"; text: "Закрити"; onClicked: flightSummaryPopup.close() }
+   }
+  }
+ }
  Popup{id:hardwarePopup;objectName:"hardwarePopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(760,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#f00d1725";border.color:"#2f4860";radius:14}onAboutToShow:hardwareContent.active=true;contentItem:Loader{id:hardwareContent;objectName:"hardwareContent";anchors.fill:parent;active:false;sourceComponent:Component{HardwarePanel{anchors.fill:parent;anchors.margins:16;video:vd;telemetry:t;onCloseRequested:hardwarePopup.close();onOpenStarlink:{hardwarePopup.close();starlinkPopup.open()}onOpenNetworkDetails:{hardwarePopup.close();diagnostics.open()}}}}}
  Popup{id:starlinkPopup;objectName:"starlinkPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(640,w.width-40);height:Math.min(460,w.height-48);background:Rectangle{color:"#f00d1725";border.color:"#2f4860";radius:14}onAboutToShow:starlinkContent.active=true;contentItem:Loader{id:starlinkContent;objectName:"starlinkContent";anchors.fill:parent;active:false;sourceComponent:Component{StarlinkPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:starlinkPopup.close()}}}}
  Popup{id:diagnostics;objectName:"diagnostics";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#0d1725";border.color:green;radius:14}onAboutToShow:diagnosticsContent.active=true;contentItem:Loader{id:diagnosticsContent;objectName:"diagnosticsContent";anchors.fill:parent;active:false;sourceComponent:Component{DiagnosticsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:diagnostics.close()}}}}

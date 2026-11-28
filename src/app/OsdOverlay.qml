@@ -44,7 +44,15 @@ Item {
  }
  function elementEnabled(name) {
   if (enabledElements[name] !== undefined) return enabledElements[name] === true
-  return name !== "homeDistance" && name !== "reticle" && name !== "horizon"
+  // The video state is on the flight bar already; it stays off unless the pilot turns it on.
+  return name !== "homeDistance" && name !== "reticle" && name !== "horizon" && name !== "video"
+ }
+ // A tile is shown only when it has something to say: no flight controller, no empty "—" boxes.
+ // While the pilot arranges the OSD every enabled tile is shown.
+ function has(field, value) {
+  if (telemetry.connected !== true) return false
+  if ((telemetry.freshness || {})[field] === false) return true
+  return value !== undefined && value !== null && value !== ""
  }
  function attitudeAvailable() {
   var freshness = telemetry.freshness || {}
@@ -145,18 +153,18 @@ Item {
  }
 
  property var tiles: [
-  {name:"link", group:"top-left", defaultX:5, defaultY:5, text:root.linkLabel() + root.linkDetails()},
-  {name:"arm", group:"top-left", defaultX:5, defaultY:11, text:"ARM: " + (telemetry.connected !== true ? "—" : ((telemetry.freshness || {}).armed === false ? "застаріло" : (telemetry.armed === null || telemetry.armed === undefined ? "—" : (telemetry.armed ? "активний" : "вимкнений"))))},
-  {name:"mode", group:"top-left", defaultX:5, defaultY:17, text:"Режим: " + root.telemetryText("flightMode", telemetry.flightMode)},
-  {name:"battery", group:"top-right", defaultX:5, defaultY:23, text:"АКБ: " + root.telemetryText("batteryVoltage", telemetry.batteryVoltage, " В", 1) + root.optionalTelemetryText("batteryRemaining", telemetry.batteryRemaining, "%", 0)},
-  {name:"gps", group:"top-right", defaultX:5, defaultY:29, text:"GPS: " + root.gpsFixDisplay() + root.optionalTelemetryText("satellites", telemetry.satellites, " супутн.", 0)},
-  {name:"altitude", group:"bottom-left", defaultX:5, defaultY:35, text:"Висота: " + root.telemetryText("altitude", telemetry.altitude, " м", 0)},
-  {name:"speed", group:"bottom-left", defaultX:5, defaultY:41, text:"Швидкість: " + root.telemetryText("groundSpeed", telemetry.groundSpeed, root.speedSuffix(), 1)},
-  {name:"heading", group:"bottom-left", defaultX:5, defaultY:47, text:"Напрямок: " + root.telemetryText("heading", telemetry.heading, "°", 0)},
-  {name:"video", group:"top-right", defaultX:5, defaultY:53, text:"Відео: " + (video.streamId ? (video.state === "playing" ? "активне" : "перевіряється") : "немає")},
-  {name:"homeDistance", group:"bottom-left", defaultX:5, defaultY:59, text:"До точки повернення: " + root.telemetryText("homeDistance", telemetry.homeDistance, " м", 0) + root.homeArrow()}
+  {name:"link", data:telemetry.connected === true, group:"top-left", defaultX:5, defaultY:5, text:root.linkLabel() + root.linkDetails()},
+  {name:"arm", data:root.has("armed", telemetry.armed), group:"top-left", defaultX:5, defaultY:11, text:"ARM: " + (telemetry.connected !== true ? "—" : ((telemetry.freshness || {}).armed === false ? "застаріло" : (telemetry.armed === null || telemetry.armed === undefined ? "—" : (telemetry.armed ? "активний" : "вимкнений"))))},
+  {name:"mode", data:root.has("flightMode", telemetry.flightMode), group:"top-left", defaultX:5, defaultY:17, text:"Режим: " + root.telemetryText("flightMode", telemetry.flightMode)},
+  {name:"battery", data:root.has("batteryVoltage", telemetry.batteryVoltage), group:"top-right", defaultX:5, defaultY:23, text:"АКБ: " + root.telemetryText("batteryVoltage", telemetry.batteryVoltage, " В", 1) + root.optionalTelemetryText("batteryRemaining", telemetry.batteryRemaining, "%", 0)},
+  {name:"gps", data:root.has("gpsFix", telemetry.gpsFix), group:"top-right", defaultX:5, defaultY:29, text:"GPS: " + root.gpsFixDisplay() + root.optionalTelemetryText("satellites", telemetry.satellites, " супутн.", 0)},
+  {name:"altitude", data:root.has("altitude", telemetry.altitude), group:"bottom-left", defaultX:5, defaultY:35, text:"Висота: " + root.telemetryText("altitude", telemetry.altitude, " м", 0)},
+  {name:"speed", data:root.has("groundSpeed", telemetry.groundSpeed), group:"bottom-left", defaultX:5, defaultY:41, text:"Швидкість: " + root.telemetryText("groundSpeed", telemetry.groundSpeed, root.speedSuffix(), 1)},
+  {name:"heading", data:root.has("heading", telemetry.heading), group:"bottom-left", defaultX:5, defaultY:47, text:"Напрямок: " + root.telemetryText("heading", telemetry.heading, "°", 0)},
+  {name:"video", data:true, group:"top-right", defaultX:5, defaultY:53, text:"Відео: " + (video.streamId ? (video.state === "playing" ? "активне" : "перевіряється") : "немає")},
+  {name:"homeDistance", data:root.has("homeDistance", telemetry.homeDistance), group:"bottom-left", defaultX:5, defaultY:59, text:"До точки повернення: " + root.telemetryText("homeDistance", telemetry.homeDistance, " м", 0) + root.homeArrow()}
  ]
- property var visibleTiles: root.tiles.filter(function(tileData) { return root.elementEnabled(tileData.name) })
+ property var visibleTiles: root.tiles.filter(function(tileData) { return root.elementEnabled(tileData.name) && (root.editing || tileData.data) })
  function groupRank(tile) {
   var rank = 0
   for (var i = 0; i < visibleTiles.length; i++) {

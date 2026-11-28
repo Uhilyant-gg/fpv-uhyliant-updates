@@ -106,3 +106,28 @@ class Tests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class FillIdentityTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        root = Path(self.temp.name)
+        devices_module.DATA = root
+        devices_module.DB = root / 'devices.sqlite3'
+        devices_module.LEGACY_DB = root / 'devices.json'
+        self.orig = devices_module.interfaces
+        devices_module.interfaces = lambda: []
+
+    def tearDown(self):
+        devices_module.interfaces = self.orig
+        self.temp.cleanup()
+
+    def test_chip_and_sensor_read_from_the_camera_fill_only_the_gaps(self):
+        d = devices_module.Devices()
+        did = d.saveDiscoveredCamera('Cam', '192.168.1.10', {'verified': True, 'sensor': 'imx335'}, [], 'ready')
+        self.assertTrue(d.fillIdentity(did, {'platform': 'gk7205v300', 'sensor': 'imx307', 'evil': 'x'}))
+        identity = d.items[0]['openipcIdentity']
+        self.assertEqual((identity['platform'], identity['sensor']), ('gk7205v300', 'imx335'))
+        self.assertNotIn('evil', identity)
+        self.assertFalse(d.fillIdentity(did, {'platform': 'other'}), 'nothing to fill: nothing written')
+        self.assertFalse(d.fillIdentity('nope', {'platform': 'x'}))

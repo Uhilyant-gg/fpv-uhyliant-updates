@@ -26,7 +26,16 @@ READ_ONLY_COMMANDS = {
     "videoFps": "cli -g .video0.fps",
     "videoBitrate": "cli -g .video0.bitrate",
     "videoGop": "cli -g .video0.gopSize",
+    # The camera's chip and sensor, so the station knows the hardware without asking anyone.
+    "chip": "ipcinfo --chip-name",
+    "sensor": "ipcinfo --short-sensor",
 }
+
+
+def parse_token(text: str) -> str:
+    """One short hardware name (e.g. "gk7205v300", "imx307"), or empty."""
+    value = text.strip().splitlines()[0].strip() if text.strip() else ""
+    return value if re.fullmatch(r"[A-Za-z0-9_.-]{2,32}", value) else ""
 
 
 def parse_video(codec: str, size: str, fps: str, bitrate: str, gop: str) -> dict:
@@ -125,6 +134,8 @@ def read_facts(session) -> dict:
         "freeKb": parse_free_kb(run("overlay")),
     }
     facts.update(parse_release(run("release")))
+    facts["platform"] = parse_token(run("chip"))
+    facts["sensor"] = parse_token(run("sensor"))
     facts["video"] = parse_video(*(run(k) for k in ("videoCodec", "videoSize", "videoFps", "videoBitrate", "videoGop")))
     return facts
 

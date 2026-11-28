@@ -292,6 +292,29 @@ class Devices(QObject):
         self.changed.emit()
         self.streamsChanged.emit()
 
+    def fillIdentity(self, did, values):
+        """Hardware facts the station read from the camera itself (chip, sensor): only fills gaps."""
+        item = next((x for x in self._items if x['id'] == did), None)
+        if item is None:
+            return False
+        identity = dict(item.get('openipcIdentity') or {})
+        missing = {
+            k: str(v) for k, v in (values or {}).items() if k in ('platform', 'sensor') and v and not identity.get(k)
+        }
+        if not missing:
+            return False
+        with self._connect() as d:
+            row = d.execute('SELECT identity_json FROM devices WHERE id=?', (did,)).fetchone()
+            try:
+                stored = json.loads(row[0]) if row and row[0] else {}
+            except ValueError:
+                stored = {}
+            stored.update(missing)
+            d.execute('UPDATE devices SET identity_json=? WHERE id=?', (json.dumps(stored, ensure_ascii=False), did))
+        self._load()
+        self.changed.emit()
+        return True
+
     def _save_identity(self, did, identity):
         with self._connect() as d:
             d.execute('UPDATE devices SET identity_json=? WHERE id=?', (json.dumps(identity, ensure_ascii=False), did))

@@ -264,7 +264,7 @@ class VideoPresetsRuntime(QObject):
         key = self.activeKey
         preset = self._slot(key) if key else None
         if preset is None:
-            return "Авто · пресет ще не вибрано" if self.auto else "Пресет відео не вибрано"
+            return "Авто · як у камері" if self.auto else "Як у камері"
         kbps = self.bitrateKbps or preset["bitrateKbps"]
         mark = "*" if kbps != preset["bitrateKbps"] else ""
         head = f"Авто · {key}" if self.auto else key

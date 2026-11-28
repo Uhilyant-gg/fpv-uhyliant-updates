@@ -73,8 +73,20 @@ in plain words, and the station fixes what it can by itself.
    not always on.
 8. Flight black box: every flight writes its own log with all details into **a separate folder**
    (its own setting, like the DVR folder); a short summary after landing.
+   Done: `<black box folder>/<date_time camera>/` holds `flight.json` (camera, link), `seconds.jsonl`
+   (video, link, Starlink, flight controller, preset every second), `events.jsonl`, `summary.json`
+   and `Підсумок.txt`; after a flight of 20 s or more the pilot sees the summary. Last 200 flights.
+   "Журнал польотів" in the home menu lists every flight newest first, grouped by day (сьогодні,
+   вчора, date), with duration and dropouts at a glance; a click shows its summary and events.
 9. A 20-second link test in Preflight before take-off.
+   Done: starts by itself when Preflight opens; checks once a second whether the camera answers and
+   how fast, and on the flight screen also frames, dropouts and packet loss; then says "можна
+   летіти" / "зверніть увагу" / "краще не летіти" with advice (e.g. the "Авто" preset).
 Order: 1+2+6, then 3, then 4+5 with telemetry forwarding, then 8+9, then 7 on real hardware.
+Picture after a dropout: majestic has no documented "send a keyframe now" request (its endpoints
+list and wiki name none; SIGUSR1 is reserved), so the station relies on short keyframe intervals in
+its presets (0.5 s up to 2 Mbit/s, 1 s above): the picture returns within ~0.5–1 s after the link.
+To try on a camera: whether an IDR request exists in the installed build.
 
 ## Video presets, streams and controls (agreed 2026-11-28)
 - Flight menu holds only what is needed in the air; every other setting lives in the home menu.

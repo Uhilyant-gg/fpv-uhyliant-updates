@@ -39,7 +39,7 @@ def test_nine_slots_on_keys_2_to_0_with_defaults_from_the_weakest_link(tmp_path)
     assert rt.slots[0]["name"] == "Мінімум" and rt.slots[0]["bitrateKbps"] == 512
     assert rt.slots[8]["name"] == "Максимум" and rt.slots[8]["bitrateKbps"] == 6144
     assert not any(s["empty"] for s in rt.slots), "the station fills every slot by itself"
-    assert rt.label == "Пресет відео не вибрано"
+    assert rt.label == "Як у камері", "no preset yet: the camera keeps its own settings"
 
 
 def test_applying_a_preset_writes_it_into_the_camera(tmp_path):

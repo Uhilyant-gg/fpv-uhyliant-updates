@@ -84,6 +84,10 @@ def single_shot(delay, callback):
         app.processEvents()
         fly = one(window, 'cameraFly')
         assert not fly.property('enabled'), 'no connection chosen yet'
+        assert not one(window, 'connection-static').property('visible'), 'not set up yet: behind "＋"'
+        one(window, 'connectionMore').clicked.emit()
+        app.processEvents()
+        assert one(window, 'connection-static').property('visible')
         one(window, 'connection-static').clicked.emit()
         app.processEvents()
         assert not window.findChild(QObject, 'cameraSettingsDialog').property('visible'), 'no form: the station binds by itself'
