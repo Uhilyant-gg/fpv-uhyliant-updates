@@ -208,6 +208,22 @@ class ConnectionsRuntime(QObject):
         relay = self._relays.get(device_id)
         return relay.window() if relay is not None else None
 
+    def control_host(self, device_id) -> str:
+        """Where the station can reach the camera to change its settings, in flight too.
+
+        The selected connection if it reaches the camera, otherwise any other that does.
+        A static IP only receives video: the camera cannot be reached through it.
+        """
+        statuses = self._statuses.get(device_id, {})
+        selected = self._selected.get(device_id)
+        order = ([selected] if selected in ("local", "cloud", "starlink") else []) + ["cloud", "starlink", "local"]
+        for kind in order:
+            if statuses.get(kind, {}).get("state") == "available":
+                host = self._host(device_id, kind)
+                if host:
+                    return host
+        return ""
+
     @Slot(str)
     def probeSelected(self, device_id):
         """In flight, when the video is lost: is the camera itself reachable right now?"""

@@ -63,6 +63,8 @@ MODELS = {
     "dvrRuntime": ("dvr_runtime", "DvrRuntime"),
     "linkMonitor": ("link_monitor", "LinkMonitor"),
     "linkDoctor": ("link_doctor", "LinkDoctor"),
+    "controllerActions": ("controller_actions", "ControllerActions"),
+    "videoPresets": ("video_presets", "VideoPresetsRuntime"),
     "connectionsRuntime": ("connections_runtime", "ConnectionsRuntime"),
 }
 

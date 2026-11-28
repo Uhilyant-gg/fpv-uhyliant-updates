@@ -139,6 +139,7 @@ def main():
     from dvr_runtime import DvrRuntime
     from link_monitor import LinkMonitor
     from link_doctor import LinkDoctor
+    import video_presets
     from rtp_relay import RtpRelay
     from connection_profiles import ConnectionStore
     from connections_runtime import ConnectionsRuntime
@@ -252,10 +253,14 @@ def main():
     streams.autoSelect()
     pairing.reconcile()
     display_runtime = DisplayRuntime(app)
+    controller_source = default_controller_source()
     controller = ControllerRuntime(
-        ControllerOnboarding(default_controller_source(), JsonControllerProfileStore(DATA / 'controller-profiles.json'))
+        ControllerOnboarding(controller_source, JsonControllerProfileStore(DATA / 'controller-profiles.json'))
     )
-    app._runtime_refs = app._runtime_refs + (display_runtime, controller)
+    from controller_actions import ControllerActions
+
+    controller_actions = ControllerActions(controller_source, DATA / 'controller-actions.json')
+    app._runtime_refs = app._runtime_refs + (display_runtime, controller, controller_actions)
     home.setController(controller)
     flight_alerts = FlightAlertsRuntime(telemetry, s)
     presets = PresetsRuntime(preset_store, s)
@@ -290,10 +295,44 @@ def main():
         relay=RtpRelay,
     )
     link_doctor = LinkDoctor(link_monitor, d, connections)
+    camera_logins = lambda: (
+        [(credentials.username or 'root', credentials.secret())]
+        + list(  # noqa: E731
+            camera_setup.DEFAULT_CREDENTIALS
+        )
+    )
+    video_preset_runtime = video_presets.VideoPresetsRuntime(
+        video_presets.VideoPresetStore(DATA / 'video-presets.json'),
+        d,
+        connections,
+        lambda host, lines: video_presets.run_on_camera(
+            host,
+            camera_logins(),
+            lambda h, u, p: camera_setup.CameraShell(h, u, p, DATA / 'camera_known_hosts'),
+            lines,
+        ),
+    )
     v.host_resolver = connections.host_for
     secondary.host_resolver = connections.host_for
     v.push_resolver = connections.push_url_for
     dvr_runtime.recordingChanged.connect(lambda: s.setRecordingActive(dvr_runtime.recording))
+
+    def feed_auto():
+        # Once a second in flight: how the link behaves, for the "Auto" video preset.
+        device_id = d.activeId
+        kind = connections.selected.get(device_id, '')
+        status = connections.statuses.get(device_id, {}).get(kind, {})
+        details = link_doctor.details
+        video_preset_runtime.observe(
+            {
+                'lost': link_monitor.lost,
+                'lossPct': details.get('lossPct', 0),
+                'jitterMs': details.get('jitterMs', 0),
+                'latencyMs': status.get('latencyMs'),
+            }
+        )
+
+    link_doctor.changed.connect(feed_auto)
     app._runtime_refs = app._runtime_refs + (
         flight_alerts,
         presets,
@@ -337,6 +376,8 @@ def main():
         ('dvrRuntime', dvr_runtime),
         ('linkMonitor', link_monitor),
         ('linkDoctor', link_doctor),
+        ('controllerActions', controller_actions),
+        ('videoPresets', video_preset_runtime),
         ('connectionsRuntime', connections),
     ]:
         ctx.setContextProperty(name, obj)

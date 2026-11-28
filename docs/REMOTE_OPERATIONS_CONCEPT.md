@@ -82,8 +82,10 @@ Order: 1+2+6, then 3, then 4+5 with telemetry forwarding, then 8+9, then 7 on re
   frame comes, and what the camera is set to.
 - Video presets belong to each camera and change the camera's own settings, in flight too.
 - Bitrate is controlled per stream: by presets and by a quick change on the flight bar; an "Auto"
-  preset lowers bitrate and other settings by itself to hold a target latency.
-- PC keyboard keys 1…0 switch the camera presets: 1 is the weakest link, up to 0.
+  preset moves between the camera's own presets by itself to hold a target latency: one step
+  down after 3 bad seconds (at most every 10 s), one step up after 30 good seconds.
+- PC keyboard: key 1 turns on "Auto"; keys 2…0 switch the camera presets, 2 is the weakest link,
+  up to 0. Choosing a preset by hand turns Auto off.
 - A controller channel swaps the streams (main ↔ additional).
 - Additional camera (thermal) on the camera's USB through UVC or a capture card: first tried on the
   official OpenIPC firmware, without a custom build. Picture-in-picture made on the camera to save

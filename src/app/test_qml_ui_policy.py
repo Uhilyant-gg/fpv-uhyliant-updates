@@ -40,6 +40,7 @@ class QmlUiPolicyAuditTests(unittest.TestCase):
                 "TimelinePanel.qml",
                 "ZeroTierPanel.qml",
                 "UpdatePanel.qml",
+                "VideoPresetsPanel.qml",
             },
         )
 

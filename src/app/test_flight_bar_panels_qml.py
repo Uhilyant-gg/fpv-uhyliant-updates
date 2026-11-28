@@ -40,6 +40,8 @@ Link = make('Link', {'history': 'QVariantList', 'fps': int, 'lost': bool, 'lostS
 Dvr = make('Dvr', {'recording': bool, 'canStart': bool, 'elapsedText': str, 'freeSpaceText': str, 'lowSpace': bool},
            {'toggle': ((), None, lambda self: None)})
 Ctl = make('Ctl', {'health': str, 'summary': str})
+VP = make('VP', {'busy': bool}, {'stepBitrate': ((int,), bool, lambda self, d: steps.append(d) or True)})
+steps = []
 Doctor = make('Doctor', {'details': 'QVariantMap', 'text': str, 'level': str})
 Station = make('Station', {'osdEnabled': bool}, {'setOSDEnabled': ((bool,), None, lambda self, v: None)})
 
@@ -57,6 +59,7 @@ props = dict(
     dvrRuntime=Dvr(recording=False, canStart=True, elapsedText='', freeSpaceText='вільно 3,1 ГБ', lowSpace=False),
     controllerRuntime=Ctl(health='ready', summary='Пульт готовий'),
     station=Station(osdEnabled=True),
+    videoPresets=VP(busy=False),
     linkDoctor=Doctor(details={'internet': False, 'hasStream': True, 'lossPct': 2.5, 'jitterMs': 4.2, 'kbps': 3200, 'codec': 'H.265', 'keyframeS': 1.0}, text='', level='ok'),
 )
 for name, obj in props.items():
@@ -84,6 +87,9 @@ app.processEvents()
 link = child(bar, 'flightBarLink')
 assert link.property('caption') == 'Зв’язок · Starlink IPv6' and link.property('value') == '58 мс · 30 к/с'
 assert child(bar, 'flightBarFc').property('value') == 'АКБ 16,4 В'
+child(bar, 'flightBarBitrateDown').clicked.emit()
+child(bar, 'flightBarBitrateUp').clicked.emit()
+assert steps == [-1, 1], steps
 for gone in ('flightBarPreflight', 'flightBarOsd', 'flightBarVideo', 'flightBarStarlink', 'flightBarHardware'):
     assert bar.findChild(QObject, gone) is None, gone + ' moved to the menu'
 assert not child(bar, 'flightBarLowSpace').property('visible'), 'free space only when it runs low'
