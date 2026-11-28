@@ -20,16 +20,18 @@ import camera_setup as cs
 
 AUTO_KEY = "1"
 KEYS = ("2", "3", "4", "5", "6", "7", "8", "9", "0")
-SIZES = ("960x540", "1280x720", "1920x1080")
+SIZES = ("640x360", "960x540", "1280x720", "1920x1080")
 FPS = (30, 60, 90)
 GOPS = (0.5, 1, 2)
 MIN_KBPS, MAX_KBPS = 256, 20000
-BITRATE_STEPS = (512, 1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384)
+BITRATE_STEPS = (512, 768, 1024, 1536, 2048, 2560, 3072, 4096, 6144)
 
 # The automatic ladder: nine bitrates for the keys 2…0. For each, the largest picture
 # that still gets enough data per pixel to stay clean (no blocks), never below 30 fps,
 # 60 fps as soon as the bitrate carries it: smoothness and detail together.
-LADDER_KBPS = (1024, 1536, 2048, 3072, 4096, 5120, 6144, 8192, 10240)
+# Starlink on the drone carries at most ~6 Mbit/s and works reliably up to ~2.5 Mbit/s
+# (owner's measurements), so the ladder is dense below 2.5 and stops at 6.
+LADDER_KBPS = (512, 768, 1024, 1536, 2048, 2560, 3072, 4096, 6144)
 LADDER_NAMES = (
     "Мінімум",
     "Дуже слабкий канал",
@@ -44,7 +46,7 @@ LADDER_NAMES = (
 # H.265 bits per pixel per frame below which fast FPV motion turns into blocks.
 MIN_BITS_PER_PIXEL = 0.05
 # From the least to the most wanted picture for FPV: smoothness before size.
-PICTURES = (("960x540", 30), ("1280x720", 30), ("1280x720", 60), ("1920x1080", 60))
+PICTURES = (("640x360", 30), ("960x540", 30), ("1280x720", 30), ("1280x720", 60), ("1920x1080", 60))
 
 
 def picture_for(kbps: int) -> tuple[str, int]:
