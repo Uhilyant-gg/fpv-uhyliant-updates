@@ -587,3 +587,48 @@ def test_flight_closes_camera_sessions_and_stops_reading(inspect_runtime):
     rt.clock.now += 5
     rt.refresh()
     assert len(rt.calls) == 2
+
+
+class FakeRelay:
+    made = []
+
+    def __init__(self, listen, forward, starts=True):
+        self.listen, self.forward, self.starts = listen, forward, starts
+        self.stopped = False
+        FakeRelay.made.append(self)
+
+    def start(self):
+        return self.starts
+
+    def stop(self):
+        self.stopped = True
+
+    def window(self):
+        return {"packets": 30, "lossPct": 0.0}
+
+
+def test_pushed_video_goes_through_the_station_relay(push_runtime, tmp_path):
+    rt = push_runtime
+    FakeRelay.made = []
+    rt._relay_factory = FakeRelay
+    rt.setAddress("c1", "static", "93.170.12.5")
+    rt.select("c1", "static")
+    rt.push_url_for({"id": "c1"})
+    relay = FakeRelay.made[0]
+    assert relay.listen == 5600 and relay.forward != 5600 and relay.forward % 2 == 0
+    assert f"m=video {relay.forward} RTP/AVP" in (tmp_path / "sdp" / "push-c1.sdp").read_text()
+    assert rt.relay_window("c1") == {"packets": 30, "lossPct": 0.0}
+    rt.push_url_for({"id": "c1"})
+    assert relay.stopped and len(FakeRelay.made) == 2, "a new flight replaces the old relay"
+    rt.resumeListening()
+    assert FakeRelay.made[1].stopped and rt.relay_window("c1") is None, "leaving the flight frees the port"
+
+
+def test_without_the_relay_the_player_gets_the_push_port(push_runtime, tmp_path):
+    rt = push_runtime
+    rt._relay_factory = lambda listen, forward: FakeRelay(listen, forward, starts=False)
+    rt.setAddress("c1", "static", "93.170.12.5")
+    rt.select("c1", "static")
+    rt.push_url_for({"id": "c1"})
+    assert "m=video 5600 RTP/AVP" in (tmp_path / "sdp" / "push-c1.sdp").read_text()
+    assert rt.relay_window("c1") is None

@@ -138,6 +138,8 @@ def main():
     from presets_runtime import PresetsRuntime
     from dvr_runtime import DvrRuntime
     from link_monitor import LinkMonitor
+    from link_doctor import LinkDoctor
+    from rtp_relay import RtpRelay
     from connection_profiles import ConnectionStore
     from connections_runtime import ConnectionsRuntime
     from zerotier_local import ZeroTierLocal
@@ -285,12 +287,21 @@ def main():
         zerotier=ZeroTierLocal(),
         listen=not x.first_run_acceptance_smoke,
         sdp_folder=DATA / 'push-video',
+        relay=RtpRelay,
     )
+    link_doctor = LinkDoctor(link_monitor, d, connections)
     v.host_resolver = connections.host_for
     secondary.host_resolver = connections.host_for
     v.push_resolver = connections.push_url_for
     dvr_runtime.recordingChanged.connect(lambda: s.setRecordingActive(dvr_runtime.recording))
-    app._runtime_refs = app._runtime_refs + (flight_alerts, presets, dvr_runtime, connections, link_monitor)
+    app._runtime_refs = app._runtime_refs + (
+        flight_alerts,
+        presets,
+        dvr_runtime,
+        connections,
+        link_monitor,
+        link_doctor,
+    )
     ctx = e.rootContext()
     for name, obj in [
         ('station', s),
@@ -325,6 +336,7 @@ def main():
         ('presetsRuntime', presets),
         ('dvrRuntime', dvr_runtime),
         ('linkMonitor', link_monitor),
+        ('linkDoctor', link_doctor),
         ('connectionsRuntime', connections),
     ]:
         ctx.setContextProperty(name, obj)

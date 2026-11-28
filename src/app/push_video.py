@@ -73,6 +73,25 @@ def free_port(used: set[int]) -> int:
     return port
 
 
+def free_loopback_port() -> int:
+    """An even UDP port on this PC with the next one free too (the player may use it for RTCP)."""
+    for _ in range(20):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1] & ~1
+        try:
+            with (
+                socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as a,
+                socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as b,
+            ):
+                a.bind(("0.0.0.0", port))
+                b.bind(("0.0.0.0", port + 1))
+            return port
+        except OSError:
+            continue
+    return 0
+
+
 def lan_address(target: str = "192.0.2.1") -> str:
     """This PC's address on the home network (no packet is sent)."""
     try:

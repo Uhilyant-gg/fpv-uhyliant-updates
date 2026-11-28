@@ -40,6 +40,7 @@ Link = make('Link', {'history': 'QVariantList', 'fps': int, 'lost': bool, 'lostS
 Dvr = make('Dvr', {'recording': bool, 'canStart': bool, 'elapsedText': str, 'freeSpaceText': str},
            {'toggle': ((), None, lambda self: None)})
 Ctl = make('Ctl', {'health': str, 'summary': str})
+Doctor = make('Doctor', {'details': 'QVariantMap', 'text': str, 'level': str})
 Station = make('Station', {'osdEnabled': bool}, {'setOSDEnabled': ((bool,), None, lambda self, v: None)})
 
 types = [{'key': 'local', 'label': 'Локальна мережа'}, {'key': 'starlink', 'label': 'Starlink IPv6'}]
@@ -56,6 +57,7 @@ props = dict(
     dvrRuntime=Dvr(recording=False, canStart=True, elapsedText='', freeSpaceText='вільно 58 ГБ'),
     controllerRuntime=Ctl(health='ready', summary='Пульт готовий'),
     station=Station(osdEnabled=True),
+    linkDoctor=Doctor(details={'internet': False, 'hasStream': True, 'lossPct': 2.5, 'jitterMs': 4.2, 'kbps': 3200}, text='', level='ok'),
 )
 for name, obj in props.items():
     ctx.setContextProperty(name, obj)
@@ -106,8 +108,21 @@ assert 'затримка 3 мс' in texts, texts
 assert 'дані надходять · АКБ 16.4 В · супутників 12' in texts, texts
 assert 'Пульт готовий' in texts and 'OpenIPC fpv' in texts, texts
 assert not child(hw, 'hardwareZeroTier').property('visible'), 'ZeroTier line only for a ZeroTier connection'
+assert not child(hw, 'hardwareInternet').property('visible'), 'a local flight does not need the internet'
+assert 'втрачено 2,5% пакетів · нерівність 4 мс · 3,2 Мбіт/с' in texts, texts
 
 props['connectionsRuntime']._v['selected'] = {'c1': 'starlink'}
+props['connectionsRuntime'].changed.emit()
+app.processEvents()
+assert child(hw, 'hardwareInternet').property('visible')
+assert 'немає · перевірте роутер або провайдера' in value_texts(hw)
+props['connectionsRuntime']._v['selected'] = {'c1': 'static'}
+props['connectionsRuntime']._v['statuses'] = {'c1': {'static': {'state': 'available', 'latencyMs': None, 'label': 'камера надсилає'}}}
+props['connectionsRuntime'].changed.emit()
+app.processEvents()
+assert 'камера надсилає' in value_texts(hw), 'a static IP has no latency to show'
+props['connectionsRuntime']._v['selected'] = {'c1': 'starlink'}
+props['connectionsRuntime']._v['statuses'] = statuses
 props['connectionsRuntime'].changed.emit()
 sl = load('StarlinkPanel.qml')
 app.processEvents()

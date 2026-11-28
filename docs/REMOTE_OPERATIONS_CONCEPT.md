@@ -60,6 +60,22 @@ This records decisions agreed with the product owner, so later work builds on th
 - Control is taken automatically and never taken away by the station; the flight controller has its
   own failsafe for link loss.
 
+## Link-loss diagnosis (agreed 2026-11-28)
+The pilot must see at once where the chain camera → Starlink → internet → pilot's PC → decoder broke,
+in plain words, and the station fixes what it can by itself.
+1. Stream analysis on the PC: packets arriving, loss, jitter, bitrate, packets without frames.
+2. Internet check on the pilot's PC.
+3. Starlink dish data: outage causes, obstruction map, position and heading (also for the map).
+4. Camera health from a firmware helper: CPU temperature and load, video service, real bitrate.
+5. Video vs telemetry: video gone but telemetry alive means the camera, not the network.
+6. The banner names the cause ("Пропав інтернет на ПК пілота", "Starlink: перешкода в небі", ...).
+7. Automatic bitrate reduction on a weak link: **a separate video-stream preset** the pilot chooses,
+   not always on.
+8. Flight black box: every flight writes its own log with all details into **a separate folder**
+   (its own setting, like the DVR folder); a short summary after landing.
+9. A 20-second link test in Preflight before take-off.
+Order: 1+2+6, then 3, then 4+5 with telemetry forwarding, then 8+9, then 7 on real hardware.
+
 ## Map and wind
 - Satellite base map (Esri World Imagery); download a selected area in advance, or automatically
   around the drone. Orientation: north-up, track-up or follow the drone. Picture-in-picture (movable,
