@@ -15,6 +15,7 @@ class FakeCameraServer(paramiko.ServerInterface):
         self.event = threading.Event()
 
     def check_auth_password(self, username, password):
+        self.camera["logins"] = self.camera.get("logins", 0) + 1
         ok = username == "root" and password == self.camera["password"]
         return paramiko.AUTH_SUCCESSFUL if ok else paramiko.AUTH_FAILED
 
@@ -146,3 +147,16 @@ def test_real_ssh_reads_the_camera_ids(camera, tmp_path):
     assert (result["ztNetwork"], result["ztNode"]) == ("8056c2e21c000001", "89e92ceee5")
     assert result["variant"] == "fpv"
     assert not any(c.startswith("cli -s") or c.startswith("killall") for c in camera["commands"]), "read only"
+
+
+def test_real_ssh_pool_keeps_one_session_for_frequent_reads(camera, tmp_path):
+    import camera_inspect as ci
+
+    camera["answers"] = {"zerotier-cli info": "200 info 89e92ceee5 1.12.2 ONLINE"}
+    pool = ci.InspectorPool(lambda: list(cs.DEFAULT_CREDENTIALS), shell_for(camera, tmp_path / "known"))
+    try:
+        for _ in range(4):
+            assert pool.inspect("127.0.0.1")["ztNode"] == "89e92ceee5"
+    finally:
+        pool.close_all()
+    assert camera["logins"] == 1, "frequent reads use one SSH login"

@@ -108,6 +108,78 @@ def inspect_camera(host: str, credentials, shell) -> dict:
     return cs.with_camera(host, credentials, shell, action)
 
 
+class InspectorPool:
+    """Keeps one SSH session per camera open between reads.
+
+    Reading every few seconds must not log in every time: the handshake is the
+    expensive part on the camera's small CPU. The session is reused until it
+    fails or ``close_all`` is called (before a flight).
+    """
+
+    def __init__(self, credentials, shell):
+        import threading
+
+        self._credentials = credentials
+        self._shell = shell
+        self._sessions: dict[str, object] = {}
+        self._lock = threading.Lock()
+
+    def inspect(self, host: str) -> dict:
+        with self._lock:
+            session = self._sessions.get(host)
+        if session is not None:
+            try:
+                return {"state": "read", **read_facts(session)}
+            except Exception:
+                self._close(host)
+        return self._login_and_read(host)
+
+    def _login_and_read(self, host: str) -> dict:
+        last = "no-access"
+        for username, password in self._credentials():
+            if not password:
+                continue
+            shell = self._shell(host, username, password)
+            try:
+                session = shell.__enter__()
+            except cs.SetupError as error:
+                last = error.state
+                if last != "no-access":
+                    break
+                continue
+            except Exception:
+                last = "failed"
+                break
+            try:
+                facts = read_facts(session)
+            except Exception:
+                shell.__exit__(None, None, None)
+                return {"state": "failed", "message": cs.MESSAGES["failed"]}
+            with self._lock:
+                self._sessions[host] = session
+            return {"state": "read", **facts}
+        return {"state": last, "message": cs.MESSAGES[last]}
+
+    def _close(self, host: str):
+        with self._lock:
+            session = self._sessions.pop(host, None)
+        if session is not None:
+            try:
+                session.__exit__(None, None, None)
+            except Exception:
+                pass
+
+    def close_all(self):
+        with self._lock:
+            hosts = list(self._sessions)
+        for host in hosts:
+            self._close(host)
+
+    @property
+    def open_sessions(self) -> int:
+        return len(self._sessions)
+
+
 def summary(facts: dict) -> str:
     """One line for the camera settings, in plain language."""
     if not facts:

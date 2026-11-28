@@ -113,3 +113,72 @@ def test_shell_accepts_zerotier_addresses(tmp_path):
         "fd80:56c2:e21c:0:199:9389:e92c:eee5", "root", "12345", tmp_path / "k", client_factory=Client
     ) as s:
         assert s.client.host.startswith("fd80:")
+
+
+class CountingShell:
+    """A camera that counts logins and can drop the connection."""
+
+    def __init__(self):
+        self.logins = 0
+        self.closed = 0
+        self.broken = False
+        self.password = "12345"
+
+    def __call__(self, host, user, password):
+        camera = self
+
+        class Shell:
+            def __enter__(self):
+                if password != camera.password:
+                    raise cs.SetupError("no-access")
+                camera.logins += 1
+                return self
+
+            def __exit__(self, *exc):
+                camera.closed += 1
+                return False
+
+            def run(self, command):
+                if camera.broken:
+                    raise OSError("connection lost")
+                return Session(full()).run(command)
+
+        return Shell()
+
+
+def test_pool_logs_in_once_and_reuses_the_session():
+    camera = CountingShell()
+    pool = ci.InspectorPool(lambda: [("root", "12345")], camera)
+    for _ in range(5):
+        assert pool.inspect("192.168.1.10")["ztNode"] == "89e92ceee5"
+    assert camera.logins == 1, "one login for many reads"
+    assert pool.open_sessions == 1
+
+
+def test_pool_logs_in_again_after_the_connection_drops():
+    camera = CountingShell()
+    pool = ci.InspectorPool(lambda: [("root", "12345")], camera)
+    pool.inspect("192.168.1.10")
+    camera.broken = True
+    assert pool.inspect("192.168.1.10")["state"] == "failed"
+    assert camera.closed >= 1 and pool.open_sessions == 0
+    camera.broken = False
+    assert pool.inspect("192.168.1.10")["state"] == "read"
+    assert camera.logins == 3, "first login, one immediate re-login when the link dropped, then a new session"
+
+
+def test_pool_close_all_before_a_flight():
+    camera = CountingShell()
+    pool = ci.InspectorPool(lambda: [("root", "12345")], camera)
+    pool.inspect("192.168.1.10")
+    pool.inspect("192.168.1.11")
+    pool.close_all()
+    assert pool.open_sessions == 0 and camera.closed == 2
+
+
+def test_pool_reports_a_wrong_password():
+    camera = CountingShell()
+    camera.password = "other"
+    pool = ci.InspectorPool(lambda: [("root", "a"), ("root", "12345")], camera)
+    assert pool.inspect("192.168.1.10")["state"] == "no-access"
+    assert pool.open_sessions == 0

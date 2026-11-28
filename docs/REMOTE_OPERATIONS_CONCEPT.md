@@ -49,7 +49,9 @@ This records decisions agreed with the product owner, so later work builds on th
   the station reads over SSH, with read-only commands, its ZeroTier node and network IDs, its public IPv6,
   firmware variant/version, flash size and free space. ZeroTier IDs fill in by themselves unless a person
   entered other values; the Starlink IPv6 is taken only when the camera is seen through ZeroTier (in the
-  field, so the address is Starlink's). Read again every 10 minutes, at once when the camera appears.
+  field, so the address is Starlink's). Read at once when the camera appears and then every 5 seconds over one
+  SSH session that stays open; never in flight (the session is closed before the flight); a failed login is
+  retried after a minute.
 - Camera firmware: official OpenIPC plus selected add-ons installed during or after flashing:
   ZeroTier, a flight-controller bridge (raw bytes to/from the network), settings sync, watchdog.
   The station checks over SSH whether an add-on fits (firmware variant, flash size, free space).
