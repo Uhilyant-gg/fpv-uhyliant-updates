@@ -86,20 +86,20 @@ ApplicationWindow {
     video: w.simulation ? ({}) : videoRuntime.diagnostics
     cameraName: devicesModel.activeName
     presetName: presetsRuntime.activeName
-    pipEnabled: w.pipEnabled
-    onOpenVehicle: openVehicleSettings("presets")
-    onOpenStreams: streamsPopup.open()
     linkKind: connectionsRuntime.selected[devicesModel.activeId] || ""
     linkKindLabel: { var k = linkKind; var types = connectionsRuntime.types; for (var i = 0; i < types.length; i++) if (types[i].key === k) return types[i].label; return "" }
     linkStatus: (connectionsRuntime.statuses[devicesModel.activeId] || {})[linkKind] || ({})
     linkHistory: linkMonitor.history
-    onOpenDiagnostics: openService("diagnostics")
+    linkLost: linkMonitor.lost
+    linkLostSeconds: linkMonitor.lostSeconds
+    linkFps: linkMonitor.fps
+    linkWarning: linkDoctor.level === "warning"
+    onOpenVehicle: openVehicleSettings("presets")
     onOpenHardware: hardwarePopup.open()
     onOpenStarlink: starlinkPopup.open()
-    onOpenPreflight: preflightPopup.open()
     onOpenMenu: flightMenu.open()
     onHideRequested: w.flightBarHidden = true
-    onLeaveFlight: { if (w.simulation) w.simulation = false; else disconnectDevice() }
+    onLeaveFlight: { if (w.simulation) w.simulation = false; else if (t.armed === true) leaveFlightConfirm.open(); else disconnectDevice() }
    }
    Item {
    id: flightArea
@@ -265,6 +265,37 @@ ApplicationWindow {
      Layout.topMargin: 14
      Layout.bottomMargin: 4
      elide: Text.ElideRight
+    }
+    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
+    Text {
+     text: "ПОЛІТ"
+     color: sub
+     font.pixelSize: 12
+     font.bold: true
+     Layout.fillWidth: true
+     Layout.leftMargin: 14
+     Layout.topMargin: 5
+    }
+    Button {
+     objectName: "flightMenuPreflight"
+     text: "Підготовка до польоту"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
+     enabled: !w.simulation
+     onClicked: { flightMenu.close(); preflightPopup.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Button {
+     objectName: "flightMenuHardware"
+     text: "Обладнання"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
+     enabled: !w.simulation
+     onClicked: { flightMenu.close(); hardwarePopup.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
+    }
+    Button {
+     objectName: "flightMenuStarlink"
+     visible: !w.simulation && flightBar.linkKind === "starlink"
+     text: "Starlink"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
+     onClicked: { flightMenu.close(); starlinkPopup.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
     }
     Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
     Text {
@@ -541,7 +572,8 @@ ApplicationWindow {
  Popup{id:backupPopup;objectName:"backupPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(700,w.width-40);height:Math.min(600,w.height-48);background:Rectangle{color:"#0d1725";border.color:blue;radius:14}onAboutToShow:backupContent.active=true;onClosed:if(backupContent.item)backupContent.item.clearSensitiveFields();contentItem:Loader{id:backupContent;objectName:"backupContent";anchors.fill:parent;active:false;sourceComponent:Component{BackupPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:backupPopup.close()}}}}
  Popup{id:osdSettingsPopup;objectName:"osdSettingsPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(1180,w.width-40);height:Math.min(900,w.height-48);background:Rectangle{color:"#f00d1725";border.color:blue;radius:14}onAboutToShow:osdSettingsLoader.active=true;contentItem:Loader{id:osdSettingsLoader;objectName:"osdSettingsLoader";anchors.fill:parent;active:false;sourceComponent:Component{OsdSettingsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:osdSettingsPopup.close()}}}}
  Popup{id:preflightPopup;objectName:"preflightPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#f00d1725";border.color:amber;radius:14}onAboutToShow:{preflightContent.active=true;controllerRuntime.observe()}contentItem:Loader{id:preflightContent;objectName:"preflightContent";anchors.fill:parent;active:false;sourceComponent:Component{PreflightPanel{anchors.fill:parent;anchors.margins:16;cameraName:devicesModel.activeName;video:vd;telemetry:t;network:net;navigation:ext;nextAction:homeDashboard.nextAction;osdEnabled:station.osdEnabled;controllerHealth:controllerRuntime.health;controllerDetail:controllerRuntime.summary;onCloseRequested:preflightPopup.close();onOpenOsdSettings:function(){preflightPopup.close();w.openOsdSettings()}onOpenSimulation:function(){preflightPopup.close();simulation=true}onOpenDiagnostics:function(){preflightPopup.close();diagnostics.open()}}}}}
- Popup{id:hardwarePopup;objectName:"hardwarePopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(760,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#f00d1725";border.color:"#2f4860";radius:14}onAboutToShow:hardwareContent.active=true;contentItem:Loader{id:hardwareContent;objectName:"hardwareContent";anchors.fill:parent;active:false;sourceComponent:Component{HardwarePanel{anchors.fill:parent;anchors.margins:16;video:vd;telemetry:t;onCloseRequested:hardwarePopup.close();onOpenNetworkDetails:{hardwarePopup.close();diagnostics.open()}}}}}
+ Dialog{id:leaveFlightConfirm;objectName:"leaveFlightConfirm";modal:true;anchors.centerIn:Overlay.overlay;title:"Дрон озброєний. Вийти з польоту?";standardButtons:Dialog.Yes|Dialog.No;onAccepted:disconnectDevice();Text{text:"Відео і телеметрія на станції зупиняться. На сам дрон це не впливає.";color:fg;wrapMode:Text.Wrap;width:360}}
+ Popup{id:hardwarePopup;objectName:"hardwarePopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(760,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#f00d1725";border.color:"#2f4860";radius:14}onAboutToShow:hardwareContent.active=true;contentItem:Loader{id:hardwareContent;objectName:"hardwareContent";anchors.fill:parent;active:false;sourceComponent:Component{HardwarePanel{anchors.fill:parent;anchors.margins:16;video:vd;telemetry:t;onCloseRequested:hardwarePopup.close();onOpenStarlink:{hardwarePopup.close();starlinkPopup.open()}onOpenNetworkDetails:{hardwarePopup.close();diagnostics.open()}}}}}
  Popup{id:starlinkPopup;objectName:"starlinkPopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(640,w.width-40);height:Math.min(460,w.height-48);background:Rectangle{color:"#f00d1725";border.color:"#2f4860";radius:14}onAboutToShow:starlinkContent.active=true;contentItem:Loader{id:starlinkContent;objectName:"starlinkContent";anchors.fill:parent;active:false;sourceComponent:Component{StarlinkPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:starlinkPopup.close()}}}}
  Popup{id:diagnostics;objectName:"diagnostics";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(860,w.width-40);height:Math.min(640,w.height-48);background:Rectangle{color:"#0d1725";border.color:green;radius:14}onAboutToShow:diagnosticsContent.active=true;contentItem:Loader{id:diagnosticsContent;objectName:"diagnosticsContent";anchors.fill:parent;active:false;sourceComponent:Component{DiagnosticsPanel{anchors.fill:parent;anchors.margins:16;onCloseRequested:diagnostics.close()}}}}
  Popup{id:firmwarePopup;objectName:"firmwarePopup";modal:true;anchors.centerIn:Overlay.overlay;width:Math.min(900,w.width-40);height:Math.min(700,w.height-48);onAboutToShow:firmwarePanelLoader.active=true;onOpened:if(firmwarePanelLoader.item)firmwarePanelLoader.item.activeDevice();background:Rectangle{color:"#0d1725";border.color:amber;radius:14}contentItem:Loader{id:firmwarePanelLoader;objectName:"firmwarePanelLoader";anchors.fill:parent;active:false;sourceComponent:Component{FirmwareCenter{anchors.fill:parent;anchors.margins:18;onCloseRequested:firmwarePopup.close()}}}}

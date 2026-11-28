@@ -8,6 +8,7 @@ Item {
  id: root
  signal closeRequested()
  signal openNetworkDetails()
+ signal openStarlink()
  property var video: ({})
  property var telemetry: ({})
  property color fg: "#f4f7fb"
@@ -132,6 +133,10 @@ Item {
   }
 
   Item { Layout.fillHeight: true }
-  Button { objectName: "hardwareNetworkDetails"; text: "Мережа ПК детально"; onClicked: root.openNetworkDetails() }
+  RowLayout {
+   spacing: 8
+   Button { objectName: "hardwareStarlink"; visible: root.kind === "starlink"; text: "Starlink"; onClicked: root.openStarlink() }
+   Button { objectName: "hardwareNetworkDetails"; text: "Мережа ПК детально"; onClicked: root.openNetworkDetails() }
+  }
  }
 }

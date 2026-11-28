@@ -314,6 +314,9 @@ def test_free_space_is_shown_for_a_missing_folder(make, monkeypatch):
     runtime = make()
     monkeypatch.setattr(dvr, "free_bytes", lambda path: 120 * 1024**3)
     assert runtime.freeSpaceText == "вільно 120 ГБ"
+    assert not runtime.lowSpace
+    monkeypatch.setattr(dvr, "free_bytes", lambda path: 3 * 1024**3)
+    assert runtime.lowSpace, "less than about half an hour of recording left"
 
 
 def test_shutdown_wait_is_bounded_with_a_running_qt_app(make):

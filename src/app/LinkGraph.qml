@@ -5,13 +5,15 @@ import QtQuick
 Item {
  id: root
  property var values: []
- property int slots: 60
+ // As many seconds as fit with bars at least 2 px wide; the newest are kept.
+ property int slots: Math.max(10, Math.min(60, Math.floor((width - 4) / 3)))
+ readonly property var shown: values.length > slots ? values.slice(values.length - slots) : values
  property color green: "#27d59a"
  property color amber: "#ffb84d"
  property color red: "#ff6678"
  readonly property real peak: {
   var top = 1
-  for (var i = 0; i < values.length; i++) top = Math.max(top, Number(values[i]))
+  for (var i = 0; i < shown.length; i++) top = Math.max(top, Number(shown[i]))
   return top
  }
  implicitWidth: 120
@@ -25,9 +27,9 @@ Item {
   Repeater {
    model: root.slots
    Item {
-    readonly property int offset: index - (root.slots - root.values.length)
-    readonly property real value: offset >= 0 ? Number(root.values[offset]) : -1
-    width: Math.max(1, (root.width - 4 - (root.slots - 1)) / root.slots)
+    readonly property int offset: index - (root.slots - root.shown.length)
+    readonly property real value: offset >= 0 ? Number(root.shown[offset]) : -1
+    width: Math.max(2, Math.floor((root.width - 4 - (root.slots - 1)) / root.slots))
     height: root.height - 4
     Rectangle {
      visible: value >= 0

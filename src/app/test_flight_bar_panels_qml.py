@@ -1,4 +1,4 @@
-"""Flight bar: link graph, Starlink button only on a Starlink connection, hardware and Starlink panels."""
+"""Flight bar: one link block, one flight-controller block, the rest in the menu; hardware and Starlink panels."""
 
 import os
 import subprocess
@@ -37,7 +37,7 @@ Connections = make('Connections', {'selected': 'QVariantMap', 'statuses': 'QVari
                    {'addressFor': ((str, str), str, lambda self, d, k: '2001:db8::10'),
                     'refresh': ((), None, lambda self: refreshed.append(1))})
 Link = make('Link', {'history': 'QVariantList', 'fps': int, 'lost': bool, 'lostSeconds': int})
-Dvr = make('Dvr', {'recording': bool, 'canStart': bool, 'elapsedText': str, 'freeSpaceText': str},
+Dvr = make('Dvr', {'recording': bool, 'canStart': bool, 'elapsedText': str, 'freeSpaceText': str, 'lowSpace': bool},
            {'toggle': ((), None, lambda self: None)})
 Ctl = make('Ctl', {'health': str, 'summary': str})
 Doctor = make('Doctor', {'details': 'QVariantMap', 'text': str, 'level': str})
@@ -54,7 +54,7 @@ props = dict(
                                    cameraFacts={'c1': {'summary': 'OpenIPC fpv', 'starlinkFromCamera': True}},
                                    types=types, zerotierText='', zerotierState='ok'),
     linkMonitor=Link(history=[30, 30, 0, 12, 30], fps=30, lost=False, lostSeconds=0),
-    dvrRuntime=Dvr(recording=False, canStart=True, elapsedText='', freeSpaceText='вільно 58 ГБ'),
+    dvrRuntime=Dvr(recording=False, canStart=True, elapsedText='', freeSpaceText='вільно 3,1 ГБ', lowSpace=False),
     controllerRuntime=Ctl(health='ready', summary='Пульт готовий'),
     station=Station(osdEnabled=True),
     linkDoctor=Doctor(details={'internet': False, 'hasStream': True, 'lossPct': 2.5, 'jitterMs': 4.2, 'kbps': 3200}, text='', level='ok'),
@@ -76,25 +76,38 @@ def child(item, name):
     assert found is not None, name
     return found
 
-bar = load('FlightBar.qml', linkKind='local', linkKindLabel='Локальна мережа', linkStatus=statuses['c1']['local'],
-           linkHistory=[30, 0, 30])
+bar = load('FlightBar.qml', linkKind='starlink', linkKindLabel='Starlink IPv6', linkStatus=statuses['c1']['starlink'],
+           linkHistory=[30, 0, 30], linkFps=30, video={'state': 'playing'},
+           telemetry={'connected': True, 'batteryVoltage': 16.42, 'freshness': {}})
+bar.setProperty('width', 1366)
 app.processEvents()
-assert not child(bar, 'flightBarStarlink').property('visible'), 'no Starlink button on a local connection'
-assert child(bar, 'flightBarHardware').property('visible')
-assert child(bar, 'flightBarGraph').property('visible')
+link = child(bar, 'flightBarLink')
+assert link.property('caption') == 'Зв’язок · Starlink IPv6' and link.property('value') == '58 мс · 30 к/с'
+assert child(bar, 'flightBarFc').property('value') == 'АКБ 16,4 В'
+for gone in ('flightBarPreflight', 'flightBarOsd', 'flightBarVideo', 'flightBarStarlink', 'flightBarHardware'):
+    assert bar.findChild(QObject, gone) is None, gone + ' moved to the menu'
+assert not child(bar, 'flightBarLowSpace').property('visible'), 'free space only when it runs low'
+props['dvrRuntime']._v['lowSpace'] = True
+props['dvrRuntime'].changed.emit()
+app.processEvents()
+assert child(bar, 'flightBarLowSpace').property('visible')
 opened = []
 bar.openHardware.connect(lambda: opened.append('hardware'))
-bar.openStarlink.connect(lambda: opened.append('starlink'))
-child(bar, 'flightBarHardware').clicked.emit()
-bar.setProperty('linkKind', 'starlink')
+link.clicked.emit()
+child(bar, 'flightBarFc').clicked.emit()
+assert opened == ['hardware', 'hardware'], opened
+bar.setProperty('linkLost', True)
+bar.setProperty('linkLostSeconds', 4)
 app.processEvents()
-assert child(bar, 'flightBarStarlink').property('visible'), 'Starlink button on a Starlink connection'
-child(bar, 'flightBarStarlink').clicked.emit()
-child(bar, 'flightBarGraph').clicked.emit()
-assert opened == ['hardware', 'starlink', 'starlink'], opened
+assert link.property('value') == 'немає відео 4 с'
+assert child(bar, 'flightMenuToggle').property('text') == '☰ Меню'
+bar.setProperty('width', 1000)
+app.processEvents()
+assert child(bar, 'flightMenuToggle').property('text') == '☰', 'narrow screen: icons only'
 bar.setProperty('simulation', True)
 app.processEvents()
-assert not child(bar, 'flightBarHardware').property('visible') and not child(bar, 'flightBarGraph').property('visible')
+assert link.property('value') == 'симуляція' and child(bar, 'flightBarFc').property('value') == 'Польотник: штучні дані'
+assert not child(bar, 'dvrToggle').property('visible')
 
 hw = load('HardwarePanel.qml', video={'streamId': 's1', 'state': 'playing', 'width': 1280, 'height': 720},
           telemetry={'connected': True, 'batteryVoltage': 16.4, 'satellites': 12})
