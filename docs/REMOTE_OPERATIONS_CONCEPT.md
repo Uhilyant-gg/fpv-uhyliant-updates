@@ -81,6 +81,10 @@ in plain words, and the station fixes what it can by itself.
    how fast, and on the flight screen also frames, dropouts and packet loss; then says "можна
    летіти" / "зверніть увагу" / "краще не летіти" with advice (e.g. the "Авто" preset).
 Order: 1+2+6, then 3, then 4+5 with telemetry forwarding, then 8+9, then 7 on real hardware.
+Picture after a dropout: majestic has no documented "send a keyframe now" request (its endpoints
+list and wiki name none; SIGUSR1 is reserved), so the station relies on short keyframe intervals in
+its presets (0.5 s up to 2 Mbit/s, 1 s above): the picture returns within ~0.5–1 s after the link.
+To try on a camera: whether an IDR request exists in the installed build.
 
 ## Video presets, streams and controls (agreed 2026-11-28)
 - Flight menu holds only what is needed in the air; every other setting lives in the home menu.
