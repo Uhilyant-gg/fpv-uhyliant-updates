@@ -146,6 +146,12 @@ Item {
    dot: linkDoctor.details.internet === true ? root.green : (linkDoctor.details.internet === false ? root.red : root.amber)
   }
   Row_ {
+   objectName: "hardwareCameraHealth"
+   title: "Стан камери"
+   value: cameraFeatures.healthText
+   dot: (cameraFeatures.features.health || {}).videoService === false ? root.red : (((cameraFeatures.features.health || {}).tempC || 0) >= 90 ? root.amber : ((cameraFeatures.features.health || {}).videoService ? root.green : root.grey))
+  }
+  Row_ {
    objectName: "hardwareUsbVideo"
    title: "USB-відео на камері"
    value: cameraFeatures.usbText

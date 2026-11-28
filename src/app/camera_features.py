@@ -37,7 +37,14 @@ READ_COMMANDS = {
     "audioEnabled": "cli -g .audio.enabled",
     "audioRate": "cli -g .audio.srate",
     "audioVolume": "cli -g .audio.volume",
+    # The camera's own health: chip temperature, CPU load, is the video service running.
+    "temp": "ipcinfo --temp",
+    "load": "cat /proc/loadavg",
+    "videoService": "pidof majestic",
 }
+
+TEMP_WARN_C = 90  # the SoC slows down or resets near 100 °C
+LOAD_WARN = 2.0  # on a one- or two-core camera chip
 
 # RTSP paths of majestic: the second stream, and the USB camera encoded by the camera.
 SECOND_PATH = "/stream=1"
@@ -95,8 +102,24 @@ def parse_features(answers: dict) -> dict:
     volume = _number(get("audioVolume"))
     # The FPV build of majestic has no sound at all; other builds answer the audio keys.
     audio_supported = variant != "fpv" and audio_enabled is not None
+    temp_code, temp_text = get("temp")
+    try:
+        temp = round(float(temp_text.strip().split()[0]), 1) if temp_code == 0 and temp_text.strip() else None
+    except ValueError:
+        temp = None
+    if temp is not None and not -40 <= temp <= 150:
+        temp = None
+    load_code, load_text = get("load")
+    try:
+        load = float(load_text.split()[0]) if load_code == 0 and load_text.strip() else None
+    except ValueError:
+        load = None
+    service_code, service_text = get("videoService")
+    # pidof answers 1 with no output when majestic is not running.
+    service = bool(service_text.strip()) if service_code in (0, 1) else None
     return {
         "variant": variant,
+        "health": {"tempC": temp, "load": load, "videoService": service},
         "second": _flag(get("video1")) is True,
         "usb": {
             "supported": usb_supported,
@@ -167,6 +190,33 @@ def usb_text(features: dict) -> str:
     return f"{name}: камера кодує, потік на бічній панелі"
 
 
+def health_text(features: dict) -> str:
+    """The camera's own state in a line (hardware panel)."""
+    health = (features or {}).get("health") or {}
+    if not health:
+        return "ще не перевірено"
+    parts = []
+    if health.get("videoService") is False:
+        parts.append("відеосервіс не працює")
+    elif health.get("videoService"):
+        parts.append("відеосервіс працює")
+    if health.get("tempC") is not None:
+        parts.append(f"чип {health['tempC']:g} °C".replace(".", ","))
+    if health.get("load") is not None:
+        parts.append(f"навантаження {health['load']:g}".replace(".", ","))
+    return " · ".join(parts) or "камера не повідомила свій стан"
+
+
+def health_warning(features: dict) -> str:
+    """A camera problem worth a banner while the video still plays, or empty."""
+    health = (features or {}).get("health") or {}
+    if (health.get("tempC") or 0) >= TEMP_WARN_C:
+        return f"Камера перегрівається: {health['tempC']:g} °C".replace(".", ",")
+    if (health.get("load") or 0) >= LOAD_WARN:
+        return "Камера перевантажена · можливі посмикування відео"
+    return ""
+
+
 def audio_text(features: dict) -> str:
     audio = features.get("audio") or {}
     if not features:
@@ -210,6 +260,7 @@ class CameraFeaturesRuntime(QObject):
         self._device = getattr(devices, "activeId", "") or ""
         self._message = ""
         self._usb_tried_at = -1e9
+        self._read_at = -1e9
         self._read.connect(self._apply)
         self._applied.connect(self._apply_done)
         self._timer = QTimer(self)
@@ -249,6 +300,21 @@ class CameraFeaturesRuntime(QObject):
     def micVolume(self):
         volume = (self._features.get("audio") or {}).get("volume")
         return volume if isinstance(volume, int) else -1
+
+    @Property(str, notify=changed)
+    def healthText(self):
+        return health_text(self._features)
+
+    def warning(self) -> str:
+        """For the link doctor: a camera problem while the video plays."""
+        return health_warning(self._features) if self._fresh() else ""
+
+    def video_service_down(self) -> bool:
+        """For the link doctor: the camera is up but its video service is not."""
+        return self._fresh() and ((self._features.get("health") or {}).get("videoService") is False)
+
+    def _fresh(self) -> bool:
+        return self._clock() - self._read_at <= 2.5 * self._timer.interval() / 1000
 
     @Property(str, notify=changed)
     def message(self):
@@ -332,6 +398,7 @@ class CameraFeaturesRuntime(QObject):
         if result is None or device != (getattr(self._devices, "activeId", "") or ""):
             return
         self._features = result
+        self._read_at = self._clock()
         sync = getattr(self._devices, "syncAutoStreams", None)
         if sync is not None:
             sync(device, streams_for(result), list(AUTO_PATHS))

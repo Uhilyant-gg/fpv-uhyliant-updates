@@ -173,3 +173,18 @@ class RuntimeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_camera_health_is_read_and_told():
+    features = cf.parse_features(
+        answers(temp=(0, "61.4\n"), load=(0, "0.42 0.30 0.25 1/50 123"), videoService=(0, "812"))
+    )
+    assert features["health"] == {"tempC": 61.4, "load": 0.42, "videoService": True}
+    assert cf.health_text(features) == "відеосервіс працює · чип 61,4 °C · навантаження 0,42"
+    assert cf.health_warning(features) == ""
+    hot = cf.parse_features(answers(temp=(0, "93"), videoService=(1, "")))
+    assert hot["health"]["videoService"] is False
+    assert cf.health_warning(hot) == "Камера перегрівається: 93 °C"
+    assert cf.health_text(hot).startswith("відеосервіс не працює")
+    unknown = cf.parse_features(answers(temp=(127, ""), load=(0, "garbage"), videoService=(127, "")))
+    assert unknown["health"] == {"tempC": None, "load": None, "videoService": None}

@@ -46,7 +46,7 @@ VP = make('VP', {'busy': bool}, {'stepBitrateMain': ((int,), bool, lambda self, 
 steps = []
 Doctor = make('Doctor', {'details': 'QVariantMap', 'text': str, 'level': str})
 mic = []
-Features = make('Features', {'features': 'QVariantMap', 'usbText': str, 'audioText': str, 'audioSupported': bool, 'micEnabled': bool,
+Features = make('Features', {'features': 'QVariantMap', 'usbText': str, 'healthText': str, 'audioText': str, 'audioSupported': bool, 'micEnabled': bool,
                              'micRate': int, 'micVolume': int, 'message': str},
                 {'setMicEnabled': ((bool,), None, lambda self, v: mic.append(('on', v))),
                  'setMicVolume': ((int,), None, lambda self, v: mic.append(('volume', v))),
@@ -74,7 +74,7 @@ props = dict(
     station=Station(osdEnabled=True),
     videoPresets=VP(busy=False),
     starlinkDish=Dish(available=True, status={'stateText': 'на зв’язку', 'latencyMs': 42, 'dropPct': 0.5, 'obstructedPct': 3.1, 'currentlyObstructed': False, 'downMbps': 85.3, 'upMbps': 12.4, 'alerts': ['антена перегріта, швидкість знижена']}, reason='', lastOutageCause='перешкода в небі (дерева, будівлі, корпус дрона)'),
-    cameraFeatures=Features(features={'usb': {'device': 'P2 Pro', 'enabled': True}}, usbText='P2 Pro: камера кодує, потік на бічній панелі',
+    cameraFeatures=Features(features={'usb': {'device': 'P2 Pro', 'enabled': True}, 'health': {'videoService': True, 'tempC': 61}}, healthText='відеосервіс працює · чип 61 °C · навантаження 0,4', usbText='P2 Pro: камера кодує, потік на бічній панелі',
                             audioText='мікрофон увімкнено · 8 кГц', audioSupported=True, micEnabled=True, micRate=8000, micVolume=60, message=''),
     cameraAudio=Audio(text='звук грає', playing=True, muted=False, volume=80),
     linkDoctor=Doctor(details={'internet': False, 'hasStream': True, 'lossPct': 2.5, 'jitterMs': 4.2, 'kbps': 3200, 'codec': 'H.265', 'keyframeS': 1.0}, text='', level='ok'),
@@ -177,6 +177,7 @@ props['connectionsRuntime']._v['statuses'] = {'c1': {'starlink': {'state': 'unco
 props['connectionsRuntime'].changed.emit()
 app.processEvents()
 assert child(sl, 'starlinkState').property('text') == 'Адресу камери в Starlink ще не отримано'
+assert 'відеосервіс працює · чип 61 °C · навантаження 0,4' in value_texts(hw)
 assert 'P2 Pro: камера кодує, потік на бічній панелі' in value_texts(hw) and 'звук грає' in value_texts(hw)
 
 audio = load('AudioPanel.qml')
