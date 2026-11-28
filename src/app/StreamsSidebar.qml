@@ -2,10 +2,13 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Left strip of the flight screen. At the top the main stream and the camera's sound, then the
-// camera's other streams (they appear here by themselves when the camera has them) and the map:
-// a click opens a window, another closes it (a closed stream is stopped, no bitrate). A dot in the
-// corner: green — the picture plays, amber — waiting for it. ⚙ under a tile opens its settings.
+// Left strip of the flight screen: one square tile per source, no captions. A tile shows what the
+// source is (an icon) and its number (1 is the main video; the same number is on its window).
+// The name, what a click does and the settings appear under the mouse.
+//   click — show in a window / close it (a closed stream is paused: no bitrate);
+//   ⚙ in the tile's corner (under the mouse) or the right button — this source's settings.
+// Dot in the corner: green — the picture plays, amber — waiting for it, none — paused.
+// The camera's streams come and go here by themselves.
 Rectangle {
  id: root
  signal openLayouts()
@@ -14,11 +17,10 @@ Rectangle {
  property color fg: "#f4f7fb"
  property color sub: "#b7c8da"
  property color green: "#27d59a"
- color: "#0b1420"
- border.color: "#22364b"
-
  property color amber: "#ffb84d"
- implicitWidth: 76
+ implicitWidth: 64
+ color: "#0b1420"
+ border.color: "#1a2a3c"
 
  // Green dot: the picture plays; amber: waiting for it; none: the stream is paused (no bitrate).
  function dotFor(stream, slot) {
@@ -28,135 +30,128 @@ Rectangle {
   var win = extraWindows.windows[slot] || {}
   return win.state === "playing" ? root.green : root.amber
  }
+ function iconFor(kind) {
+  return kind === "map" || kind === "thermal" || kind === "usb" || kind === "sound" ? kind : "main"
+ }
 
- component StreamTile: ColumnLayout {
+ component Tile: Button {
   id: tile
-  property var stream: ({})
+  property string iconKind: "main"
+  property int number: 0
   property bool on: false
-  property bool main: false
+  property bool muted: false
   property bool settings: true
-  property string iconKind: stream.kind === "secondary" ? "sub" : (stream.kind || "sub")
   property color dot: "transparent"
   property string hint: ""
-  property bool muted: false
-  signal toggled()
   signal settingsRequested()
-  Layout.fillWidth: true
-  spacing: 1
-  Button {
-   objectName: tile.main ? "sideMain" : (tile.iconKind === "sound" ? "sideSound" : "sideStream")
-   Layout.fillWidth: true
-   Layout.preferredHeight: 54
-   padding: 2
-   enabled: tile.main || tile.on || tile.iconKind === "sound" || extraWindows.openCount < 3
-   opacity: enabled ? 1 : 0.45
-   background: Rectangle {
-    radius: 9
-    color: tile.on ? "#173528" : (parent.hovered ? "#1d3047" : "#111e2e")
-    border.color: tile.on ? root.green : (parent.hovered ? "#4f6c88" : "#22364b")
-    border.width: tile.on ? 1.5 : 1
-    Rectangle { // state dot
-     visible: tile.dot.a > 0
-     anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 5
-     width: 7; height: 7; radius: 4
-     color: tile.dot
-    }
-   }
-   contentItem: Column {
-    spacing: 2
-    topPadding: 4
-    SidebarIcon {
-     anchors.horizontalCenter: parent.horizontalCenter
-     width: 24; height: 24
-     kind: tile.iconKind
-     muted: tile.muted
-     color: tile.on ? root.green : root.fg
-    }
-    Text {
-     width: parent.width
-     horizontalAlignment: Text.AlignHCenter
-     text: tile.stream.name || ""
-     color: tile.on ? root.fg : root.sub
-     font.pixelSize: 10
-     wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
-     lineHeight: 0.9
-    }
-   }
-   onClicked: tile.toggled()
-   HoverHint { text: tile.hint }
+  Layout.alignment: Qt.AlignHCenter
+  implicitWidth: 50
+  implicitHeight: 50
+  padding: 0
+  hoverEnabled: true
+  opacity: enabled ? 1 : 0.4
+  background: Rectangle {
+   radius: 12
+   color: tile.on ? "#123627" : (tile.hovered ? "#192a3d" : "#0f1a28")
+   border.color: tile.on ? root.green : (tile.hovered ? "#3f5c79" : "#1e3045")
+   border.width: tile.on ? 1.5 : 1
   }
-  Button {
-   objectName: "sideSettings"
-   visible: tile.settings
-   Layout.alignment: Qt.AlignHCenter
-   Layout.preferredWidth: 40
-   Layout.preferredHeight: 16
-   padding: 0
-   text: "⚙"
-   font.pixelSize: 11
-   contentItem: Text { text: parent.text; font: parent.font; color: parent.hovered ? root.fg : "#7f96ad"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-   background: Rectangle { radius: 5; color: parent.hovered ? "#22364b" : "transparent" }
-   onClicked: tile.settingsRequested()
-   HoverHint { text: "Налаштування: " + (tile.stream.name || "потік") }
+  contentItem: Item {
+   SidebarIcon {
+    anchors.centerIn: parent
+    width: 26; height: 26
+    kind: tile.iconKind
+    muted: tile.muted
+    color: tile.on ? root.green : (tile.hovered ? root.fg : root.sub)
+   }
+   Rectangle { // the source's number, the same as on its window
+    visible: tile.number > 0
+    anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 3
+    width: 15; height: 15; radius: 5
+    color: tile.on ? root.green : "#22364b"
+    Text { anchors.centerIn: parent; text: tile.number; color: tile.on ? "#06130d" : root.fg; font.pixelSize: 10; font.bold: true }
+   }
+   Rectangle { // state dot
+    visible: tile.dot.a > 0
+    anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 4
+    width: 8; height: 8; radius: 4
+    color: tile.dot
+    border.color: "#0b1420"; border.width: 1
+   }
+   Button { // settings, only under the mouse
+    objectName: "sideSettings"
+    visible: tile.settings && (tile.hovered || hovered)
+    anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 2
+    width: 18; height: 18; padding: 0
+    hoverEnabled: true
+    background: Rectangle { radius: 9; color: parent.hovered ? "#3f5c79" : "#e0192a3d"; border.color: "#3f5c79" }
+    contentItem: Text { text: "⚙"; color: root.fg; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+    onClicked: tile.settingsRequested()
+   }
+   TapHandler { acceptedButtons: Qt.RightButton; onTapped: if (tile.settings) tile.settingsRequested() }
   }
+  HoverHint { text: tile.hint; delay: 500 }
  }
 
  Flickable {
   anchors.fill: parent
-  anchors.margins: 6
-  anchors.bottomMargin: 58
+  anchors.topMargin: 7
+  anchors.bottomMargin: 64
   contentHeight: list.implicitHeight
   clip: true
   ColumnLayout {
    id: list
    width: parent.width
-   spacing: 6
-   StreamTile {
-    main: true
+   spacing: 7
+   Tile {
+    objectName: "sideMain"
     on: true
-    dot: root.dotFor(stream, 0)
-    stream: ({ id: streamWorkspace.state.primaryId || "", name: extraWindows.mainName || "Основне", kind: "main", channel: 0 })
-    hint: "Основне відео: завжди на екрані. ⚙ — пресети якості."
+    number: 1
+    dot: root.dotFor({ kind: "main" }, 0)
+    readonly property var stream: ({ id: streamWorkspace.state.primaryId || "", name: extraWindows.mainName || "Основне відео", kind: "main", channel: 0 })
+    hint: "1 · " + stream.name + " — на великому екрані. ⚙ — пресети якості."
     onSettingsRequested: root.openStreamSettings(stream)
    }
-   StreamTile {
-    objectName: "sideSoundTile"
+   Tile {
+    objectName: "sideSound"
     visible: cameraFeatures.audioSupported
     iconKind: "sound"
     on: cameraFeatures.micEnabled && !cameraAudio.muted
     muted: cameraAudio.muted || !cameraFeatures.micEnabled
     dot: cameraAudio.playing ? root.green : (on ? root.amber : "transparent")
-    stream: ({ name: "Звук" })
-    hint: (cameraFeatures.micEnabled ? (cameraAudio.muted ? "Увімкнути звук (M)" : "Вимкнути звук (M)") : "Мікрофон камери вимкнено: ⚙, щоб увімкнути") + " · " + cameraAudio.text
-    onToggled: cameraFeatures.micEnabled ? cameraAudio.toggleMute() : root.openAudio()
+    hint: "Звук з камери: " + cameraAudio.text + ". " + (cameraFeatures.micEnabled ? (cameraAudio.muted ? "Клік — увімкнути (M)." : "Клік — вимкнути (M).") : "⚙ — увімкнути мікрофон.")
+    onClicked: cameraFeatures.micEnabled ? cameraAudio.toggleMute() : root.openAudio()
     onSettingsRequested: root.openAudio()
    }
-   Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#22364b" }
+   Rectangle { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 34; Layout.preferredHeight: 1; color: "#22364b" }
    Repeater {
     model: extraWindows.sources
-    delegate: StreamTile {
+    delegate: Tile {
      required property var modelData
-     stream: modelData
+     objectName: "sideStream"
+     iconKind: root.iconFor(modelData.kind)
+     number: modelData.number || 0
      on: modelData.slot >= 0
+     enabled: on || extraWindows.openCount < 3
      dot: root.dotFor(modelData, modelData.slot)
      settings: modelData.kind !== "map"
-     hint: (modelData.slot >= 0 ? "Закрити: " : "Показати у вікні: ") + (modelData.name || "") + (modelData.slot >= 0 && modelData.kind !== "map" ? ". Потік стане на паузу і не витрачатиме бітрейт." : "")
-     onToggled: modelData.slot >= 0 ? extraWindows.close(modelData.slot) : extraWindows.open(modelData.id)
+     hint: (modelData.number ? modelData.number + " · " : "") + (modelData.name || "") + " — "
+           + (modelData.slot >= 0 ? "клік закриває" + (modelData.kind !== "map" ? ", потік стане на паузу." : ".")
+                                  : (enabled ? "клік показує у вікні." : "вже відкрито три вікна."))
+     onClicked: modelData.slot >= 0 ? extraWindows.close(modelData.slot) : extraWindows.open(modelData.id)
      onSettingsRequested: root.openStreamSettings(modelData)
     }
    }
   }
  }
 
- Button {
+ Tile {
   objectName: "sideLayouts"
-  anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-  anchors.margins: 6
-  height: 44
-  padding: 8
-  background: Rectangle { radius: 8; color: parent.hovered ? "#22364b" : "#132235"; border.color: "#2f4860" }
-  contentItem: SidebarIcon { kind: "layouts"; color: root.fg }
+  anchors.horizontalCenter: parent.horizontalCenter
+  anchors.bottom: parent.bottom; anchors.bottomMargin: 8
+  iconKind: "layouts"
+  settings: false
+  hint: "Розташування вікон: зберегти поточне, відкрити збережене, як минулого разу"
   onClicked: root.openLayouts()
-  HoverHint { text: "Розташування вікон: зберегти поточне, відкрити збережене, як минулого разу" }
  }
 }

@@ -1,7 +1,7 @@
 import QtQuick
 
 // Small line icons of the side panel, drawn so they stay sharp at any size and in any color:
-// main camera, second stream, USB camera, thermal camera, map, sound, layouts.
+// camera, USB camera, thermal camera, map, sound, layouts.
 Canvas {
  id: icon
  property string kind: "main"
@@ -15,10 +15,10 @@ Canvas {
  onWidthChanged: requestPaint()
  onHeightChanged: requestPaint()
 
- function camera(ctx, s, small) {
-  // A camera body with a lens; "small" leaves room for a badge.
-  var w = small ? 0.62 : 0.72, h = small ? 0.44 : 0.5
-  var x = 0.5 - w / 2 - (small ? 0.08 : 0.05), y = 0.5 - h / 2 + 0.04
+ function camera(ctx, s) {
+  // A camera body with a lens.
+  var w = 0.66, h = 0.5
+  var x = 0.5 - w / 2 - 0.07, y = 0.5 - h / 2
   ctx.beginPath(); ctx.roundedRect(x * s, y * s, w * s, h * s, 0.08 * s, 0.08 * s); ctx.stroke()
   ctx.beginPath(); ctx.arc((x + w / 2) * s, (y + h / 2) * s, h * 0.3 * s, 0, Math.PI * 2); ctx.stroke()
   ctx.beginPath(); ctx.moveTo((x + w) * s, (y + h * 0.35) * s); ctx.lineTo((x + w + 0.14) * s, (y + h * 0.15) * s)
@@ -35,12 +35,7 @@ Canvas {
   ctx.lineWidth = Math.max(1.5, s * 0.075)
   ctx.lineCap = "round"; ctx.lineJoin = "round"
   if (kind === "main") {
-   camera(ctx, s, false)
-   ctx.beginPath(); ctx.arc(0.39 * s, 0.54 * s, 0.05 * s, 0, Math.PI * 2); ctx.fill()
-  } else if (kind === "sub") {
-   camera(ctx, s, true)
-   ctx.font = "bold " + Math.round(s * 0.3) + "px sans-serif"
-   ctx.fillText("2", 0.74 * s, 0.3 * s)
+   camera(ctx, s)
   } else if (kind === "usb") {
    // The USB trident.
    ctx.beginPath(); ctx.moveTo(0.5 * s, 0.1 * s); ctx.lineTo(0.5 * s, 0.84 * s); ctx.stroke()
