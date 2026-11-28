@@ -35,6 +35,7 @@ class Tests(unittest.TestCase):
         self.assertTrue(d.restoreSnapshot(snap))
         self.assertEqual(d.count, 1)
         self.assertEqual(d.activeName, 'Camera')
+        self.assertEqual(d.activeId, did)
         self.assertEqual(events, ['added', 'removed', 'restored'])
 
     def test_invalid_snapshot_leaves_live_state_unchanged(self):

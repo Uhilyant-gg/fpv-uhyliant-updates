@@ -1,6 +1,6 @@
 from PySide6.QtCore import QObject, Signal
 
-from link_monitor import LOST_AFTER_S, RETRY_EVERY_S, STARTUP_GRACE_S, LinkMonitor
+from link_monitor import HISTORY_SECONDS, LOST_AFTER_S, RETRY_EVERY_S, STARTUP_GRACE_S, LinkMonitor
 
 
 class Clock:
@@ -142,3 +142,23 @@ def test_an_empty_frame_from_reopening_the_player_is_not_video():
     assert monitor.lost, "the player was only re-opened, video is not back yet"
     sink.videoFrameChanged.emit(Frame(True))
     assert not monitor.lost and monitor.justRestored
+
+
+def test_frames_per_second_history_for_the_link_graph():
+    monitor, sink, clock = make()
+    monitor.setActive(True)
+    assert monitor.history == [] and monitor.fps == 0
+    for second in range(3):
+        for _ in range(30 if second != 1 else 5):
+            sink.videoFrameChanged.emit(Frame(True))
+        sink.videoFrameChanged.emit(Frame(False))  # empty frames are not counted
+        clock.now += 1.0
+        monitor.evaluate()
+    assert monitor.history == [30, 5, 30]
+    assert monitor.fps == 30
+    for _ in range(HISTORY_SECONDS + 5):
+        clock.now += 1.0
+        monitor.evaluate()
+    assert len(monitor.history) == HISTORY_SECONDS and monitor.history[-1] == 0
+    monitor.setActive(False)
+    assert monitor.history == []

@@ -193,6 +193,10 @@ class Devices(QObject):
         return len(self._items)
 
     @Property(str, notify=changed)
+    def activeId(self):
+        return self._active if any(x['id'] == self._active for x in self._items) else ''
+
+    @Property(str, notify=changed)
     def activeName(self):
         return next((x['name'] for x in self._items if x['id'] == self._active), '')
 

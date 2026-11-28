@@ -9,6 +9,8 @@ Rectangle {
  signal openVehicle()
  signal openStreams()
  signal openDiagnostics()
+ signal openHardware()
+ signal openStarlink()
  signal openPreflight()
  signal openMenu()
  signal leaveFlight()
@@ -20,6 +22,11 @@ Rectangle {
  property string presetName: ""
  property bool pipEnabled: false
  property bool pipAvailable: false
+ // The selected connection of the camera in flight: "local", "static", "cloud" or "starlink".
+ property string linkKind: ""
+ property string linkKindLabel: ""
+ property var linkStatus: ({})
+ property var linkHistory: []
  property color fg: "#f4f7fb"
  property color sub: "#b7c8da"
  property color green: "#27d59a"
@@ -110,7 +117,42 @@ Rectangle {
    onClicked: root.openDiagnostics()
   }
 
+  Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 30; color: "#22364b"; visible: linkGraph.visible }
+  Button {
+   id: linkGraph
+   objectName: "flightBarGraph"
+   visible: !root.simulation
+   flat: true
+   Layout.preferredHeight: 42
+   background: Rectangle { radius: 7; color: linkGraph.hovered ? "#1a2b3e" : "transparent"; border.color: linkGraph.hovered ? "#2f4860" : "transparent" }
+   onClicked: root.linkKind === "starlink" ? root.openStarlink() : root.openHardware()
+   contentItem: ColumnLayout {
+    spacing: 2
+    Text {
+     text: "Канал" + (root.linkKindLabel ? " · " + root.linkKindLabel : "") + (root.linkStatus.state === "available" && root.linkStatus.latencyMs !== null && root.linkStatus.latencyMs !== undefined ? " · " + root.linkStatus.latencyMs + " мс" : "")
+     color: root.sub; font.pixelSize: 11
+    }
+    LinkGraph { Layout.preferredWidth: 124; Layout.preferredHeight: 20; values: root.linkHistory }
+   }
+   HoverHint { text: "Відео за останню хвилину: стовпчик — кадри за секунду, червоний — секунда без відео." }
+  }
+
   Item { Layout.fillWidth: true }
+
+  BarButton {
+   objectName: "flightBarStarlink"
+   visible: !root.simulation && root.linkKind === "starlink"
+   text: "Starlink"
+   onClicked: root.openStarlink()
+   HoverHint { text: "Стан Starlink на дроні: зв’язок, затримка, адреса камери." }
+  }
+  BarButton {
+   objectName: "flightBarHardware"
+   visible: !root.simulation
+   text: "Обладнання"
+   onClicked: root.openHardware()
+   HoverHint { text: "Стан камери, каналу, польотника, пульта і запису." }
+  }
 
   BarButton {
    objectName: "dvrToggle"
