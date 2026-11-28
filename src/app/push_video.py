@@ -32,20 +32,29 @@ WAN_SERVICES = (
 )
 
 
-def sdp_text(port: int, codec: str = "h265") -> str:
-    payload, name = CODECS.get(codec, CODECS["h265"])
+def sdp_text(port: int, codec: str = "h265", payload: int | None = None) -> str:
+    default_payload, name = CODECS.get(codec, CODECS["h265"])
+    payload = payload if isinstance(payload, int) and 96 <= payload <= 127 else default_payload
     return (
         "v=0\r\no=- 0 0 IN IP4 0.0.0.0\r\ns=FPV Uhyliant\r\nc=IN IP4 0.0.0.0\r\nt=0 0\r\n"
         f"m=video {int(port)} RTP/AVP {payload}\r\na=rtpmap:{payload} {name}/90000\r\n"
     )
 
 
-def write_sdp(folder: Path, device_id: str, port: int, codec: str = "h265") -> Path:
+def write_sdp(folder: Path, device_id: str, port: int, codec: str = "h265", payload: int | None = None) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     safe = re.sub(r"[^A-Za-z0-9_-]", "_", device_id) or "camera"
     path = folder / f"push-{safe}.sdp"
-    path.write_text(sdp_text(port, codec), encoding="ascii")
+    path.write_text(sdp_text(port, codec, payload), encoding="ascii")
     return path
+
+
+def rtp_payload_type(packet: bytes) -> int | None:
+    """Dynamic RTP payload type (96-127) of a packet, or None if it is not RTP version 2."""
+    if len(packet) < 12 or packet[0] >> 6 != 2:
+        return None
+    payload = packet[1] & 0x7F
+    return payload if 96 <= payload <= 127 else None
 
 
 def is_public_ipv4(value: str) -> bool:

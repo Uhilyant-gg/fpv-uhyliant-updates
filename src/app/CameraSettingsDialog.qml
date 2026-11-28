@@ -110,6 +110,28 @@ Popup {
    Layout.fillWidth: true
    font.pixelSize: 12
   }
+  readonly property var setup: connectionsRuntime.cameraSetup[root.deviceId] || ({})
+  Text {
+   objectName: "cameraSetupMessage"
+   visible: text !== ""
+   text: parent.setup.message || ""
+   color: ({configured: "#3ddc97", already: "#3ddc97", working: root.sub})[parent.setup.state] || "#ffbf4a"
+   wrapMode: Text.WordWrap
+   Layout.fillWidth: true
+   font.pixelSize: 12
+  }
+  RowLayout {
+   visible: parent.setup.state === "no-access"
+   Layout.fillWidth: true
+   spacing: 8
+   TextField { id: cameraPassword; objectName: "cameraPasswordField"; Layout.fillWidth: true; echoMode: TextInput.Password; placeholderText: "Пароль камери" }
+   Button {
+    objectName: "cameraPasswordApply"
+    text: "Спробувати"
+    enabled: cameraPassword.text !== ""
+    onClicked: { cameraCredentials.password = cameraPassword.text; cameraPassword.text = ""; connectionsRuntime.retryCameraSetup(root.deviceId) }
+   }
+  }
   Text {
    // statuses is read so the text refreshes when the runtime changes (a port is assigned on binding)
    readonly property int port: connectionsRuntime.statuses && root.deviceId ? connectionsRuntime.pushPortFor(root.deviceId) : 0

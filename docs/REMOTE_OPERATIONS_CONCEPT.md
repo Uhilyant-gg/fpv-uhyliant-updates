@@ -31,7 +31,13 @@ This records decisions agreed with the product owner, so later work builds on th
   while flying; "Bind to this network" finds the public address, detects a grey (CGNAT) address and
   forwards the port on the router via UPnP (or says which port to forward manually); the player opens
   the stream through a local SDP file (RTP payload type 97 for H.265, 96 for H.264).
-  *Next:* write the address, port and payload type into the camera over SSH.
+  *Done (camera):* as soon as the camera answers on the station's local network and the address is known,
+  the station configures the camera itself over SSH (majestic `outgoing.server`/`outgoing.enabled`, reload),
+  reads its codec, remembers that it is configured and re-applies it when the address or port changes.
+  Login tries the session password, then the OpenIPC factory password, and asks only if both fail.
+  The camera's SSH host key is remembered on first use; a different key later is refused. The RTP payload
+  type is learnt from the packets that arrive. Tapping "Static IP" on a card without an address binds
+  the network automatically.
 - Cloud = **ZeroTier** (ready-made service instead of an own server). One ZeroTier network per camera:
   sharing = authorizing a PC in that network, revoking = deauthorizing it, archive = deauthorizing
   the camera. Addresses never need syncing: a camera's address follows from the network and node IDs

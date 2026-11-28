@@ -98,6 +98,11 @@ class ConnectionStore:
                 clean["pushPort"] = port
             if addresses.get("pushCodec") in ("h264", "h265"):
                 clean["pushCodec"] = addresses["pushCodec"]
+            payload = addresses.get("pushPayload")
+            if isinstance(payload, int) and not isinstance(payload, bool) and 96 <= payload <= 127:
+                clean["pushPayload"] = payload
+            if isinstance(addresses.get("pushConfigured"), str) and addresses["pushConfigured"].startswith("udp://"):
+                clean["pushConfigured"] = addresses["pushConfigured"]
             try:
                 from zerotier_local import validate_network_id, validate_node_id
 

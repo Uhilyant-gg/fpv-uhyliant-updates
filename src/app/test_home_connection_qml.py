@@ -41,6 +41,8 @@ def init(self, *args, **kwargs):
     kwargs['prober'] = lambda host, port: reachable.get(host)
     kwargs['run_async'] = False
     kwargs['zerotier'] = FakeZeroTier()
+    kwargs['listen'] = False
+    kwargs['binder'] = lambda port: {'state': 'grey', 'message': 'сіра адреса'}
     original_init(self, *args, **kwargs)
     runtimes.append(self)
 connections_runtime.ConnectionsRuntime.__init__ = init
@@ -80,6 +82,12 @@ def single_shot(delay, callback):
         app.processEvents()
         fly = one(window, 'cameraFly')
         assert not fly.property('enabled'), 'no connection chosen yet'
+        one(window, 'connection-static').clicked.emit()
+        app.processEvents()
+        assert not window.findChild(QObject, 'cameraSettingsDialog').property('visible'), 'no form: the station binds by itself'
+        assert runtime.bindStatus['state'] == 'grey'
+        assert runtime.statuses['c1']['static']['label'] == 'сіра адреса'
+
         cloud = one(window, 'connection-cloud')
         assert cloud.property('enabled')
         assert runtime.statuses['c1']['cloud']['label'] == 'вказати мережу'
@@ -128,7 +136,7 @@ def single_shot(delay, callback):
         app.processEvents()
         assert not dialog.property('visible')
         assert json.loads((root / 'FPV-Uhyliant' / 'connections.json').read_text()) == {
-            'c1': {'starlink': '2001:db8::10', 'ztNetwork': '8056c2e21c000001', 'ztNode': '89e92ceee5'}}
+            'c1': {'starlink': '2001:db8::10', 'ztNetwork': '8056c2e21c000001', 'ztNode': '89e92ceee5', 'pushPort': 5600}}
         names = [d['name'] for d in runtime._devices.items]
         assert names == ['Квадрик 7'], names
         assert runtime.statuses['c1']['starlink']['state'] == 'available'

@@ -369,3 +369,98 @@ def test_bind_on_a_grey_network_keeps_the_address_empty(push_runtime):
     rt.bindThisNetwork("c1")
     assert rt.bindStatus["state"] == "grey"
     assert rt.addressFor("c1", "static") == ""
+
+
+@pytest.fixture
+def setup_runtime(tmp_path):
+    clock = Clock()
+    calls = []
+    prober = Prober()
+
+    def camera_setup(host, address, port):
+        calls.append((host, address, port))
+        return rt.result
+
+    rt = ConnectionsRuntime(
+        FakeDevices(),
+        cp.ConnectionStore(tmp_path / "c.json"),
+        prober=prober,
+        run_async=False,
+        listen=False,
+        sdp_folder=tmp_path / "sdp",
+        clock=clock,
+        camera_setup=camera_setup,
+    )
+    rt.clock, rt.calls, rt.store_path, rt.prober = clock, calls, tmp_path / "c.json", prober
+    rt.result = {"state": "configured", "message": "ok", "codec": "h264"}
+    return rt
+
+
+def test_camera_is_configured_automatically_when_on_the_local_network(setup_runtime):
+    rt = setup_runtime
+    rt.refresh()  # the camera answers on the local network
+    rt.setAddress("c1", "static", "93.170.12.5")
+    assert rt.calls == [("192.168.1.10", "93.170.12.5", 5600)]
+    assert rt.cameraSetup["c1"]["state"] == "configured"
+    saved = cp.ConnectionStore(rt.store_path).load()["c1"]
+    assert saved["pushConfigured"] == "udp://93.170.12.5:5600" and saved["pushCodec"] == "h264"
+    rt.refresh()
+    assert len(rt.calls) == 1, "a configured camera is not configured again"
+
+
+def test_camera_setup_waits_for_the_local_network_and_not_while_flying(setup_runtime):
+    rt = setup_runtime
+    rt.prober.reachable = {}
+    rt.setAddress("c1", "static", "93.170.12.5")
+    rt.refresh()
+    assert rt.calls == [], "camera not on the local network"
+    rt.prober.reachable = {"192.168.1.10": 4}
+    rt.pauseListening()
+    rt.refresh()
+    assert rt.calls == [], "never while flying"
+    rt.resumeListening()
+    rt.refresh()
+    assert len(rt.calls) == 1
+
+
+def test_failed_setup_is_retried_later_and_shown_on_the_card(setup_runtime):
+    rt = setup_runtime
+    rt.refresh()
+    rt.result = {"state": "no-access", "message": "пароль"}
+    rt.setAddress("c1", "static", "93.170.12.5")
+    assert rt.statuses["c1"]["static"]["label"] == "потрібен пароль камери"
+    rt.refresh()
+    assert len(rt.calls) == 1, "no immediate retry"
+    rt.clock.now += 61
+    rt.result = {"state": "configured", "message": "ok", "codec": "h265"}
+    rt.refresh()
+    assert len(rt.calls) == 2 and rt.cameraSetup["c1"]["state"] == "configured"
+    assert rt.statuses["c1"]["static"]["label"] == "чекає камеру"
+
+
+def test_retry_runs_at_once_after_a_new_password(setup_runtime):
+    rt = setup_runtime
+    rt.refresh()
+    rt.result = {"state": "no-access", "message": "пароль"}
+    rt.setAddress("c1", "static", "93.170.12.5")
+    rt.result = {"state": "configured", "message": "ok", "codec": "h265"}
+    rt.retryCameraSetup("c1")
+    assert len(rt.calls) == 2 and rt.cameraSetup["c1"]["state"] == "configured"
+
+
+def test_payload_type_is_learnt_from_packets(setup_runtime, tmp_path):
+    rt = setup_runtime
+    rt.setAddress("c1", "static", "93.170.12.5")
+    rt.select("c1", "static")
+    rt._note_packet(5600, payload=96)
+    assert cp.ConnectionStore(rt.store_path).load()["c1"]["pushPayload"] == 96
+    rt.push_url_for({"id": "c1"})
+    assert "m=video 5600 RTP/AVP 96" in (tmp_path / "sdp" / "push-c1.sdp").read_text()
+
+
+def test_grey_address_is_shown_on_the_card(setup_runtime):
+    rt = setup_runtime
+    rt._binder = lambda port: {"state": "grey", "message": "сіра"}
+    rt.setAddress("c1", "static", "93.170.12.5")
+    rt.bindThisNetwork("c1")
+    assert rt.statuses["c1"]["static"]["label"] == "сіра адреса"

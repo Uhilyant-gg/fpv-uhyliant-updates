@@ -12,6 +12,12 @@ Prefer one contextually useful Next Best Action over exposing a subsystem toolba
 
 Apply the automation budget to every new prompt or control: if trustworthy observed evidence can determine a value or decision safely and unambiguously, automate it instead of asking the operator. Never automate by guessing unknown identity, telemetry, compatibility or success.
 
+Maximum-automation checklist (owner directive, applies to every change):
+1. Can the station find this value itself (discovery, the camera, the router, the OS, a service it already talks to)? Then it must, and the field is only a fallback.
+2. Can the station apply the setting itself (over SSH, a local API, UPnP)? Then it does so as soon as it is safe, without a separate "apply" step, and re-checks it later.
+3. When it cannot, it says exactly what is missing and what the person should do, in human language.
+4. Automatic actions are visible (status/result), safe to repeat, and never guess identity, success or consent.
+
 Manual IP and manual controller transport/port configuration are fallbacks to automatic discovery/detection. Advanced contains additional controls for otherwise normal operation. Service Mode contains recovery, manual firmware, fullflash, low-level/developer diagnostics and Hardware E2E validation.
 
 Normal firmware UX exposes the practical device/update decision while catalog, integrity, binding, reboot rediscovery and verification stay internal unless intervention is required. Diagnostics presents the practical problem before technical evidence and offers Fix only for known deterministic non-destructive remediation.

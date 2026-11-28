@@ -107,3 +107,12 @@ def test_public_ip_https_rejects_non_public_answers():
         raise OSError("offline")
 
     assert pv.public_ip_https(broken) == ""
+
+
+def test_rtp_payload_type_is_read_from_the_header():
+    assert pv.rtp_payload_type(bytes([0x80, 0x61]) + bytes(10)) == 97
+    assert pv.rtp_payload_type(bytes([0x80, 0xE0]) + bytes(10)) == 96, "marker bit is ignored"
+    assert pv.rtp_payload_type(bytes([0x40, 0x61]) + bytes(10)) is None, "not RTP v2"
+    assert pv.rtp_payload_type(b"\x80\x61") is None, "too short"
+    assert pv.rtp_payload_type(bytes([0x80, 0x21]) + bytes(10)) is None, "static payload types are not video here"
+    assert "RTP/AVP 100" in pv.sdp_text(5600, "h265", 100)

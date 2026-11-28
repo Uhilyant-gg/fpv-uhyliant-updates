@@ -140,6 +140,7 @@ def main():
     from connection_profiles import ConnectionStore
     from connections_runtime import ConnectionsRuntime
     from zerotier_local import ZeroTierLocal
+    import camera_setup
     from settings_presets import PresetStore
 
     harness.mark('application-imports-complete')
@@ -256,9 +257,21 @@ def main():
     presets = PresetsRuntime(preset_store, s)
     backup.restored.connect(presets.reload)
     dvr_runtime = DvrRuntime()
+
+    def configure_camera(host, address, port):
+        session = [(credentials.username or 'root', credentials.secret())]
+        return camera_setup.configure_push(
+            host,
+            address,
+            port,
+            session + list(camera_setup.DEFAULT_CREDENTIALS),
+            lambda h, u, p: camera_setup.CameraShell(h, u, p, DATA / 'camera_known_hosts'),
+        )
+
     connections = ConnectionsRuntime(
         d,
         ConnectionStore(DATA / 'connections.json'),
+        camera_setup=configure_camera,
         zerotier=ZeroTierLocal(),
         listen=not x.first_run_acceptance_smoke,
         sdp_folder=DATA / 'push-video',

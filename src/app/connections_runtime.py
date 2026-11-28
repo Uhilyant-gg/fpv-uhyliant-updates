@@ -19,6 +19,13 @@ import push_video as pv
 import zerotier_local as zt
 
 PUSH_FRESH_S = 3.0
+SETUP_RETRY_S = 60.0
+SETUP_LABELS = {
+    "no-access": "потрібен пароль камери",
+    "unsafe": "ключ камери змінився",
+    "failed": "камера не налаштувалась",
+}
+BIND_LABELS = {"grey": "сіра адреса", "no-internet": "немає інтернету"}
 
 PROBE_INTERVAL_MS = 5000
 PROBE_TIMEOUT_S = 1.5
@@ -40,6 +47,7 @@ class ConnectionsRuntime(QObject):
     _probed = Signal(str, str, str, object)  # device id, type, host, latency ms or None
     _ztSnapshot = Signal(object)
     _bound = Signal(str, object)
+    _setupDone = Signal(str, object)
 
     def __init__(
         self,
@@ -53,8 +61,13 @@ class ConnectionsRuntime(QObject):
         sdp_folder=None,
         binder=None,
         clock=time.monotonic,
+        camera_setup=None,
     ):
         super().__init__()
+        self._camera_setup = camera_setup
+        self._setup: dict[str, dict] = {}
+        self._setup_busy: set[str] = set()
+        self._setupDone.connect(self._apply_setup)
         self._listen = listen
         self._listening_paused = False
         self._sockets: dict[int, object] = {}
@@ -108,6 +121,15 @@ class ConnectionsRuntime(QObject):
         return self._zt.get("nodeId", "")
 
     @Property("QVariantMap", notify=changed)
+    def cameraSetup(self):
+        return {k: dict(v) for k, v in self._setup.items()}
+
+    @Slot(str)
+    def retryCameraSetup(self, device_id):
+        self._setup.pop(device_id, None)
+        self._auto_setup(device_id)
+
+    @Property("QVariantMap", notify=changed)
     def bindStatus(self):
         return dict(self._bind_status)
 
@@ -151,7 +173,7 @@ class ConnectionsRuntime(QObject):
             return
         port = self._ensure_push_port(device_id)
         self._bind_status = {"deviceId": device_id, "busy": True, "state": "", "message": "Перевіряю мережу…"}
-        self.changed.emit()
+        self._update_push_statuses()
         binder = self._binder or (lambda p: pv.bind_this_network(p, pv.Upnp(), pv.public_ip_https, pv.lan_address))
 
         def work():
@@ -200,6 +222,8 @@ class ConnectionsRuntime(QObject):
         self._rebuild()
         if kind != "static":
             self._probe(device_id, kind)
+        else:
+            self._auto_setup(device_id)
         return True
 
     @Slot(str, result=str)
@@ -255,6 +279,8 @@ class ConnectionsRuntime(QObject):
                 if kind not in ("cloud", "static") and entry["state"] not in ("unconfigured", "unsupported"):
                     self._probe(device_id, kind)
         self._update_push_statuses()
+        for device_id in list(self._statuses):
+            self._auto_setup(device_id)
         self._refresh_zerotier()
 
     # --- used by the video runtime ---------------------------------------------
@@ -272,7 +298,10 @@ class ConnectionsRuntime(QObject):
         port = self.pushPortFor(device_id)
         if self._selected.get(device_id) != "static" or not port or self._sdp_folder is None:
             return ""
-        path = pv.write_sdp(self._sdp_folder, device_id, port, self._addresses[device_id].get("pushCodec", "h265"))
+        addresses = self._addresses[device_id]
+        path = pv.write_sdp(
+            self._sdp_folder, device_id, port, addresses.get("pushCodec", "h265"), addresses.get("pushPayload")
+        )
         return path.as_uri()
 
     # --- internals -------------------------------------------------------------
@@ -337,23 +366,37 @@ class ConnectionsRuntime(QObject):
             self._store.save(self._addresses)
         return addresses["pushPort"]
 
-    def _note_packet(self, port, when=None):
+    def _note_packet(self, port, when=None, payload=None):
         first = self._clock() - self._push_seen.get(port, -1e9) > PUSH_FRESH_S
         self._push_seen[port] = self._clock() if when is None else when
+        if payload is not None:
+            # The video's RTP payload type is learnt from the packets themselves.
+            for addresses in self._addresses.values():
+                if addresses.get("pushPort") == port and addresses.get("pushPayload") != payload:
+                    addresses["pushPayload"] = payload
+                    self._store.save(self._addresses)
         if first:
             self._update_push_statuses()
 
     def _update_push_statuses(self, emit=True):
         now = self._clock()
         for device_id, statuses in self._statuses.items():
-            if "static" not in statuses or statuses["static"]["state"] == "unconfigured":
+            if "static" not in statuses:
+                continue
+            if statuses["static"]["state"] == "unconfigured":
+                bind = self._bind_status if self._bind_status.get("deviceId") == device_id else {}
+                label = "визначаю адресу…" if bind.get("busy") else BIND_LABELS.get(bind.get("state"))
+                statuses["static"] = cp.status_entry("unconfigured", None, label)
                 continue
             port = self.pushPortFor(device_id)
             fresh = port and now - self._push_seen.get(port, -1e9) <= PUSH_FRESH_S
+            setup = self._setup.get(device_id, {}).get("state")
+            bind = self._bind_status.get("state") if self._bind_status.get("deviceId") == device_id else None
+            waiting = SETUP_LABELS.get(setup) or BIND_LABELS.get(bind) or "чекає камеру"
             statuses["static"] = (
                 cp.status_entry("available", None, "камера надсилає")
                 if fresh
-                else cp.status_entry("unavailable", None, "чекає камеру")
+                else cp.status_entry("unavailable", None, waiting)
             )
         if emit:
             self.changed.emit()
@@ -376,9 +419,11 @@ class ConnectionsRuntime(QObject):
                 sock.deleteLater()
 
     def _drain(self, port, sock):
+        payload = None
         while sock.hasPendingDatagrams():
-            sock.receiveDatagram(2048)
-        self._note_packet(port)
+            packet = bytes(sock.receiveDatagram(2048).data())
+            payload = pv.rtp_payload_type(packet) or payload
+        self._note_packet(port, payload=payload)
 
     def _close_listeners(self):
         for sock in self._sockets.values():
@@ -389,7 +434,58 @@ class ConnectionsRuntime(QObject):
         self._bind_status = {"deviceId": device_id, "busy": False, **result}
         if result.get("state") in ("ready", "manual") and result.get("publicIp"):
             self.setAddress(device_id, "static", result["publicIp"])
+        self._update_push_statuses()
+
+    # --- configure the camera itself (over SSH, on the local network) -------------
+    def _auto_setup(self, device_id):
+        """Point the camera at the pilot's static IP as soon as that is possible and safe."""
+        addresses = self._addresses.get(device_id, {})
+        address, port = addresses.get("static"), addresses.get("pushPort")
+        if self._camera_setup is None or not address or not port or self._listening_paused:
+            return
+        if (
+            device_id in self._setup_busy
+            or self._statuses.get(device_id, {}).get("local", {}).get("state") != "available"
+        ):
+            return
+        target = f"udp://{address}:{port}"
+        if addresses.get("pushConfigured") == target:
+            return
+        last = self._setup.get(device_id, {})
+        if last.get("target") == target and self._clock() - last.get("at", -1e9) < SETUP_RETRY_S:
+            return
+        host = self._host(device_id, "local")
+        self._setup_busy.add(device_id)
+        self._setup[device_id] = {
+            "state": "working",
+            "message": "Налаштовую камеру…",
+            "target": target,
+            "at": self._clock(),
+        }
         self.changed.emit()
+
+        def work():
+            try:
+                result = self._camera_setup(host, address, port)
+            except Exception:
+                result = {"state": "failed", "message": ""}
+            self._setupDone.emit(device_id, dict(result, target=target))
+
+        if self._run_async:
+            threading.Thread(target=work, daemon=True).start()
+        else:
+            work()
+
+    def _apply_setup(self, device_id, result):
+        self._setup_busy.discard(device_id)
+        self._setup[device_id] = dict(result, at=self._clock())
+        addresses = self._addresses.setdefault(device_id, {})
+        if result.get("state") in ("configured", "already"):
+            addresses["pushConfigured"] = result["target"]
+            if result.get("codec") in ("h264", "h265"):
+                addresses["pushCodec"] = result["codec"]
+            self._store.save(self._addresses)
+        self._update_push_statuses()
 
     def _probe(self, device_id, kind):
         host = self._host(device_id, kind)

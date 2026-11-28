@@ -311,7 +311,11 @@ Item {
          Layout.preferredHeight: 34
          enabled: status.state !== "unsupported"
          onClicked: {
-          if (modelData.needsAddress && status.state === "unconfigured") cameraSettings.show(cameraCell.modelData, modelData.key)
+          if (modelData.key === "static" && status.state === "unconfigured") {
+           // The station finds the pilot's white address and opens the port itself.
+           connectionsRuntime.bindThisNetwork(cameraCell.cameraId)
+           connectionsRuntime.select(cameraCell.cameraId, "static")
+          } else if (modelData.needsAddress && status.state === "unconfigured") cameraSettings.show(cameraCell.modelData, modelData.key)
           else connectionsRuntime.select(cameraCell.cameraId, modelData.key)
          }
          background: Rectangle {
