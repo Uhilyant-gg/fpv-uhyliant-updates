@@ -114,7 +114,7 @@ Rectangle {
    enabled: !videoPresets.busy
    text: "−"
    Layout.preferredWidth: 30
-   onClicked: videoPresets.stepBitrate(-1)
+   onClicked: videoPresets.stepBitrateMain(-1)
    HoverHint { text: "Зменшити бітрейт камери на крок." }
   }
   BarButton {
@@ -123,7 +123,7 @@ Rectangle {
    enabled: !videoPresets.busy
    text: "+"
    Layout.preferredWidth: 30
-   onClicked: videoPresets.stepBitrate(1)
+   onClicked: videoPresets.stepBitrateMain(1)
    HoverHint { text: "Збільшити бітрейт камери на крок." }
   }
   Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 26; color: "#22364b" }

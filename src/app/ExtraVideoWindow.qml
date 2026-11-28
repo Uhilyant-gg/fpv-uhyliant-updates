@@ -27,6 +27,8 @@ Item {
  z: fullscreen ? 65 : baseZ
 
  readonly property bool fullscreen: win.fullscreen === true
+ // A map window: the mouse pans and zooms the map; the window moves by its top strip.
+ readonly property bool isMap: win.kind === "map"
  readonly property bool detached: win.detached === true
  readonly property real boxX: (win.x || 0) * width
  readonly property real boxY: (win.y || 0) * height
@@ -63,9 +65,22 @@ Item {
   color: "black"
   z: 59
  }
+ Loader {
+  id: mapContent
+  objectName: "extraMap" + root.slot
+  active: root.isMap && root.win.open === true
+  parent: root.shownAsMain && !root.fullscreen ? root.parent : root
+  readonly property bool big: root.fullscreen || root.shownAsMain
+  x: big ? 0 : root.boxX
+  y: big ? 0 : root.boxY
+  width: big ? root.width : root.boxW
+  height: big ? root.height : root.boxH
+  z: root.fullscreen ? 60 : (root.shownAsMain ? 1 : root.baseZ + 1)
+  sourceComponent: Component { FlightMap {} }
+ }
  VideoOutput {
   id: out
-  // On the big screen the stream goes under the OSD, like the main video normally is.
+  // On the big screen the stream lies over the black background and under the OSD (z 2).
   parent: root.shownAsMain && !root.fullscreen ? root.parent : root
   objectName: "extraVideoOutput" + root.slot
   readonly property bool big: root.fullscreen || root.shownAsMain
@@ -74,11 +89,15 @@ Item {
   y: big ? 0 : root.boxY
   width: big ? root.width : root.boxW
   height: big ? root.height : root.boxH
-  z: root.fullscreen ? 60 : (root.shownAsMain ? -1 : root.baseZ + 1)
-  fillMode: VideoOutput.PreserveAspectFit
+  z: root.fullscreen ? 60 : (root.shownAsMain ? 1 : root.baseZ + 1)
+  // How the pilot wants this stream shown: fit or fill, turned over, mirrored.
+  fillMode: (root.win.display || {}).fill ? VideoOutput.PreserveAspectCrop : VideoOutput.PreserveAspectFit
+  orientation: (root.win.display || {}).rotate === 180 ? 180 : 0
+  transform: Scale { origin.x: out.width / 2; xScale: (root.win.display || {}).mirror ? -1 : 1 }
+  clip: true
  }
  Text {
-  visible: !root.playing && !root.detached
+  visible: !root.isMap && !root.playing && !root.detached
   x: root.fullscreen || root.shownAsMain ? (root.width - width) / 2 : root.boxX + (root.boxW - width) / 2
   y: root.fullscreen || root.shownAsMain ? (root.height - height) / 2 : root.boxY + (root.boxH - height) / 2
   z: root.fullscreen ? 61 : root.baseZ + 2
@@ -99,40 +118,62 @@ Item {
   color: "transparent"
   radius: root.fullscreen ? 0 : 8
   border.width: root.fullscreen ? 0 : 2
-  border.color: root.playing || root.shownAsMain ? root.green : root.amber
+  border.color: root.isMap || root.playing || root.shownAsMain ? root.green : root.amber
 
   HoverHandler { id: hover; onPointChanged: tools.restart(); onHoveredChanged: if (hovered) tools.restart() }
   Timer { id: tools; interval: 2000 }
+
+  property point grab
+  property real startX
+  property real startY
+  property bool moved: false
+  function beginMove(item, mouse) { grab = item.mapToItem(root, mouse.x, mouse.y); startX = root.boxX; startY = root.boxY; moved = false }
+  function moveTo(item, mouse) {
+   var p = item.mapToItem(root, mouse.x, mouse.y)
+   var dx = p.x - grab.x, dy = p.y - grab.y
+   if (!moved && Math.abs(dx) + Math.abs(dy) < 10) return
+   moved = true
+   frame.x = Math.max(0, Math.min(root.width - root.boxW, startX + dx))
+   frame.y = Math.max(0, Math.min(root.height - root.boxH, startY + dy))
+  }
+  function endMove() {
+   var snap = 16
+   var x = frame.x, y = frame.y
+   if (x < snap) x = 0
+   if (root.width - root.boxW - x < snap) x = root.width - root.boxW
+   if (y < snap) y = 0
+   if (root.height - root.boxH - y < snap) y = root.height - root.boxH
+   extraWindows.place(root.slot, x / root.width, y / root.height, root.boxW / root.width)
+   frame.x = Qt.binding(function() { return root.fullscreen ? 0 : root.boxX })
+   frame.y = Qt.binding(function() { return root.fullscreen ? 0 : root.boxY })
+  }
 
   MouseArea {
    id: drag
    objectName: "extraWindowMouse" + root.slot
    anchors.fill: parent
-   enabled: !root.fullscreen
-   property point grab
-   property real startX
-   property real startY
-   property bool moved: false
-   onPressed: function(mouse) { grab = mapToItem(root, mouse.x, mouse.y); startX = root.boxX; startY = root.boxY; moved = false }
-   onPositionChanged: function(mouse) {
-    var p = mapToItem(root, mouse.x, mouse.y)
-    var dx = p.x - grab.x, dy = p.y - grab.y
-    if (!moved && Math.abs(dx) + Math.abs(dy) < 10) return
-    moved = true
-    frame.x = Math.max(0, Math.min(root.width - root.boxW, startX + dx))
-    frame.y = Math.max(0, Math.min(root.height - root.boxH, startY + dy))
-   }
-   onReleased: {
-    if (!moved) { root.swapRequested(root.slot); return }
-    var snap = 16
-    var x = frame.x, y = frame.y
-    if (x < snap) x = 0
-    if (root.width - root.boxW - x < snap) x = root.width - root.boxW
-    if (y < snap) y = 0
-    if (root.height - root.boxH - y < snap) y = root.height - root.boxH
-    extraWindows.place(root.slot, x / root.width, y / root.height, root.boxW / root.width)
-    frame.x = Qt.binding(function() { return root.fullscreen ? 0 : root.boxX })
-    frame.y = Qt.binding(function() { return root.fullscreen ? 0 : root.boxY })
+   // On a video the picture itself is the handle; on a map the mouse belongs to the map,
+   // unless the main video was swapped into this window.
+   enabled: !root.fullscreen && (!root.isMap || root.shownAsMain)
+   onPressed: function(mouse) { frame.beginMove(drag, mouse) }
+   onPositionChanged: function(mouse) { frame.moveTo(drag, mouse) }
+   onReleased: { if (!frame.moved) root.swapRequested(root.slot); else frame.endMove() }
+  }
+
+  Rectangle { // the map window's handle: a strip along the top, shown under the mouse
+   objectName: "extraWindowHandle" + root.slot
+   visible: root.isMap && !root.shownAsMain && !root.fullscreen && (hover.hovered || tools.running)
+   anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+   height: 22; radius: 8
+   color: "#cc0b1420"
+   Text { anchors.left: parent.left; anchors.leftMargin: 8; anchors.verticalCenter: parent.verticalCenter; text: "✥ Карта"; color: root.fg; font.pixelSize: 11 }
+   MouseArea {
+    id: handleArea
+    anchors.fill: parent
+    cursorShape: Qt.SizeAllCursor
+    onPressed: function(mouse) { frame.beginMove(handleArea, mouse) }
+    onPositionChanged: function(mouse) { frame.moveTo(handleArea, mouse) }
+    onReleased: if (frame.moved) frame.endMove()
    }
   }
 
@@ -175,7 +216,7 @@ Item {
    }
    Tool { objectName: "extraSwap" + root.slot; visible: !root.fullscreen; text: "⇄"; onClicked: root.swapRequested(root.slot); HoverHint { text: "Поміняти з основним відео (Tab)." } }
    Tool { objectName: "extraFullscreen" + root.slot; text: "⤢"; onClicked: extraWindows.setFullscreen(root.slot, !root.fullscreen); HoverHint { text: root.fullscreen ? "Повернути у вікно (Esc)." : "На весь екран." } }
-   Tool { objectName: "extraDetach" + root.slot; visible: root.canDetach && !root.fullscreen; text: "⧉"; onClicked: extraWindows.setDetached(root.slot, true); HoverHint { text: "На другий дисплей." } }
+   Tool { objectName: "extraDetach" + root.slot; visible: root.canDetach && !root.fullscreen && !root.isMap; text: "⧉"; onClicked: extraWindows.setDetached(root.slot, true); HoverHint { text: "На другий дисплей." } }
    Tool { objectName: "extraClose" + root.slot; text: "✕"; onClicked: extraWindows.close(root.slot); HoverHint { text: "Закрити. Потік стане на паузу і не витрачатиме бітрейт." } }
   }
  }

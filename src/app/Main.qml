@@ -75,16 +75,16 @@ ApplicationWindow {
   OsdOverlay{anchors.fill:parent;anchors.margins:12;visible:station.osdEnabled;positions:station.osdElements;enabledElements:station.osdEnabledElements;corner:station.osdPosition;opacityValue:station.osdOpacity;scaleFactor:station.osdScale;telemetry:t;video:sd}
  }
  property bool flightBarHidden: false
- Shortcut{sequence:"1";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("1")}
- Shortcut{sequence:"2";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("2")}
- Shortcut{sequence:"3";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("3")}
- Shortcut{sequence:"4";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("4")}
- Shortcut{sequence:"5";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("5")}
- Shortcut{sequence:"6";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("6")}
- Shortcut{sequence:"7";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("7")}
- Shortcut{sequence:"8";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("8")}
- Shortcut{sequence:"9";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("9")}
- Shortcut{sequence:"0";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("0")}
+ Shortcut{sequence:"1";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("1")}
+ Shortcut{sequence:"2";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("2")}
+ Shortcut{sequence:"3";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("3")}
+ Shortcut{sequence:"4";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("4")}
+ Shortcut{sequence:"5";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("5")}
+ Shortcut{sequence:"6";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("6")}
+ Shortcut{sequence:"7";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("7")}
+ Shortcut{sequence:"8";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("8")}
+ Shortcut{sequence:"9";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("9")}
+ Shortcut{sequence:"0";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("0")}
  Shortcut{sequence:"Tab";enabled:pages.currentIndex===1&&!w.simulation;onActivated:w.swapWindows()}
  Shortcut{sequence:"Esc";enabled:pages.currentIndex===1;onActivated:{for(var i=0;i<extraWindows.windows.length;i++)if(extraWindows.windows[i].fullscreen)extraWindows.setFullscreen(i,false)}}
  Shortcut{sequence:"F10";enabled:pages.currentIndex===1;onActivated:w.flightBarHidden=!w.flightBarHidden}
@@ -113,7 +113,7 @@ ApplicationWindow {
     linkLostSeconds: linkMonitor.lostSeconds
     linkFps: linkMonitor.fps
     linkWarning: linkDoctor.level === "warning"
-    onOpenVehicle: videoPresetsPopup.open()
+    onOpenVehicle: { videoPresets.editStream(0, ""); videoPresetsPopup.open() }
     onOpenHardware: hardwarePopup.open()
     onOpenStarlink: starlinkPopup.open()
     onOpenMenu: flightMenu.open()
@@ -129,6 +129,24 @@ ApplicationWindow {
     anchors.bottom: parent.bottom
     width: visible ? implicitWidth : 0
     onOpenLayouts: layoutsPopup.open()
+    onOpenStreamSettings: function(stream) {
+     if (stream.kind === "main") { videoPresets.editStream(0, ""); videoPresetsPopup.open(); return }
+     streamSettingsContent.stream = stream
+     streamSettingsPopup.open()
+    }
+   }
+   Popup {
+    id: streamSettingsPopup
+    objectName: "streamSettingsPopup"
+    x: streamsSidebar.width + 6
+    y: (flightBar.visible ? flightBar.height : 0) + 6
+    padding: 0
+    background: Rectangle { color: "#f20a1420"; border.color: "#71879c"; radius: 12 }
+    contentItem: StreamSettingsPanel {
+     id: streamSettingsContent
+     onCloseRequested: streamSettingsPopup.close()
+     onOpenPresets: function(channel, name) { streamSettingsPopup.close(); videoPresets.editStream(channel, name); videoPresetsPopup.open() }
+    }
    }
    Popup {
     id: layoutsPopup
@@ -148,7 +166,7 @@ ApplicationWindow {
    anchors.left: streamsSidebar.right; anchors.right: parent.right; anchors.bottom: parent.bottom
    anchors.top: flightBar.visible ? flightBar.bottom : parent.top
    clip: true
-   Rectangle { anchors.fill: parent; visible: !w.simulation; color: "black" }
+   Rectangle { anchors.fill: parent; visible: !w.simulation; color: "black"; z: -2 }
    VideoOutput {
     id: videoOut
     objectName: "mainFlightVideoOutput"
@@ -250,6 +268,8 @@ ApplicationWindow {
    Column { visible:!w.simulation&&primaryDetached; anchors.centerIn:parent; spacing:8; Text{text:"Основний потік відкрито в окремому вікні";color:fg;font.pixelSize:18} Button{text:"Повернути до основного екрана";onClicked:primaryDetached=false} }
    OsdOverlay {
     objectName: "flightOsdOverlay"
+    // Above whatever is on the big screen (the main video or a swapped-in window), under the windows.
+    z: 2
     anchors.fill:parent; anchors.margins:12
     visible:station.osdEnabled&&(w.simulation||!primaryDetached)
     positions:station.osdElements; enabledElements:station.osdEnabledElements; corner:station.osdPosition
@@ -354,7 +374,7 @@ ApplicationWindow {
      objectName: "flightMenuVideoPresets"
      text: "Пресети відео камери"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
      enabled: !w.simulation
-     onClicked: { flightMenu.close(); videoPresetsPopup.open() }
+     onClicked: { flightMenu.close(); videoPresets.editStream(0, ""); videoPresetsPopup.open() }
      background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
     }
     Button {

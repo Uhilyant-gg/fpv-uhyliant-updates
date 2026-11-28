@@ -53,7 +53,7 @@ def make(tmp_path, ok=True):
 
 def test_sources_are_the_cameras_other_streams(tmp_path):
     rt, _ = make(tmp_path)
-    assert [s["id"] for s in rt.sources] == ["sub", "thermal", "cam2", "cam3"], "not the main one"
+    assert [s["id"] for s in rt.sources] == ["sub", "thermal", "cam2", "cam3", "map"], "not the main one; the map too"
     assert all(s["slot"] == -1 for s in rt.sources)
 
 
@@ -68,7 +68,7 @@ def test_plus_opens_up_to_three_windows_and_minus_stops_the_stream(tmp_path):
     assert rt.open("main") == -1, "the main stream is on the big screen already"
     rt.close(1)
     assert rt.openCount == 2 and rt._runtimes[1].stopped == 1, "a closed stream is stopped: no bitrate"
-    assert [s["slot"] for s in rt.sources] == [-1, 0, 2, -1]
+    assert [s["slot"] for s in rt.sources] == [-1, 0, 2, -1, -1]
 
 
 def test_new_windows_do_not_cover_each_other(tmp_path):
@@ -190,3 +190,35 @@ def test_a_window_with_room_stays_where_the_pilot_put_it(tmp_path):
     rt.place(1, 0.05, 0.5, 0.25)
     w = rt.windows[1]
     assert (round(w["x"], 3), round(w["y"], 3), w["w"]) == (0.05, 0.5, 0.25)
+
+
+def test_the_map_is_a_window_that_spends_no_bitrate(tmp_path):
+    rt, _ = make(tmp_path)
+    assert rt.open("map") == 0
+    w = rt.windows[0]
+    assert w["kind"] == "map" and w["name"] == "Карта" and w["url"] == ""
+    assert rt._runtimes[0].url == "", "no video stream was started for the map"
+    rt.close(0)
+    assert rt._runtimes[0].stopped == 0
+
+
+def test_each_stream_has_its_own_way_of_showing(tmp_path):
+    rt, _ = make(tmp_path)
+    assert rt.display("thermal") == {"fill": False, "rotate": 0, "mirror": False}
+    rt.setDisplay("thermal", "rotate", 180)
+    rt.setDisplay("thermal", "mirror", True)
+    rt.setDisplay("thermal", "rotate", 33)
+    rt.setDisplay("thermal", "unknown", 1)
+    assert rt.display("thermal") == {"fill": False, "rotate": 0, "mirror": True}
+    rt.setDisplay("thermal", "rotate", 180)
+    rt.open("thermal")
+    assert rt.windows[0]["display"]["rotate"] == 180
+    assert rt.display("sub")["rotate"] == 0, "other streams are untouched"
+
+
+def test_which_camera_encoder_sends_a_stream():
+    from extra_windows import channel_for
+
+    assert channel_for({"kind": "sub", "path": "/stream=1"}) == 1
+    assert channel_for({"kind": "thermal", "path": "/thermal"}) == -1
+    assert channel_for({"kind": "main", "path": "/stream=1"}) == 1

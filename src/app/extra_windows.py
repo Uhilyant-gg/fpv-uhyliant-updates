@@ -17,10 +17,24 @@ from PySide6.QtCore import Property, QObject, Signal, Slot
 from video import VideoRuntime
 
 MAX_WINDOWS = 3
+# The map is a window like a video stream, but it spends no bitrate of the link.
+MAP_ID = "map"
 DEFAULT_WIDTH = 0.3
 MIN_WIDTH, MAX_WIDTH = 0.12, 0.7
 # Windows never lie over each other (owner's rule): this gap stays between them.
 GAP = 0.006
+
+
+DISPLAY_DEFAULT = {"fill": False, "rotate": 0, "mirror": False}
+
+
+def channel_for(stream) -> int:
+    """Which of the camera's own encoders sends this stream: 1 for the second stream,
+    -1 when the camera does not encode it itself (e.g. a USB thermal camera)."""
+    path = str(stream.get("path", ""))
+    if stream.get("kind") in ("sub", "secondary") or path.rstrip("/").endswith(("=1", "/1")):
+        return 1
+    return -1
 
 
 def _clamp(value, low, high):
@@ -80,9 +94,11 @@ class ExtraWindowsRuntime(QObject):
                 {
                     **slot,
                     "index": index,
-                    "name": names.get(slot["streamId"], ""),
-                    "url": runtime.url if slot["open"] else "",
-                    "state": runtime.state if slot["open"] else "stopped",
+                    "name": "Карта" if slot["streamId"] == MAP_ID else names.get(slot["streamId"], ""),
+                    "kind": "map" if slot["streamId"] == MAP_ID else "video",
+                    "url": runtime.url if slot["open"] and slot["streamId"] != MAP_ID else "",
+                    "display": self.display(slot["streamId"]) if slot["open"] else dict(DISPLAY_DEFAULT),
+                    "state": runtime.state if slot["open"] and slot["streamId"] != MAP_ID else "stopped",
                 }
             )
         return out
@@ -98,10 +114,40 @@ class ExtraWindowsRuntime(QObject):
                 "name": s.get("name", ""),
                 "kind": s.get("kind", ""),
                 "slot": open_by_stream.get(s.get("id"), -1),
+                "channel": channel_for(s),
             }
             for s in self._streams()
             if s.get("id") != primary
-        ]
+        ] + [{"id": MAP_ID, "name": "Карта", "kind": "map", "slot": open_by_stream.get(MAP_ID, -1), "channel": -1}]
+
+    @Property(str, notify=changed)
+    def mainName(self):
+        primary = self._primary_id()
+        return next((s.get("name", "") for s in self._streams() if s.get("id") == primary), "")
+
+    # --- how each stream is shown in its window -----------------------------------
+    @Slot(str, result="QVariantMap")
+    def display(self, stream_id):
+        saved = (self._camera_data().get("display") or {}).get(stream_id) or {}
+        out = dict(DISPLAY_DEFAULT)
+        out.update({k: saved[k] for k in DISPLAY_DEFAULT if k in saved})
+        return out
+
+    @Slot(str, str, "QVariant")
+    def setDisplay(self, stream_id, key, value):
+        """Fit or fill the window, turn the picture over (a camera mounted upside down), mirror it."""
+        if key not in DISPLAY_DEFAULT or not stream_id:
+            return
+        if key == "rotate":
+            value = 180 if int(value) == 180 else 0
+        else:
+            value = bool(value)
+        entry = self._camera_data()
+        display = entry.get("display") if isinstance(entry.get("display"), dict) else {}
+        display.setdefault(stream_id, {})[key] = value
+        entry["display"] = display
+        self._write_camera(entry)
+        self.changed.emit()
 
     @Property(int, notify=changed)
     def openCount(self):
@@ -129,7 +175,7 @@ class ExtraWindowsRuntime(QObject):
         free = next((i for i, s in enumerate(self._slots) if not s["open"]), -1)
         if free < 0:
             return -1
-        if not self._runtimes[free].prepare(stream_id):
+        if stream_id != MAP_ID and not self._runtimes[free].prepare(stream_id):
             self.changed.emit()
             return -1
         count = self.openCount
@@ -146,7 +192,8 @@ class ExtraWindowsRuntime(QObject):
         if not 0 <= index < MAX_WINDOWS or not self._slots[index]["open"]:
             return
         self._save()  # the arrangement before closing is what "as last time" brings back
-        self._runtimes[index].stop()
+        if self._slots[index]["streamId"] != MAP_ID:
+            self._runtimes[index].stop()
         self._slots[index] = self._empty()
         if self._last_used == index:
             self._last_used = next((i for i, s in enumerate(self._slots) if s["open"]), -1)
@@ -389,7 +436,7 @@ class ExtraWindowsRuntime(QObject):
             self._camera = camera
             self.closeAll()
         else:
-            known = {s.get("id") for s in self._streams()}
+            known = {s.get("id") for s in self._streams()} | {MAP_ID}
             for index, slot in enumerate(self._slots):
                 if slot["open"] and slot["streamId"] not in known:
                     self.close(index)
