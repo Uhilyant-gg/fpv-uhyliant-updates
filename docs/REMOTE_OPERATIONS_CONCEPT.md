@@ -157,8 +157,9 @@ To try on a camera: whether an IDR request exists in the installed build.
 Done (2026-11-28): the drone on the map from the flight controller's GPS (MAVLink, MSP, CRSF):
 an arrow along the heading, the trail it flew, the home point and a line home; "follow" (off by
 itself when the pilot pans), north-up or course-up; zoom with the mouse wheel or the touchpad over
-the map window (around the pointer, or around the drone while following). Still to do: download an
-area in advance, MGRS points, the Starlink position as a second source, wind.
+the map window (around the pointer, or around the drone while following). MGRS points: typed in
+the map's ⚑ panel or put by a right click, kept between flights; the drone's own MGRS in the corner.
+Still to do: download an area in advance, the Starlink position as a second source, wind.
 
 ## Out of scope
 - Payload-drop / impact-point calculators are not built by this project.
