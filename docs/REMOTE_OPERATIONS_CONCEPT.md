@@ -76,6 +76,19 @@ in plain words, and the station fixes what it can by itself.
 9. A 20-second link test in Preflight before take-off.
 Order: 1+2+6, then 3, then 4+5 with telemetry forwarding, then 8+9, then 7 on real hardware.
 
+## Video presets, streams and controls (agreed 2026-11-28)
+- Flight menu holds only what is needed in the air; every other setting lives in the home menu.
+- The pilot sees the stream itself: codec, size, frame rate, real bitrate, loss, how often a full
+  frame comes, and what the camera is set to.
+- Video presets belong to each camera and change the camera's own settings, in flight too.
+- Bitrate is controlled per stream: by presets and by a quick change on the flight bar; an "Auto"
+  preset lowers bitrate and other settings by itself to hold a target latency.
+- PC keyboard keys 1…0 switch the camera presets: 1 is the weakest link, up to 0.
+- A controller channel swaps the streams (main ↔ additional).
+- Additional camera (thermal) on the camera's USB through UVC or a capture card: first tried on the
+  official OpenIPC firmware, without a custom build. Picture-in-picture made on the camera to save
+  bitrate comes after the separate stream works.
+
 ## Map and wind
 - Satellite base map (Esri World Imagery); download a selected area in advance, or automatically
   around the drone. Orientation: north-up, track-up or follow the drone. Picture-in-picture (movable,

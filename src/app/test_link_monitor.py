@@ -162,3 +162,19 @@ def test_frames_per_second_history_for_the_link_graph():
     assert len(monitor.history) == HISTORY_SECONDS and monitor.history[-1] == 0
     monitor.setActive(False)
     assert monitor.history == []
+
+
+class SizedFrame(Frame):
+    def width(self):
+        return 1280
+
+    def height(self):
+        return 720
+
+
+def test_the_size_of_the_frames_actually_shown():
+    monitor, sink, clock = make()
+    monitor.setActive(True)
+    assert monitor.frameSize == ""
+    sink.videoFrameChanged.emit(SizedFrame(True))
+    assert monitor.frameSize == "1280×720"

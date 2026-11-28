@@ -43,6 +43,7 @@ class LinkMonitor(QObject):
         self._history = []
         self._count = 0
         self._bucket_start = None
+        self._size = ""
         self._timer = QTimer(self)
         self._timer.setInterval(tick_ms)
         self._timer.timeout.connect(self.evaluate)
@@ -62,6 +63,11 @@ class LinkMonitor(QObject):
     @Property("QVariantList", notify=changed)
     def history(self):
         return list(self._history)
+
+    @Property(str, notify=changed)
+    def frameSize(self):
+        """Width × height of the frames actually shown."""
+        return self._size
 
     @Property(int, notify=changed)
     def fps(self):
@@ -119,6 +125,13 @@ class LinkMonitor(QObject):
         self._last_frame = self._clock()
         self._seen_frame = True
         self._count += 1
+        try:
+            size = f"{frame.width()}×{frame.height()}"
+        except AttributeError:
+            size = self._size
+        if size != self._size:
+            self._size = size
+            self.changed.emit()
         if self._lost_since is not None:
             self._lost_since = None
             self._restored_at = self._clock()

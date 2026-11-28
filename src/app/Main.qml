@@ -327,29 +327,11 @@ ApplicationWindow {
     Button {
      text: "Налаштувати розташування OSD"
      objectName: "flightMenuOsdSettings"
+     visible: w.simulation
      font.pixelSize: 14
      Layout.fillWidth: true
      Layout.preferredHeight: 44
      onClicked: { flightMenu.close(); openOsdSettings() }
-     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
-    }
-    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
-    Text {
-     text: "ЗАПИС ВІДЕО"
-     color: sub
-     font.pixelSize: 12
-     font.bold: true
-     Layout.fillWidth: true
-     Layout.leftMargin: 14
-     Layout.topMargin: 5
-    }
-    Button {
-     objectName: "flightMenuRecordingSettings"
-     text: "Папка для записів"
-     font.pixelSize: 14
-     Layout.fillWidth: true
-     Layout.preferredHeight: 44
-     onClicked: { flightMenu.close(); openStationSettings("recording") }
      background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
     }
     Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
@@ -408,9 +390,10 @@ ApplicationWindow {
      Layout.rightMargin: 14
      font.pixelSize: 12
     }
-    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
+    Rectangle { visible: !w.simulation; Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
     Text {
-     text: "ІНСТРУМЕНТИ СТАНЦІЇ"
+     text: "СЕРВІС"
+     visible: !w.simulation
      color: sub
      font.pixelSize: 12
      font.bold: true
@@ -419,51 +402,26 @@ ApplicationWindow {
      Layout.topMargin: 5
     }
     Button {
-     text: "Пристрої"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
-     objectName: "flightMenuDevices"
-     enabled: !w.simulation
-     onClicked: { flightMenu.close(); devices.open() }
-     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
-    }
-    Button {
-     text: "Дрони і пресети"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
-     objectName: "flightMenuPresets"
-     onClicked: { flightMenu.close(); openVehicleSettings("presets") }
-     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
-    }
-    Button {
-     text: "Налаштування станції"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
-     objectName: "flightMenuController"
-     onClicked: { flightMenu.close(); openStationSettings("") }
-     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
-    }
-    Button {
-     text: "Обслуговування"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
-     objectName: "flightMenuService"
-     enabled: !w.simulation
-     onClicked: { flightMenu.close(); openService("") }
-     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
-    }
-    Button {
      text: "Перейти до сервісного режиму"; font.pixelSize: 14; Layout.fillWidth: true; Layout.preferredHeight: 46
-     enabled: !w.simulation
+     visible: !w.simulation
      onClicked: { flightMenu.close(); enterServiceMode() }
      background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
     }
     Button {
      text: "Hardware E2E"; font.pixelSize: 14; Layout.fillWidth: true; Layout.preferredHeight: 46
-     enabled: !w.simulation
+     visible: !w.simulation
      onClicked: { flightMenu.close(); hardwareE2EPopup.open() }
      background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
     }
-    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
+    Rectangle { visible: !w.simulation; Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#627489" }
     Button {
+     objectName: "flightMenuDisconnect"
      text: "Відключити камеру"
      font.pixelSize: 15
      Layout.fillWidth: true
      Layout.preferredHeight: 48
-     enabled: !w.simulation
-     onClicked: { flightMenu.close(); disconnectDevice() }
+     visible: !w.simulation
+     onClicked: { flightMenu.close(); flightBar.leaveFlight() }
      background: Rectangle { radius: 8; color: parent.hovered ? "#663c2d35" : "#382b1c25"; border.color: "#a56878" }
     }
     Item { Layout.preferredHeight: 8 }
