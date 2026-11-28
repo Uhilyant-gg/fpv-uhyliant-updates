@@ -43,7 +43,7 @@ ApplicationWindow {
  onConnectedChanged: { if (!connected) { dvrRuntime.stop(); extraWindows.closeAll(); w.mainSource = -1; connectionsRuntime.resumeListening() } else connectionsRuntime.pauseListening() }
  function attachDvrSink(){var sink=player.videoOutput ? player.videoOutput.videoSink : null;dvrRuntime.setVideoSink(sink);linkMonitor.setVideoSink(sink)}
  property bool linkWatchActive: connected && !simulation && !serviceMode
- onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive);controllerActions.setActive(linkWatchActive);starlinkDish.setActive(linkWatchActive);cameraAudio.setActive(linkWatchActive);blackBox.setActive(linkWatchActive);if(linkWatchActive)flightAlerts.resetSession()}
+ onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive);controllerActions.setActive(linkWatchActive);starlinkDish.setActive(linkWatchActive);cameraAudio.setActive(linkWatchActive);blackBox.setActive(linkWatchActive);windRuntime.setActive(linkWatchActive);if(linkWatchActive)flightAlerts.resetSession()}
  Connections{target:controllerActions;function onSwapRequested(){w.swapWindows()}}
  Connections{target:linkDoctor;function onRetryNeeded(){w.recoverPrimary()}}
  Connections{target:linkMonitor;function onRetryNeeded(){if(!videoRecovery.running)w.recoverPrimary()}}

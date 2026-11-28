@@ -379,6 +379,9 @@ def main():
             'windows': extra_windows.openCount,
             'sound': camera_audio.playing,
         }
+        if wind_runtime.available:
+            sample['windMs'] = wind_runtime.wind.get('speedMs')
+            sample['windFromDeg'] = wind_runtime.wind.get('fromDeg')
         for key in ('lossPct', 'jitterMs', 'kbps', 'smoothingMs', 'internet'):
             if key in details:
                 sample[key] = details[key]
@@ -412,6 +415,9 @@ def main():
     from map_marks import MapMarksRuntime
 
     map_marks = MapMarksRuntime(DATA / 'map-marks.json')
+    from wind import WindRuntime
+
+    wind_runtime = WindRuntime(telemetry)
     from link_test import LinkTestRuntime
 
     def link_test_sample():
@@ -439,6 +445,7 @@ def main():
         black_box,
         link_test,
         map_marks,
+        wind_runtime,
         flight_alerts,
         presets,
         dvr_runtime,
@@ -488,12 +495,14 @@ def main():
         ('blackBox', black_box),
         ('linkTest', link_test),
         ('mapMarks', map_marks),
+        ('windRuntime', wind_runtime),
         ('controllerActions', controller_actions),
         ('videoPresets', video_preset_runtime),
         ('connectionsRuntime', connections),
     ]:
         ctx.setContextProperty(name, obj)
     ctx.setContextProperty('appWindowTitle', WINDOW_TITLE)
+    ctx.setContextProperty('mapTilesDir', str(DATA / 'map-tiles'))
     harness.mark('qml-load-begin')
     e.load(QUrl.fromLocalFile(str(here / 'Main.qml')))
     harness.mark('qml-load-complete')

@@ -159,7 +159,13 @@ an arrow along the heading, the trail it flew, the home point and a line home; "
 itself when the pilot pans), north-up or course-up; zoom with the mouse wheel or the touchpad over
 the map window (around the pointer, or around the drone while following). MGRS points: typed in
 the map's ⚑ panel or put by a right click, kept between flights; the drone's own MGRS in the corner.
-Still to do: download an area in advance, the Starlink position as a second source, wind.
+Wind: Open-Meteo forecast at the drone's point (rounded to ~5 km before it leaves the PC) for the
+level nearest to its height (10/80/120/180 m): an arrow to where it blows, speed and gusts on the
+map, no warnings; also written to the black box. The map tile cache path comes from the station
+(the old file:// replace broke on Windows).
+Still to do: download an area in advance (Esri's terms forbid bulk download of its imagery; options
+for the owner: import a map file the pilot has the right to use, e.g. MBTiles), the Starlink
+position as a second source.
 
 ## Out of scope
 - Payload-drop / impact-point calculators are not built by this project.
