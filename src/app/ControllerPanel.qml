@@ -110,6 +110,33 @@ Item {
    color: root.amber; wrapMode: Text.WordWrap; Layout.fillWidth: true
   }
 
+  Rectangle {
+   objectName: "swapSwitchSection"
+   Layout.fillWidth: true
+   implicitHeight: swapColumn.implicitHeight + 20
+   radius: 8
+   color: "#0f1c2b"
+   border.color: "#2f4860"
+   ColumnLayout {
+    id: swapColumn
+    anchors.fill: parent
+    anchors.margins: 10
+    spacing: 6
+    Text { text: "Тумблер «поміняти потоки місцями»"; color: root.fg; font.bold: true }
+    Text {
+     text: "У польоті кожне перемикання цього тумблера міняє основне і додаткове відео місцями."
+     color: root.sub; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 12
+    }
+    RowLayout {
+     spacing: 8
+     Text { objectName: "swapChannel"; text: controllerActions.swapText; color: root.fg; font.pixelSize: 15; Layout.fillWidth: true }
+     Button { objectName: "assignSwap"; text: "Призначити"; enabled: !controllerActions.learning; onClicked: controllerActions.learnSwap() }
+     Button { objectName: "clearSwap"; text: "Прибрати"; flat: true; visible: controllerActions.assigned && !controllerActions.learning; onClicked: controllerActions.clearSwap() }
+    }
+    Text { objectName: "swapMessage"; visible: text !== ""; text: controllerActions.message; color: root.sub; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 12 }
+   }
+  }
+
   Item { Layout.fillHeight: true }
 
   RowLayout {

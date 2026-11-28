@@ -253,10 +253,14 @@ def main():
     streams.autoSelect()
     pairing.reconcile()
     display_runtime = DisplayRuntime(app)
+    controller_source = default_controller_source()
     controller = ControllerRuntime(
-        ControllerOnboarding(default_controller_source(), JsonControllerProfileStore(DATA / 'controller-profiles.json'))
+        ControllerOnboarding(controller_source, JsonControllerProfileStore(DATA / 'controller-profiles.json'))
     )
-    app._runtime_refs = app._runtime_refs + (display_runtime, controller)
+    from controller_actions import ControllerActions
+
+    controller_actions = ControllerActions(controller_source, DATA / 'controller-actions.json')
+    app._runtime_refs = app._runtime_refs + (display_runtime, controller, controller_actions)
     home.setController(controller)
     flight_alerts = FlightAlertsRuntime(telemetry, s)
     presets = PresetsRuntime(preset_store, s)
@@ -355,6 +359,7 @@ def main():
         ('dvrRuntime', dvr_runtime),
         ('linkMonitor', link_monitor),
         ('linkDoctor', link_doctor),
+        ('controllerActions', controller_actions),
         ('videoPresets', video_preset_runtime),
         ('connectionsRuntime', connections),
     ]:

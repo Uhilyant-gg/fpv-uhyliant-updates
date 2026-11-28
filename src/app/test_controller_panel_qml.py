@@ -15,6 +15,7 @@ from PySide6.QtQml import QQmlComponent, QQmlEngine
 from controller_onboarding import ControllerOnboarding
 from controller_profile_store import JsonControllerProfileStore
 from controller_runtime import ControllerRuntime
+from controller_actions import ControllerActions
 
 class Radio:
     frame = [1500, 1500, 1000, 1500]
@@ -27,6 +28,8 @@ store = JsonControllerProfileStore(Path(tempfile.mkdtemp()) / "c.json")
 runtime = ControllerRuntime(ControllerOnboarding(radio, store), interval_ms=60000)
 engine = QQmlEngine()
 engine.rootContext().setContextProperty("controllerRuntime", runtime)
+actions = ControllerActions(radio, Path(tempfile.mkdtemp()) / "a.json")
+engine.rootContext().setContextProperty("controllerActions", actions)
 component = QQmlComponent(engine, QUrl.fromLocalFile(str(Path("ControllerPanel.qml").resolve())))
 panel = component.create()
 assert panel is not None, [e.toString() for e in component.errors()]
@@ -40,6 +43,16 @@ assert runtime.active, "panel must start polling when shown"
 assert text("controllerName") == "EdgeTX Radio"
 assert "Налаштуйте" in text("controllerSummary")
 assert panel.findChild(QObject, "configureController").property("visible")
+assert text("swapChannel") == "не призначено"
+panel.findChild(QObject, "assignSwap").clicked.emit()
+app.processEvents()
+assert text("swapChannel") == "Перемкніть тумблер, яким міняти потоки…"
+for value in (1000, 1000, 2000, 2000, 2000, 2000):
+    radio.frame = [1500, 1500, value, 1500]
+    actions.poll()
+app.processEvents()
+assert text("swapChannel") == "канал 3" and text("swapMessage") == "Потоки міняє канал 3"
+radio.frame = [1500, 1500, 1000, 1500]
 
 runtime.startWizard()
 app.processEvents()
