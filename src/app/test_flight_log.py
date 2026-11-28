@@ -67,9 +67,8 @@ def test_each_flight_gets_its_own_folder_with_seconds_events_and_summary(tmp_pat
     rt.finished.connect(lambda: finished.append(1))
     fly(rt, clock, 34)
     folders = list((tmp_path / "box").iterdir())
-    assert [f.name for f in folders] == ["2026-11-28_10-00-00 Квадрик 7"], (
-        "date, time and camera; no quotes in the name"
-    )
+    names = [f.name for f in folders]
+    assert names == ["2026-11-28_10-00-00 Квадрик 7"], "date, time and camera; no quotes in the name"
     folder = folders[0]
     assert len((folder / "seconds.jsonl").read_text(encoding="utf-8").splitlines()) == 35
     events = [json.loads(x)["text"] for x in (folder / "events.jsonl").read_text(encoding="utf-8").splitlines()]
