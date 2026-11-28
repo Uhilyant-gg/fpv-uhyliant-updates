@@ -154,5 +154,11 @@ To try on a camera: whether an IDR request exists in the installed build.
 - Position source selectable: flight-controller GPS or Starlink.
 - Wind: forecast for the drone's point and altitude; arrow and speed on the map; no wind warnings.
 
+Done (2026-11-28): the drone on the map from the flight controller's GPS (MAVLink, MSP, CRSF):
+an arrow along the heading, the trail it flew, the home point and a line home; "follow" (off by
+itself when the pilot pans), north-up or course-up; zoom with the mouse wheel or the touchpad over
+the map window (around the pointer, or around the drone while following). Still to do: download an
+area in advance, MGRS points, the Starlink position as a second source, wind.
+
 ## Out of scope
 - Payload-drop / impact-point calculators are not built by this project.

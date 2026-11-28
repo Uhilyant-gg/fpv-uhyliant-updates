@@ -86,9 +86,11 @@ class LinkDoctor(QObject):
         clock=time.monotonic,
         tick_ms=1000,
         starlink=None,
+        camera=None,
     ):
         super().__init__()
         self._starlink = starlink
+        self._camera = camera  # the camera's own health (temperature, load, video service)
         self._lost_at = None
         self._monitor = link_monitor
         self._devices = devices
@@ -191,6 +193,20 @@ class LinkDoctor(QObject):
             warning = self._starlink.warning()
             if warning and self._verdict["level"] == "ok":
                 self._verdict = {"code": "starlink", "level": "warning", "text": warning}
+        if self._camera is not None:
+            if (
+                lost
+                and self._verdict["code"] in ("camera-silent", "checking", "no-packets")
+                and self._camera.video_service_down()
+            ):
+                self._verdict = {
+                    "code": "camera-service",
+                    "level": "lost",
+                    "text": "Відеосервіс камери не працює · камера зазвичай перезапускає його сама",
+                }
+            warning = self._camera.warning()
+            if warning and self._verdict["level"] == "ok":
+                self._verdict = {"code": "camera-health", "level": "warning", "text": warning}
         self.changed.emit()
 
     def _check_internet(self, now):

@@ -26,7 +26,7 @@ GROUP_FIELDS = {
     "heartbeat": ("armed", "flightMode"),
     "battery": ("batteryVoltage", "current", "batteryRemaining"),
     "gps": ("gpsFix", "satellites", "hdop"),
-    "position": ("altitude", "groundSpeed", "heading", "homeDistance", "homeBearing"),
+    "position": ("altitude", "groundSpeed", "heading", "homeDistance", "homeBearing", "latitude", "longitude"),
     "attitude": ("roll", "pitch", "yaw"),
     "radio": ("rssi", "rssiSource"),
     "home": (),
@@ -285,6 +285,8 @@ class MavlinkWorker(QThread):
             hdg = getattr(msg, "hdg", 65535)
             self._emit(
                 "position",
+                latitude=self._position[0] if any(self._position) else None,
+                longitude=self._position[1] if any(self._position) else None,
                 altitude=msg.relative_alt / 1000.0,
                 heading=None if hdg == 65535 else hdg / 100.0,
                 homeDistance=_distance_m(self._home, self._position),
@@ -324,6 +326,8 @@ class MavlinkWorker(QThread):
             if lat or lon:
                 self._home = (lat, lon)
                 self._touch("home")
+                # Kept while the flight lasts: the home point does not go stale like a position.
+                self._data["homeLatitude"], self._data["homeLongitude"] = lat, lon
             self._emit(
                 "position",
                 homeDistance=_distance_m(self._home, self._position),

@@ -218,10 +218,12 @@ class MspRuntime(QObject):
             voltage, _mah, rssi, current = struct.unpack_from('<BHHH', payload)
             self._set({'batteryVoltage': voltage / 10, 'current': current / 100, 'rssi': rssi})
         elif command == MSP_RAW_GPS and len(payload) >= 16:
-            fix, sats, _lat, _lon, alt, speed, course = struct.unpack_from('<BBiihHH', payload)
+            fix, sats, lat, lon, alt, speed, course = struct.unpack_from('<BBiihHH', payload)
             self._set(
                 {
                     'gpsFix': fix,
+                    'latitude': lat / 1e7 if fix and (lat or lon) else None,
+                    'longitude': lon / 1e7 if fix and (lat or lon) else None,
                     'satellites': sats,
                     'altitude': float(alt),
                     'groundSpeed': speed / 100,

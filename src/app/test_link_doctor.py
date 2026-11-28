@@ -200,3 +200,34 @@ def test_starlink_warns_while_flying_and_is_asked_after_a_dropout():
     monitor.lost = False
     doctor.evaluate()
     assert starlink.asked == [7], "asked about the 7 seconds without video"
+
+
+class Camera:
+    def __init__(self):
+        self.down = False
+        self.text = ""
+
+    def video_service_down(self):
+        return self.down
+
+    def warning(self):
+        return self.text
+
+
+def test_camera_health_names_its_own_causes():
+    monitor, connections, clock = Monitor(), Connections("cloud"), Clock()
+    camera = Camera()
+    doctor = LinkDoctor(
+        monitor, Devices(), connections, internet_check=lambda: True, run_async=False, clock=clock, camera=camera
+    )
+    doctor.setActive(True)
+    camera.text = "Камера перегрівається: 93 °C"
+    doctor.evaluate()
+    assert (doctor.code, doctor.text) == ("camera-health", "Камера перегрівається: 93 °C")
+    monitor.lost = True
+    camera.down = True
+    doctor.evaluate()
+    assert doctor.code == "camera-service" and "Відеосервіс камери не працює" in doctor.text
+    connections.statuses["c1"]["cloud"]["state"] = "unavailable"
+    doctor.evaluate()
+    assert doctor.code == "camera-unreachable", "an unreachable camera is not blamed on its service"

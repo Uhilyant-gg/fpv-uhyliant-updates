@@ -302,16 +302,6 @@ def main():
         return camera_setup.CameraShell(host, username, password, DATA / 'camera_known_hosts')
 
     starlink_dish = StarlinkRuntime(d, connections, dish_shell)
-    link_doctor = LinkDoctor(link_monitor, d, connections, starlink=starlink_dish)
-    from extra_windows import ExtraWindowsRuntime
-
-    extra_windows = ExtraWindowsRuntime(d, streams, DATA / 'extra-windows.json', host_resolver=connections.host_for)
-    camera_logins = lambda: (
-        [(credentials.username or 'root', credentials.secret())]
-        + list(  # noqa: E731
-            camera_setup.DEFAULT_CREDENTIALS
-        )
-    )
     from camera_audio import AudioRuntime
     from camera_features import CameraFeaturesRuntime
 
@@ -324,6 +314,16 @@ def main():
     )
     if not x.first_run_acceptance_smoke:
         camera_features.start()
+    link_doctor = LinkDoctor(link_monitor, d, connections, starlink=starlink_dish, camera=camera_features)
+    from extra_windows import ExtraWindowsRuntime
+
+    extra_windows = ExtraWindowsRuntime(d, streams, DATA / 'extra-windows.json', host_resolver=connections.host_for)
+    camera_logins = lambda: (
+        [(credentials.username or 'root', credentials.secret())]
+        + list(  # noqa: E731
+            camera_setup.DEFAULT_CREDENTIALS
+        )
+    )
     video_preset_runtime = video_presets.VideoPresetsRuntime(
         video_presets.VideoPresetStore(DATA / 'video-presets.json'),
         d,

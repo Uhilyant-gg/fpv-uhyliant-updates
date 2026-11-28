@@ -46,6 +46,7 @@ class CrsfRuntimeTests(unittest.TestCase):
         self.assertEqual(telemetry['groundSpeed'], 45.0)
         self.assertEqual(telemetry['heading'], 90.0)
         self.assertEqual(telemetry['altitude'], 123.0)
+        self.assertEqual((telemetry['latitude'], telemetry['longitude']), (50.0, 30.0))
         self.assertEqual(telemetry['satellites'], 11)
         self.assertIsNone(telemetry['armed'])
         now[0] += runtime.STALE_SECONDS + 0.1
