@@ -13,13 +13,15 @@ import time
 from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 from PySide6.QtMultimedia import QVideoSink
 
-LOST_AFTER_S = 1.5
+LOST_AFTER_S = 1.0
 # The first frame after entering the flight screen may take a few seconds.
 STARTUP_GRACE_S = 8.0
 RESTORED_SHOWN_S = 3.0
 # With UDP push the player reports no error when packets stop, so while the link
-# is lost the monitor itself asks to re-open the video this often.
-RETRY_EVERY_S = 3.0
+# is lost the monitor itself re-opens the video: at once, then as a safety net this
+# often. A re-opened player waits for the camera by itself and opening takes ~1.5 s,
+# so re-opening more often would only interrupt it and slow the recovery down.
+RETRY_EVERY_S = 10.0
 
 
 class LinkMonitor(QObject):
@@ -91,7 +93,13 @@ class LinkMonitor(QObject):
             self._timer.stop()
         self.changed.emit()
 
-    def _frame(self, *_):
+    def _frame(self, frame=None):
+        # Stopping or re-opening the player sends an empty frame: that is not video.
+        try:
+            if frame is not None and not frame.isValid():
+                return
+        except AttributeError:
+            pass
         self._last_frame = self._clock()
         self._seen_frame = True
         if self._lost_since is not None:
