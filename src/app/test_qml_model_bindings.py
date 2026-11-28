@@ -70,6 +70,7 @@ MODELS = {
     "blackBox": ("flight_log", "BlackBoxRuntime"),
     "linkTest": ("link_test", "LinkTestRuntime"),
     "mapMarks": ("map_marks", "MapMarksRuntime"),
+    "windRuntime": ("wind", "WindRuntime"),
     "controllerActions": ("controller_actions", "ControllerActions"),
     "videoPresets": ("video_presets", "VideoPresetsRuntime"),
     "connectionsRuntime": ("connections_runtime", "ConnectionsRuntime"),

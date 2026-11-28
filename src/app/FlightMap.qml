@@ -48,7 +48,8 @@ Item {
   name: "osm"
   PluginParameter { name: "osm.mapping.custom.host"; value: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/%z/%y/%x" }
   PluginParameter { name: "osm.mapping.providersrepository.disabled"; value: true }
-  PluginParameter { name: "osm.mapping.cache.directory"; value: StandardPaths.writableLocation(StandardPaths.AppLocalDataLocation).toString().replace("file://", "") + "/map-tiles" }
+  // A real folder path from the station (a file:// URL turned into a path breaks on Windows: "/C:/...").
+  PluginParameter { name: "osm.mapping.cache.directory"; value: typeof mapTilesDir !== "undefined" ? mapTilesDir : StandardPaths.writableLocation(StandardPaths.AppLocalDataLocation).toString().replace("file://", "") + "/map-tiles" }
   PluginParameter { name: "osm.useragent"; value: "FPV-Uhyliant-ground-station" }
  }
 
@@ -302,6 +303,35 @@ Item {
     }
    }
   }
+ }
+
+ // The wind at the drone's height: an arrow to where it blows, speed and gusts (no warnings).
+ Rectangle {
+  objectName: "flightMapWind"
+  readonly property bool windAvailable: typeof windRuntime !== "undefined" && windRuntime !== null && windRuntime.available
+  visible: windAvailable
+  z: 2
+  anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 6
+  anchors.topMargin: 28
+  width: windRow.implicitWidth + 12; height: 30; radius: 6
+  color: "#cc0b1420"; border.color: "#5f7f9e"
+  Row {
+   id: windRow
+   anchors.centerIn: parent
+   spacing: 6
+   Text {
+    text: "➜"
+    color: "#7fd3ff"; font.pixelSize: 16; font.bold: true
+    // Where the wind blows to, turned with the map.
+    rotation: parent.parent.windAvailable ? windRuntime.wind.fromDeg + 180 - 90 - view.map.bearing : 0
+   }
+   Text {
+    anchors.verticalCenter: parent.verticalCenter
+    text: parent.parent.windAvailable ? (String(windRuntime.wind.speedMs).replace(".", ",") + " м/с" + (windRuntime.wind.gustMs ? " · пориви " + String(windRuntime.wind.gustMs).replace(".", ",") : "") + " · " + windRuntime.wind.levelM + " м") : ""
+    color: "#f4f7fb"; font.pixelSize: 12; font.bold: true
+   }
+  }
+  HoverHint { text: parent.windAvailable ? windRuntime.text + ". Прогноз Open-Meteo для точки дрона." : ""; delay: 500 }
  }
 
  Rectangle {
