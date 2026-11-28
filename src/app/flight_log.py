@@ -128,6 +128,68 @@ def summary_lines(summary: dict) -> list[str]:
     return lines
 
 
+MONTHS = (
+    "січня",
+    "лютого",
+    "березня",
+    "квітня",
+    "травня",
+    "червня",
+    "липня",
+    "серпня",
+    "вересня",
+    "жовтня",
+    "листопада",
+    "грудня",
+)
+
+
+def day_label(day, today) -> str:
+    """ "Сьогодні", "Вчора" or "28 листопада 2026"."""
+    if day == today:
+        return "Сьогодні"
+    if (today - day).days == 1:
+        return "Вчора"
+    return f"{day.day} {MONTHS[day.month - 1]} {day.year}"
+
+
+def _read_json(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def list_flights(root: Path, today) -> list[dict]:
+    """The flights in the black box, newest first, each with its day for grouping."""
+    try:
+        folders = [p for p in Path(root).iterdir() if p.is_dir() and _NAME.match(p.name) and (p / HEADER).exists()]
+    except OSError:
+        return []
+    flights = []
+    for folder in sorted(folders, key=lambda p: p.name, reverse=True):
+        header = _read_json(folder / HEADER)
+        summary = _read_json(folder / "summary.json")
+        try:
+            started = datetime.strptime(folder.name[:19], "%Y-%m-%d_%H-%M-%S")
+        except ValueError:
+            continue
+        flights.append(
+            {
+                "path": str(folder),
+                "day": day_label(started.date(), today),
+                "time": started.strftime("%H:%M"),
+                "camera": summary.get("camera") or header.get("camera", ""),
+                "link": header.get("link", ""),
+                "finished": bool(summary),
+                "duration": format_duration(summary.get("durationS", 0)) if summary else "",
+                "outages": int(summary.get("outages", 0) or 0),
+            }
+        )
+    return flights
+
+
 class FlightLog:
     """Writes one flight; the files stay valid line by line even if the PC loses power."""
 
@@ -223,6 +285,7 @@ class BlackBoxRuntime(QObject):
         self._folder = str(self._settings.value(FOLDER_KEY, "") or "").strip()
         self._log: FlightLog | None = None
         self._summary: dict = {}
+        self._flights: list[dict] = []
         self._error = ""
         self._timer = QTimer(self)
         self._timer.setInterval(interval_ms)
@@ -291,6 +354,69 @@ class BlackBoxRuntime(QObject):
         folder = self._summary.get("folder")
         return bool(folder and self._open_url(QUrl.fromLocalFile(folder)))
 
+    # --- the flights journal --------------------------------------------------
+    @Property("QVariantList", notify=changed)
+    def flights(self):
+        return list(self._flights)
+
+    @Slot()
+    def refresh(self):
+        self._flights = list_flights(Path(self.folder), self._now().date())
+        self.changed.emit()
+
+    def _own(self, path) -> Path | None:
+        """A flight folder of this black box, never anything else."""
+        try:
+            folder = Path(str(path)).resolve()
+            root = Path(self.folder).resolve()
+        except OSError:
+            return None
+        if folder.parent != root or not _NAME.match(folder.name) or not (folder / HEADER).exists():
+            return None
+        return folder
+
+    @Slot(str, result="QVariantMap")
+    def flightDetails(self, path):
+        folder = self._own(path)
+        if folder is None:
+            return {}
+        header = _read_json(folder / HEADER)
+        summary = _read_json(folder / "summary.json")
+        events = []
+        try:
+            for line in (folder / "events.jsonl").read_text(encoding="utf-8").splitlines():
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(entry, dict):
+                    events.append({"time": str(entry.get("time", "")), "text": str(entry.get("text", ""))})
+        except OSError:
+            pass
+        return {
+            "camera": header.get("camera", ""),
+            "link": header.get("link", ""),
+            "started": header.get("started", ""),
+            "lines": summary_lines(summary)
+            if summary
+            else ["Політ не завершився штатно (наприклад, станцію закрили)."],
+            "events": events,
+        }
+
+    @Slot(str, result=bool)
+    def openFlight(self, path):
+        folder = self._own(path)
+        return bool(folder and self._open_url(QUrl.fromLocalFile(str(folder))))
+
+    @Slot(str, result=bool)
+    def deleteFlight(self, path):
+        folder = self._own(path)
+        if folder is None or (self._log is not None and self._log.folder.resolve() == folder):
+            return False
+        shutil.rmtree(folder, ignore_errors=True)
+        self.refresh()
+        return not folder.exists()
+
     # --- a flight -------------------------------------------------------------
     @Slot(bool)
     def setActive(self, active):
@@ -331,6 +457,7 @@ class BlackBoxRuntime(QObject):
         except OSError:
             summary = {}
         self._summary = summary
+        self._flights = list_flights(Path(self.folder), self._now().date())
         self.changed.emit()
         if summary and summary.get("durationS", 0) >= SHORT_FLIGHT_S:
             self.finished.emit()

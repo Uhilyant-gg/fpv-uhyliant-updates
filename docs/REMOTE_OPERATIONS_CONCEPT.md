@@ -76,6 +76,8 @@ in plain words, and the station fixes what it can by itself.
    Done: `<black box folder>/<date_time camera>/` holds `flight.json` (camera, link), `seconds.jsonl`
    (video, link, Starlink, flight controller, preset every second), `events.jsonl`, `summary.json`
    and `Підсумок.txt`; after a flight of 20 s or more the pilot sees the summary. Last 200 flights.
+   "Журнал польотів" in the home menu lists every flight newest first, grouped by day (сьогодні,
+   вчора, date), with duration and dropouts at a glance; a click shows its summary and events.
 9. A 20-second link test in Preflight before take-off.
    Done: starts by itself when Preflight opens; checks once a second whether the camera answers and
    how fast, and on the flight screen also frames, dropouts and packet loss; then says "можна

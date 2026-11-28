@@ -128,3 +128,40 @@ def test_durations_in_plain_words():
     assert fl.format_duration(125) == "2 хв 05 с"
     assert fl.format_duration(3725) == "1 год 02 хв"
     assert fl.safe_name('a/b:c*"d"') == "a b c d"
+
+
+def test_the_journal_lists_flights_newest_first_grouped_by_day(tmp_path):
+    rt, clock, opened = make(tmp_path, [{"fps": 30, "lost": False, "verdictText": ""}])
+    root = tmp_path / "box"
+    for name, summary in (
+        ("2026-11-26_09-15-00 Крило", {"durationS": 600, "outages": 2, "camera": "Крило"}),
+        ("2026-11-27_18-40-10 Квадрик", {"durationS": 125, "outages": 0, "camera": "Квадрик"}),
+        ("2026-11-28_08-05-00 Квадрик", None),
+    ):
+        (root / name).mkdir(parents=True)
+        (root / name / fl.HEADER).write_text(json.dumps({"camera": name.split(" ")[1], "link": "Starlink IPv6"}))
+        if summary:
+            (root / name / "summary.json").write_text(json.dumps(summary))
+    (root / "2026-11-27_18-40-10 Квадрик" / "events.jsonl").write_text(
+        json.dumps({"time": "18:41:02", "text": "Відео зникло"}) + "\nbroken\n", encoding="utf-8"
+    )
+    (root / "not a flight").mkdir()
+    rt.refresh()
+    flights = rt.flights
+    assert [f["day"] for f in flights] == ["Сьогодні", "Вчора", "26 листопада 2026"]
+    assert [(f["time"], f["duration"], f["outages"]) for f in flights] == [
+        ("08:05", "", 0),
+        ("18:40", "2 хв 05 с", 0),
+        ("09:15", "10 хв 00 с", 2),
+    ]
+    assert not flights[0]["finished"]
+    details = rt.flightDetails(flights[1]["path"])
+    assert details["events"] == [{"time": "18:41:02", "text": "Відео зникло"}]
+    assert details["lines"][0] == "Тривалість: 2 хв 05 с"
+    assert "не завершився" in rt.flightDetails(flights[0]["path"])["lines"][0]
+    assert rt.flightDetails(str(tmp_path)) == {}, "only folders of this black box"
+    assert not rt.deleteFlight(str(root / "not a flight"))
+    assert rt.deleteFlight(flights[2]["path"])
+    assert len(rt.flights) == 2 and (root / "not a flight").exists()
+    rt.openFlight(rt.flights[0]["path"])
+    assert opened == [rt.flights[0]["path"]]

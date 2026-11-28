@@ -16,6 +16,7 @@ Item {
  signal openController()
  signal openPresets()
  signal openRecording()
+ signal openFlights()
  signal openStationSettings()
  signal openVehicleSettings()
  signal openService()
@@ -37,6 +38,7 @@ Item {
   {label: "Камери", detail: "Знайти, вибрати або додати камеру", glyph: "◉", action: "devices", section: "main"},
   {label: "Дрони і пресети", detail: "Пресети, OSD і попередження для кожного дрона", glyph: "☰", action: "vehicles", section: "main"},
   {label: "Налаштування станції", detail: "Пульт, запис відео, ZeroTier, резервна копія", glyph: "⚙", action: "station", section: "main"},
+  {label: "Журнал польотів", detail: "Чорна скринька: усі польоти за датою", glyph: "▤", action: "flights", section: "main"},
   {label: "Обслуговування", detail: "Діагностика, події, прошивка камери", glyph: "⌕", action: "service", section: "main"}
  ]
 
@@ -90,6 +92,7 @@ Item {
   else if (action === "controller") openController()
   else if (action === "presets") openPresets()
   else if (action === "recording") openRecording()
+  else if (action === "flights") openFlights()
   else if (action === "station") openStationSettings()
   else if (action === "vehicles") openVehicleSettings()
   else if (action === "service") openService()
