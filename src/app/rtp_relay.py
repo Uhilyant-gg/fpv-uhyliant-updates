@@ -96,6 +96,8 @@ class RtpRelay:
         self._thread = None
 
     def start(self) -> bool:
+        # All interfaces on purpose: the camera pushes from the internet to this PC's public
+        # address (the router forwards the port here), exactly like the pre-flight listener.
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4 * 1024 * 1024)
@@ -121,6 +123,8 @@ class RtpRelay:
                     data = sock.recv(65536)
                 except OSError:
                     break
+                if parse_rtp(data) is None:
+                    continue  # the port is open to the internet: only RTP video goes on to the player
                 try:
                     out.sendto(data, target)
                 except OSError:

@@ -82,6 +82,7 @@ def test_relay_forwards_every_packet_and_counts_them():
     try:
         camera = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         for seq in range(20):
+            camera.sendto(b"not video", ("127.0.0.1", listen))  # dropped, never reaches the player
             camera.sendto(packet(seq), ("127.0.0.1", listen))
         received = [player.recv(2048) for _ in range(20)]
         assert [parse_rtp(p)[0] for p in received] == list(range(20)), "same packets, same order"
