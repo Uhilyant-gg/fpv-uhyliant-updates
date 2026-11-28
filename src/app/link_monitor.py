@@ -22,6 +22,8 @@ RESTORED_SHOWN_S = 3.0
 # often. A re-opened player waits for the camera by itself and opening takes ~1.5 s,
 # so re-opening more often would only interrupt it and slow the recovery down.
 RETRY_EVERY_S = 10.0
+# The link graph on the flight bar: frames received in each of the last seconds.
+HISTORY_SECONDS = 60
 
 
 class LinkMonitor(QObject):
@@ -38,6 +40,9 @@ class LinkMonitor(QObject):
         self._restored_at = None
         self._seen_frame = False
         self._last_retry = None
+        self._history = []
+        self._count = 0
+        self._bucket_start = None
         self._timer = QTimer(self)
         self._timer.setInterval(tick_ms)
         self._timer.timeout.connect(self.evaluate)
@@ -53,6 +58,14 @@ class LinkMonitor(QObject):
     @Property(bool, notify=changed)
     def justRestored(self):
         return self._restored_at is not None and self._clock() - self._restored_at < RESTORED_SHOWN_S
+
+    @Property("QVariantList", notify=changed)
+    def history(self):
+        return list(self._history)
+
+    @Property(int, notify=changed)
+    def fps(self):
+        return self._history[-1] if self._history else 0
 
     @Property(str, notify=changed)
     def text(self):
@@ -87,6 +100,9 @@ class LinkMonitor(QObject):
         self._lost_since = None
         self._restored_at = None
         self._last_retry = None
+        self._history = []
+        self._count = 0
+        self._bucket_start = self._clock() if active else None
         if active:
             self._timer.start()
         else:
@@ -102,6 +118,7 @@ class LinkMonitor(QObject):
             pass
         self._last_frame = self._clock()
         self._seen_frame = True
+        self._count += 1
         if self._lost_since is not None:
             self._lost_since = None
             self._restored_at = self._clock()
@@ -112,6 +129,11 @@ class LinkMonitor(QObject):
         if not self._active:
             return
         now = self._clock()
+        while now - self._bucket_start >= 1.0:
+            self._history.append(self._count)
+            self._count = 0
+            self._bucket_start += 1.0
+        del self._history[:-HISTORY_SECONDS]
         limit = LOST_AFTER_S if self._seen_frame else STARTUP_GRACE_S
         if self._lost_since is None and now - self._last_frame > limit:
             self._lost_since = self._last_frame

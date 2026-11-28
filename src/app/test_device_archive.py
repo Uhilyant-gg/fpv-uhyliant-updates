@@ -35,7 +35,7 @@ def test_archive_hides_restore_returns(devices):
     assert [d["id"] for d in devices.homeItems] == [second]
     assert [d["id"] for d in devices.archivedItems] == [first]
     assert devices.archivedItems[0]["archivedAt"] > 0
-    assert devices.activeName == "", "archiving the active camera releases it"
+    assert devices.activeName == "" and devices.activeId == "", "archiving the active camera releases it"
     devices.setActive(first)
     assert devices.activeName == "", "an archived camera cannot become active"
     assert not devices.archiveDevice(first), "already archived"
