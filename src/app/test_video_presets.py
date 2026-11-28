@@ -226,3 +226,21 @@ def test_an_older_camera_without_cbr_still_gets_the_preset():
     preset = vp.build_ladder()["6"]
     assert vp.run_on_camera("10.0.0.2", [("root", "12345")], Shell, vp.commands(preset)) == {"state": "applied"}
     assert len(ran) == 6
+
+
+def test_the_second_stream_has_its_own_presets_on_video1(tmp_path):
+    rt, sent, store = make(tmp_path)
+    rt.apply("6")
+    rt.editStream(1, "Другий потік")
+    assert rt.channel == 1 and rt.streamName == "Другий потік" and rt.activeKey == ""
+    rt.apply("3")
+    assert sent[-1][1][1] == "cli -s .video1.size 640x360" and sent[-1][1][3] == "cli -s .video1.bitrate 768"
+    assert rt.streamLabel.startswith("3 · ") and rt.label.startswith("6 · "), "the flight bar shows the main stream"
+    assert store.load()["c1#video1"]["active"] == "3" and store.load()["c1"]["active"] == "6"
+    rt.chooseMain("4")
+    assert sent[-1][1][0] == "cli -s .video0.rcMode cbr", "keys act on the main stream"
+    assert rt.channel == 1, "the presets window stays on its stream"
+    rt.stepBitrateMain(1)
+    assert sent[-1][1][0].startswith("cli -s .video0.bitrate")
+    rt.editStream(0, "")
+    assert rt.channel == 0 and rt.streamName == "Основний потік"

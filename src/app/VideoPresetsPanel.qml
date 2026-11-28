@@ -33,7 +33,7 @@ Item {
 
   RowLayout {
    Layout.fillWidth: true
-   Text { text: "ПРЕСЕТИ ВІДЕО · " + (devicesModel.activeName || "камера не вибрана"); color: root.fg; font.pixelSize: 20; font.bold: true; Layout.fillWidth: true; elide: Text.ElideRight }
+   Text { text: "ПРЕСЕТИ ВІДЕО · " + (devicesModel.activeName || "камера не вибрана") + " · " + videoPresets.streamName; color: root.fg; font.pixelSize: 20; font.bold: true; Layout.fillWidth: true; elide: Text.ElideRight }
    Button { objectName: "closeVideoPresets"; text: "Закрити"; onClicked: root.closeRequested() }
   }
   Text {
@@ -43,6 +43,7 @@ Item {
   RowLayout {
    Layout.fillWidth: true
   Switch {
+   visible: videoPresets.channel === 0
    objectName: "videoPresetsAuto"
    text: "1 · Авто: станція сама перемикає ці пресети за станом каналу"
    checked: videoPresets.auto

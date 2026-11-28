@@ -63,6 +63,7 @@ MODELS = {
     "dvrRuntime": ("dvr_runtime", "DvrRuntime"),
     "linkMonitor": ("link_monitor", "LinkMonitor"),
     "linkDoctor": ("link_doctor", "LinkDoctor"),
+    "extraWindows": ("extra_windows", "ExtraWindowsRuntime"),
     "starlinkDish": ("starlink_runtime", "StarlinkRuntime"),
     "controllerActions": ("controller_actions", "ControllerActions"),
     "videoPresets": ("video_presets", "VideoPresetsRuntime"),

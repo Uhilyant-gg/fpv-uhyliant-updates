@@ -19,12 +19,12 @@ ApplicationWindow {
  function stateUa(value){if(value===undefined||value===null||value==="")return "недоступно";var states={"idle":"очікування","stopped":"зупинено","checking":"перевірка","ready":"готово","playing":"відтворення","reconnecting":"перепідключення","stalled":"зупинка потоку","error":"помилка","blocked":"заблоковано","executing":"виконання","installing":"встановлення","reboot-pending":"очікується перезапуск","verified":"перевірено","hardware-validation-pending":"очікується перевірка на обладнанні","applied-pending-verification":"застосовано, очікується перевірка","unavailable":"недоступно","unknown":"ще не визначено","connected":"підключено","disconnected":"відключено","stale":"дані давно не оновлювалися","degraded":"працює нестабільно","attention":"потребує уваги","traffic-no-heartbeat":"є передавання без підтвердження зв’язку","ok":"справно"};return states[value]||"потрібна перевірка"}
  function stopPrimary(){videoRecovery.stop();player.stop();player.source="";videoRuntime.stop();videoRecoveryCount=0}
  function stopSecondary(){secondaryRecovery.stop();secondaryPlayer.stop();secondaryPlayer.source="";secondaryVideoRuntime.stop();secondaryRecoveryCount=0}
- // The small window and the big picture change places at once: each player keeps drawing into
- // its own output and the outputs swap their size and place, so nothing is re-opened. Without the small window the streams swap roles.
- property bool pipSwapped:false
- property int pipCorner:1
- property real pipScale:0.32
- function swapWindows(){if(pipEnabled&&!primaryDetached&&!secondaryDetached){pipSwapped=!pipSwapped}else if(streamWorkspace.state.pipAvailable){streamWorkspace.swap();rebuildPlayback()}}
+ // Additional windows (up to three, opened by the pilot with "+"). A window and the main video
+ // change places at once: each player keeps its own output and only the outputs move.
+ property int mainSource:-1
+ function swapWithWindow(i){var win=extraWindows.windows[i];if(!win||!win.open||win.detached||win.fullscreen)return;mainSource=(mainSource===i)?-1:i;extraWindows.touch(i)}
+ function swapWindows(){var i=extraWindows.lastUsed;if(i>=0)swapWithWindow(i)}
+ Connections{target:extraWindows;function onChanged(){if(w.mainSource>=0){var win=extraWindows.windows[w.mainSource];if(!win||!win.open||win.detached||win.fullscreen)w.mainSource=-1}}}
  function setPip(enabled){var requested=enabled&&streamWorkspace.state.pipAvailable;videoWorkspaceRuntime.setPipEnabled(requested);if(!requested)stopSecondary();else startSecondary()}
  function connectDevice(id){var item=null;for(var i=0;i<devicesModel.items.length;i++){if(devicesModel.items[i].id===id){item=devicesModel.items[i];break}}if(!item||item.onboardingState!=="ready")return;serviceMode=false;stopPrimary();setPip(false);devicesModel.setActive(id);timelineRuntime.recordEvent("camera-selected");streamWorkspace.autoSelect();if(devicesModel.activeName!==""&&streamWorkspace.state.primaryId!=="")startSelected()}
  function disconnectDevice(){serviceMode=false;primaryDetached=false;secondaryDetached=false;stopPrimary();setPip(false);videoWorkspaceRuntime.stopAll();devicesModel.clearActive();streamWorkspace.autoSelect()}
@@ -36,11 +36,11 @@ ApplicationWindow {
  function rebuildPlayback(){var wasPlaying=player.playbackState===MediaPlayer.PlayingState||videoRuntime.streamId!=="";var keepPip=pipEnabled&&streamWorkspace.state.pipAvailable;stopPrimary();stopSecondary();if(wasPlaying)startSelected();if(keepPip&&streamWorkspace.state.pipAvailable){videoWorkspaceRuntime.setPipEnabled(true);startSecondary()}}
  function recoverPrimary(){if(!connected||videoRuntime.url==="")return;videoRecoveryCount++;videoRecovery.interval=videoRecoveryCount<10?1000:2000;player.stop();if(videoRuntime.reconnect()){player.source="";player.source=videoRuntime.url;player.play()}else videoRecovery.start()}
  function recoverSecondary(){if(!pipEnabled||secondaryVideoRuntime.url==="")return;secondaryRecoveryCount++;secondaryRecovery.interval=secondaryRecoveryCount<10?1000:2000;secondaryPlayer.stop();if(secondaryVideoRuntime.reconnect()){secondaryPlayer.source="";secondaryPlayer.source=secondaryVideoRuntime.url;secondaryPlayer.play()}else secondaryRecovery.start()}
- onPipEnabledChanged:if(!pipEnabled){pipSwapped=false;secondaryDetached=false;secondaryRecovery.stop();secondaryPlayer.stop();secondaryPlayer.source="";secondaryRecoveryCount=0}
+ onPipEnabledChanged:if(!pipEnabled){secondaryDetached=false;secondaryRecovery.stop();secondaryPlayer.stop();secondaryPlayer.source="";secondaryRecoveryCount=0}
  MediaPlayer{id:player;videoOutput:primaryDetached?detachedPrimaryVideoOut:videoOut;onPlayingChanged:{timelineRuntime.observe("primary-video",playing?"playing":"stopped");if(playing){videoRecovery.stop();videoRecoveryCount=0;videoRuntime.markPlaying()}else if(videoRuntime.state==="playing"){videoRuntime.markStalled("Основний відеопотік несподівано зупинився.");videoRecovery.restart()}}onErrorOccurred:function(error,errorString){videoRuntime.playbackError(errorString);if(videoRuntime.streamId!=="")videoRecovery.restart()}}
  property bool dvrVideoAvailable: !simulation && connected && player.playbackState === MediaPlayer.PlayingState
  onDvrVideoAvailableChanged: dvrRuntime.setVideoAvailable(dvrVideoAvailable)
- onConnectedChanged: { if (!connected) { dvrRuntime.stop(); connectionsRuntime.resumeListening() } else connectionsRuntime.pauseListening() }
+ onConnectedChanged: { if (!connected) { dvrRuntime.stop(); extraWindows.closeAll(); w.mainSource = -1; connectionsRuntime.resumeListening() } else connectionsRuntime.pauseListening() }
  function attachDvrSink(){var sink=player.videoOutput ? player.videoOutput.videoSink : null;dvrRuntime.setVideoSink(sink);linkMonitor.setVideoSink(sink)}
  property bool linkWatchActive: connected && !simulation && !serviceMode
  onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive);controllerActions.setActive(linkWatchActive);starlinkDish.setActive(linkWatchActive)}
@@ -75,19 +75,18 @@ ApplicationWindow {
   OsdOverlay{anchors.fill:parent;anchors.margins:12;visible:station.osdEnabled;positions:station.osdElements;enabledElements:station.osdEnabledElements;corner:station.osdPosition;opacityValue:station.osdOpacity;scaleFactor:station.osdScale;telemetry:t;video:sd}
  }
  property bool flightBarHidden: false
- Shortcut{sequence:"1";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("1")}
- Shortcut{sequence:"2";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("2")}
- Shortcut{sequence:"3";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("3")}
- Shortcut{sequence:"4";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("4")}
- Shortcut{sequence:"5";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("5")}
- Shortcut{sequence:"6";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("6")}
- Shortcut{sequence:"7";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("7")}
- Shortcut{sequence:"8";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("8")}
- Shortcut{sequence:"9";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("9")}
- Shortcut{sequence:"0";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.choose("0")}
+ Shortcut{sequence:"1";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("1")}
+ Shortcut{sequence:"2";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("2")}
+ Shortcut{sequence:"3";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("3")}
+ Shortcut{sequence:"4";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("4")}
+ Shortcut{sequence:"5";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("5")}
+ Shortcut{sequence:"6";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("6")}
+ Shortcut{sequence:"7";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("7")}
+ Shortcut{sequence:"8";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("8")}
+ Shortcut{sequence:"9";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("9")}
+ Shortcut{sequence:"0";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("0")}
  Shortcut{sequence:"Tab";enabled:pages.currentIndex===1&&!w.simulation;onActivated:w.swapWindows()}
- Shortcut{sequence:"F1";enabled:pages.currentIndex===1&&!w.simulation;onActivated:w.setPip(false)}
- Shortcut{sequence:"F2";enabled:pages.currentIndex===1&&!w.simulation;onActivated:w.setPip(true)}
+ Shortcut{sequence:"Esc";enabled:pages.currentIndex===1;onActivated:{for(var i=0;i<extraWindows.windows.length;i++)if(extraWindows.windows[i].fullscreen)extraWindows.setFullscreen(i,false)}}
  Shortcut{sequence:"F10";enabled:pages.currentIndex===1;onActivated:w.flightBarHidden=!w.flightBarHidden}
  Shortcut{sequence:"F9";enabled:connected&&!serviceMode&&!simulation;onActivated:dvrRuntime.toggle()}
  Shortcut{sequence:"F2";enabled:connected&&!serviceMode&&!simulation;onActivated:startSelected()} Shortcut{sequence:"F11";onActivated:w.visibility=w.visibility===Window.FullScreen?Window.Maximized:Window.FullScreen}
@@ -114,57 +113,87 @@ ApplicationWindow {
     linkLostSeconds: linkMonitor.lostSeconds
     linkFps: linkMonitor.fps
     linkWarning: linkDoctor.level === "warning"
-    onOpenVehicle: videoPresetsPopup.open()
+    onOpenVehicle: { videoPresets.editStream(0, ""); videoPresetsPopup.open() }
     onOpenHardware: hardwarePopup.open()
     onOpenStarlink: starlinkPopup.open()
-    pipAvailable: streamWorkspace.state.pipAvailable === true
-    pipOn: w.pipEnabled
-    onTogglePip: w.setPip(!w.pipEnabled)
     onOpenMenu: flightMenu.open()
     onHideRequested: w.flightBarHidden = true
     onLeaveFlight: { if (w.simulation) w.simulation = false; else if (t.armed === true) leaveFlightConfirm.open(); else disconnectDevice() }
    }
+   StreamsSidebar {
+    id: streamsSidebar
+    objectName: "streamsSidebar"
+    visible: !w.simulation && !w.flightBarHidden && extraWindows.sources.length > 0
+    anchors.left: parent.left
+    anchors.top: flightBar.visible ? flightBar.bottom : parent.top
+    anchors.bottom: parent.bottom
+    width: visible ? implicitWidth : 0
+    onOpenLayouts: layoutsPopup.open()
+    onOpenStreamSettings: function(stream) {
+     if (stream.kind === "main") { videoPresets.editStream(0, ""); videoPresetsPopup.open(); return }
+     streamSettingsContent.stream = stream
+     streamSettingsPopup.open()
+    }
+   }
+   Popup {
+    id: streamSettingsPopup
+    objectName: "streamSettingsPopup"
+    x: streamsSidebar.width + 6
+    y: (flightBar.visible ? flightBar.height : 0) + 6
+    padding: 0
+    background: Rectangle { color: "#f20a1420"; border.color: "#71879c"; radius: 12 }
+    contentItem: StreamSettingsPanel {
+     id: streamSettingsContent
+     onCloseRequested: streamSettingsPopup.close()
+     onOpenPresets: function(channel, name) { streamSettingsPopup.close(); videoPresets.editStream(channel, name); videoPresetsPopup.open() }
+    }
+   }
+   Popup {
+    id: layoutsPopup
+    objectName: "layoutsPopup"
+    x: streamsSidebar.width + 6
+    y: parent.height - height - 12
+    padding: 0
+    background: Rectangle { color: "#f20a1420"; border.color: "#71879c"; radius: 12 }
+    contentItem: LayoutsPanel { onCloseRequested: layoutsPopup.close() }
+   }
    Item {
    id: flightArea
    objectName: "flightVideoArea"
-   anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+   // The additional windows are kept apart and on screen for this shape of the video area.
+   readonly property real windowsAspect: width > 0 && height > 0 ? width / height : 1.8
+   onWindowsAspectChanged: extraWindows.setAspect(windowsAspect)
+   anchors.left: streamsSidebar.right; anchors.right: parent.right; anchors.bottom: parent.bottom
    anchors.top: flightBar.visible ? flightBar.bottom : parent.top
    clip: true
-   Rectangle { anchors.fill: parent; visible: !w.simulation; color: "black" }
+   Rectangle { anchors.fill: parent; visible: !w.simulation; color: "black"; z: -2 }
    VideoOutput {
     id: videoOut
     objectName: "mainFlightVideoOutput"
-    readonly property bool small: w.pipSwapped && pipWindow.visible
-    x: small ? pipWindow.x : 0
-    y: small ? pipWindow.y : 0
-    width: small ? pipWindow.width : parent.width
-    height: small ? pipWindow.height : parent.height
-    z: small ? 6 : 0
+    // When the pilot swaps it with an additional window, it takes that window's place.
+    readonly property var box: w.mainSource >= 0 && extraRepeater.itemAt(w.mainSource) ? extraRepeater.itemAt(w.mainSource).windowRect : null
+    x: box ? box.x : 0
+    y: box ? box.y : 0
+    width: box ? box.width : parent.width
+    height: box ? box.height : parent.height
+    z: box ? extraRepeater.itemAt(w.mainSource).contentZ : 0
     visible: !w.simulation
     fillMode: VideoOutput.PreserveAspectFit
    }
-   Text {
-    objectName: "bigSecondaryNoSignal"
-    // The additional stream is on the big screen but sends nothing: say so, the main one is in the small window.
-    visible: w.pipSwapped && pipWindow.visible && secondaryPlayer.playbackState !== MediaPlayer.PlayingState
-    anchors.centerIn: parent
-    z: 1
-    text: "Додаткове відео: немає сигналу · основне у віконці (Tab — поміняти)"
-    color: fg
-    font.pixelSize: 18
-    font.bold: true
-   }
-   VideoOutput {
-    id: secondaryVideoOut
-    objectName: "secondaryFlightVideoOutput"
-    readonly property bool big: w.pipSwapped && pipWindow.visible
-    x: big ? 0 : pipWindow.x
-    y: big ? 0 : pipWindow.y
-    width: big ? parent.width : pipWindow.width
-    height: big ? parent.height : pipWindow.height
-    z: big ? 0 : 6
-    visible: pipWindow.visible
-    fillMode: VideoOutput.PreserveAspectFit
+   // The older single second stream keeps an output; its window is replaced by the windows below.
+   VideoOutput { id: secondaryVideoOut; visible: false; width: 1; height: 1 }
+   Repeater {
+    id: extraRepeater
+    model: 3
+    ExtraVideoWindow {
+     slot: index
+     win: extraWindows.windows[index] || ({})
+     shownAsMain: w.mainSource === index
+     baseZ: 30 + (extraWindows.lastUsed === index ? 12 : index * 4)
+     canDetach: Qt.application.screens.length > 1
+     visible: !w.simulation && win.open === true
+     onSwapRequested: function(s) { w.swapWithWindow(s) }
+    }
    }
    Item {
     id: simulationWorld
@@ -203,7 +232,7 @@ ApplicationWindow {
     // Green: back again.
     readonly property bool warning: !linkMonitor.lost && !linkMonitor.justRestored && linkDoctor.level === "warning"
     visible: (linkMonitor.text !== "" || warning) && !w.simulation
-    z: 26
+    z: 71
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.top: parent.top
     anchors.topMargin: flightAlerts.active ? 72 : 16
@@ -223,7 +252,7 @@ ApplicationWindow {
    Rectangle {
     objectName: "flightAlertBanner"
     visible: flightAlerts.active && !w.simulation
-    z: 25
+    z: 70
     anchors.top: parent.top
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.topMargin: 16
@@ -237,48 +266,10 @@ ApplicationWindow {
    Rectangle { visible:w.displayFallbackNotice!==""&&!w.simulation; z:20; anchors.top:parent.top; anchors.horizontalCenter:parent.horizontalCenter; anchors.topMargin:16; width:Math.min(parent.width-32,620); height:48; radius:10; color:"#e60b1522"; border.color:amber; Text{anchors.fill:parent;anchors.margins:10;text:w.displayFallbackNotice;color:fg;horizontalAlignment:Text.AlignHCenter;verticalAlignment:Text.AlignVCenter;wrapMode:Text.WordWrap} }
    Column { objectName:"videoStartOverlay"; visible:!w.simulation&&player.playbackState!==MediaPlayer.PlayingState&&!primaryDetached&&!linkMonitor.lost; anchors.centerIn:parent; spacing:8; Text{text:stateUa(videoRuntime.state);color:fg;font.pixelSize:20;font.bold:true} Text{text:videoRuntime.error;color:red;visible:text!==""} Button{text:"Запустити відео";enabled:selectedStreamId!=="";onClicked:startSelected()} }
    Column { visible:!w.simulation&&primaryDetached; anchors.centerIn:parent; spacing:8; Text{text:"Основний потік відкрито в окремому вікні";color:fg;font.pixelSize:18} Button{text:"Повернути до основного екрана";onClicked:primaryDetached=false} }
-   Rectangle { visible: pipWindow.visible; x: pipWindow.x; y: pipWindow.y; width: pipWindow.width; height: pipWindow.height; radius: 8; color: "black"; z: 5 }
-   Rectangle {
-    id: pipWindow
-    objectName: "pipWindow"
-    // The pilot places it: drag to any corner, mouse wheel for the size, click to swap with the big picture.
-    visible: !w.simulation && pipEnabled && streamWorkspace.state.pipAvailable && !secondaryDetached
-    z: 7
-    width: Math.min(parent.width * w.pipScale, 640)
-    height: width * 9 / 16
-    readonly property real margin: 12
-    x: (w.pipCorner === 0 || w.pipCorner === 3) ? margin : parent.width - width - margin
-    y: (w.pipCorner === 0 || w.pipCorner === 1) ? margin : parent.height - height - margin
-    color: "transparent"
-    border.color: (w.pipSwapped ? player.playbackState === MediaPlayer.PlayingState : secondaryVideoRuntime.state === "playing") ? green : amber
-    border.width: 2
-    radius: 8
-    Text { anchors.centerIn: parent; visible: (w.pipSwapped ? player : secondaryPlayer).playbackState !== MediaPlayer.PlayingState; text: "немає сигналу · відновлюю"; color: fg; font.bold: true }
-    MouseArea {
-     objectName: "pipMouse"
-     anchors.fill: parent
-     property point pressedAt
-     property bool dragged: false
-     onPressed: function(mouse) { pressedAt = Qt.point(mouse.x, mouse.y); dragged = false }
-     onPositionChanged: function(mouse) {
-      if (Math.abs(mouse.x - pressedAt.x) + Math.abs(mouse.y - pressedAt.y) > 12) dragged = true
-     }
-     onReleased: function(mouse) {
-      if (!dragged) { w.swapWindows(); return }
-      var p = mapToItem(pipWindow.parent, mouse.x, mouse.y)
-      var left = p.x < pipWindow.parent.width / 2, top = p.y < pipWindow.parent.height / 2
-      w.pipCorner = top ? (left ? 0 : 1) : (left ? 3 : 2)
-     }
-     onWheel: function(wheel) {
-      var sizes = [0.22, 0.32, 0.42]
-      var i = sizes.indexOf(w.pipScale)
-      i = Math.max(0, Math.min(sizes.length - 1, (i < 0 ? 1 : i) + (wheel.angleDelta.y > 0 ? 1 : -1)))
-      w.pipScale = sizes[i]
-     }
-    }
-   }
    OsdOverlay {
     objectName: "flightOsdOverlay"
+    // Above whatever is on the big screen (the main video or a swapped-in window), under the windows.
+    z: 2
     anchors.fill:parent; anchors.margins:12
     visible:station.osdEnabled&&(w.simulation||!primaryDetached)
     positions:station.osdElements; enabledElements:station.osdEnabledElements; corner:station.osdPosition
@@ -383,7 +374,7 @@ ApplicationWindow {
      objectName: "flightMenuVideoPresets"
      text: "Пресети відео камери"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
      enabled: !w.simulation
-     onClicked: { flightMenu.close(); videoPresetsPopup.open() }
+     onClicked: { flightMenu.close(); videoPresets.editStream(0, ""); videoPresetsPopup.open() }
      background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
     }
     Button {
@@ -454,15 +445,6 @@ ApplicationWindow {
      Layout.preferredHeight: 46
      enabled: !w.simulation && (primaryDetached || player.playbackState === MediaPlayer.PlayingState)
      onClicked: { primaryDetached = !primaryDetached; flightMenu.close() }
-     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
-    }
-    Button {
-     text: secondaryDetached ? "Повернути додаткове відео" : "Відкрити додаткове відео окремо"
-     font.pixelSize: 14
-     Layout.fillWidth: true
-     Layout.preferredHeight: 46
-     enabled: !w.simulation && (secondaryDetached || secondaryPlayer.playbackState === MediaPlayer.PlayingState)
-     onClicked: { secondaryDetached = !secondaryDetached; flightMenu.close() }
      background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
     }
     Button {
@@ -540,7 +522,6 @@ ApplicationWindow {
     anchors.fill:parent;anchors.margins:16
     Text{text:"ВІДЕО";color:fg;font.pixelSize:20;font.bold:true}
     Text{text:"Основний: "+(streamWorkspace.state.primaryKind||"--")+" · Додатковий: "+(streamWorkspace.state.secondaryKind||"--");color:sub}
-    Switch{text:"PiP";checked:pipEnabled;enabled:streamWorkspace.state.pipAvailable;onToggled:setPip(checked)}
     RowLayout{Layout.fillWidth:true
      Text{text:"Екран";color:sub}
      ComboBox{Layout.fillWidth:true;model:displayRuntime.displays;textRole:"label";currentIndex:w.selectedDisplayIndex;onActivated:function(index){w.selectedDisplayIndex=index}}

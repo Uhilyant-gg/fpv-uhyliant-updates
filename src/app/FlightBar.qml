@@ -11,7 +11,6 @@ Rectangle {
  signal openHardware()
  signal openStarlink()
  signal openMenu()
- signal togglePip()
  signal leaveFlight()
  signal hideRequested()
  property bool simulation: false
@@ -28,9 +27,6 @@ Rectangle {
  property int linkLostSeconds: 0
  property int linkFps: 0
  property bool linkWarning: false
- // A second stream exists (e.g. a thermal camera): the small window can be shown.
- property bool pipAvailable: false
- property bool pipOn: false
  // Narrow screens keep the dots and values, without captions.
  readonly property bool compact: width < 1100
  property color fg: "#f4f7fb"
@@ -118,7 +114,7 @@ Rectangle {
    enabled: !videoPresets.busy
    text: "−"
    Layout.preferredWidth: 30
-   onClicked: videoPresets.stepBitrate(-1)
+   onClicked: videoPresets.stepBitrateMain(-1)
    HoverHint { text: "Зменшити бітрейт камери на крок." }
   }
   BarButton {
@@ -127,7 +123,7 @@ Rectangle {
    enabled: !videoPresets.busy
    text: "+"
    Layout.preferredWidth: 30
-   onClicked: videoPresets.stepBitrate(1)
+   onClicked: videoPresets.stepBitrateMain(1)
    HoverHint { text: "Збільшити бітрейт камери на крок." }
   }
   Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 26; color: "#22364b" }
@@ -168,14 +164,6 @@ Rectangle {
    contentItem: Text { text: parent.text; font: parent.font; color: dvrRuntime.recording ? "white" : (parent.enabled ? root.red : root.sub); horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
    background: Rectangle { radius: 7; color: dvrRuntime.recording ? "#b3263a" : (parent.hovered ? "#22364b" : "#132235"); border.color: dvrRuntime.recording ? root.red : "#2f4860" }
    HoverHint { text: "Почати або зупинити запис відео (F9). " + dvrRuntime.freeSpaceText }
-  }
-  BarButton {
-   objectName: "flightBarPip"
-   visible: !root.simulation && root.pipAvailable
-   text: root.pipOn ? "▣" : "□"
-   Layout.preferredWidth: 34
-   onClicked: root.togglePip()
-   HoverHint { text: root.pipOn ? "Сховати віконце з другим потоком (F1). Потік стане на паузу і не витрачатиме бітрейт." : "Показати друге відео у віконці (F2). Tab або клік по віконцю міняє місцями." }
   }
   BarButton { objectName: "flightMenuToggle"; text: root.compact ? "☰" : "☰ Меню"; onClicked: root.openMenu() }
   BarButton {

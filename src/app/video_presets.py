@@ -105,26 +105,28 @@ def validate(preset) -> dict:
     return clean
 
 
-def commands(preset: dict) -> list[str]:
-    """majestic settings for a validated preset, then a reload of the video service."""
+def commands(preset: dict, channel: int = 0) -> list[str]:
+    """majestic settings of one stream (video0 main, video1 second) for a validated preset,
+    then a reload of the video service."""
+    v = f".video{int(channel)}"
     return [
-        "cli -s .video0.rcMode cbr",  # an even stream: no bursts that choke the link
-        f"cli -s .video0.size {preset['size']}",
-        f"cli -s .video0.fps {int(preset['fps'])}",
-        f"cli -s .video0.bitrate {int(preset['bitrateKbps'])}",
-        f"cli -s .video0.gopSize {preset['gopS']}",
+        f"cli -s {v}.rcMode cbr",  # an even stream: no bursts that choke the link
+        f"cli -s {v}.size {preset['size']}",
+        f"cli -s {v}.fps {int(preset['fps'])}",
+        f"cli -s {v}.bitrate {int(preset['bitrateKbps'])}",
+        f"cli -s {v}.gopSize {preset['gopS']}",
         "killall -1 majestic",
     ]
 
 
-def bitrate_commands(kbps: int) -> list[str]:
+def bitrate_commands(kbps: int, channel: int = 0) -> list[str]:
     if not MIN_KBPS <= int(kbps) <= MAX_KBPS:
         raise ValueError("bitrate")
-    return [f"cli -s .video0.bitrate {int(kbps)}", "killall -1 majestic"]
+    return [f"cli -s .video{int(channel)}.bitrate {int(kbps)}", "killall -1 majestic"]
 
 
 # A reload's exit code, or a setting an older majestic does not know, is not a failure.
-OPTIONAL_COMMANDS = ("killall", "cli -s .video0.rcMode")
+OPTIONAL_COMMANDS = ("killall", "cli -s .video0.rcMode", "cli -s .video1.rcMode")
 
 
 def run_on_camera(host, credentials, shell, lines) -> dict:
@@ -177,13 +179,46 @@ class VideoPresetsRuntime(QObject):
         self._busy = False
         self._message = ""
         self._ok = True
+        # Which of the camera's streams the presets window shows: 0 main, 1 second.
+        self._channel = 0
+        self._stream_name = ""
         self._done.connect(self._finish)
         if hasattr(devices, "changed"):
             devices.changed.connect(self.changed)
 
     # --- state -----------------------------------------------------------------
-    def _device_id(self):
+    def _camera_id(self):
         return getattr(self._devices, "activeId", "") or ""
+
+    def _device_id(self):
+        """Where this stream's presets are kept: the camera, plus the stream after the first."""
+        camera = self._camera_id()
+        return camera if not camera or self._channel == 0 else f"{camera}#video{self._channel}"
+
+    def _main(self, action):
+        """Keys, Auto and the flight bar always act on the main stream."""
+        saved = self._channel
+        self._channel = 0
+        try:
+            return action()
+        finally:
+            self._channel = saved
+
+    @Slot(int, str)
+    def editStream(self, channel, name):
+        """The presets window for one stream: 0 the main one, 1 the camera's second stream."""
+        self._channel = 1 if int(channel) == 1 else 0
+        self._stream_name = str(name or "")
+        self._message = ""
+        self.changed.emit()
+
+    @Property(int, notify=changed)
+    def channel(self):
+        return self._channel
+
+    @Property(str, notify=changed)
+    def streamName(self):
+        return self._stream_name if self._channel else "Основний потік"
 
     def _camera(self, device_id=None):
         device_id = device_id or self._device_id()
@@ -217,7 +252,15 @@ class VideoPresetsRuntime(QObject):
 
     @Property(str, notify=changed)
     def label(self):
-        """For the flight bar: "3 · Баланс · 4 Мбіт/с", with * when the bitrate was changed by hand."""
+        """For the flight bar (the main stream): "3 · Баланс · 4 Мбіт/с", * after a change by hand."""
+        return self._main(self._label_now)
+
+    @Property(str, notify=changed)
+    def streamLabel(self):
+        """The same for the stream shown in the presets window."""
+        return self._label_now()
+
+    def _label_now(self):
         key = self.activeKey
         preset = self._slot(key) if key else None
         if preset is None:
@@ -246,7 +289,10 @@ class VideoPresetsRuntime(QObject):
 
     @Slot("QVariantMap")
     def observe(self, sample):
-        """Once a second in flight: how the link behaves. In Auto, may step one preset."""
+        """Once a second in flight: how the link behaves. In Auto, may step one preset (main stream)."""
+        self._main(lambda: self._observe(sample))
+
+    def _observe(self, sample):
         if not self.auto or self._busy:
             return
         step = self._auto.update(dict(sample), self._clock())
@@ -285,7 +331,7 @@ class VideoPresetsRuntime(QObject):
         if self._busy:
             self._say(MESSAGES["busy"], False)
             return False
-        host = self._connections.control_host(device_id)
+        host = self._connections.control_host(self._camera_id())
         if not host:
             self._say(MESSAGES["unreachable"], False)
             return False
@@ -319,17 +365,25 @@ class VideoPresetsRuntime(QObject):
         return self.apply(key)
 
     @Slot(str, result=bool)
+    def chooseMain(self, key):
+        return self._main(lambda: self.choose(key))
+
+    @Slot(int, result=bool)
+    def stepBitrateMain(self, direction):
+        return self._main(lambda: self.stepBitrate(direction))
+
+    @Slot(str, result=bool)
     def apply(self, key):
         preset = self._slot(key)
         if preset is None:
             self._say(MESSAGES["empty"], False)
             return False
-        return self._start({"key": key, "bitrateKbps": preset["bitrateKbps"]}, commands(preset))
+        return self._start({"key": key, "bitrateKbps": preset["bitrateKbps"]}, commands(preset, self._channel))
 
     @Slot(int, result=bool)
     def setBitrate(self, kbps):
         try:
-            lines = bitrate_commands(kbps)
+            lines = bitrate_commands(kbps, self._channel)
         except (ValueError, TypeError):
             self._say(MESSAGES["invalid"], False)
             return False

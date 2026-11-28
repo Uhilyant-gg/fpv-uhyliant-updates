@@ -303,6 +303,9 @@ def main():
 
     starlink_dish = StarlinkRuntime(d, connections, dish_shell)
     link_doctor = LinkDoctor(link_monitor, d, connections, starlink=starlink_dish)
+    from extra_windows import ExtraWindowsRuntime
+
+    extra_windows = ExtraWindowsRuntime(d, streams, DATA / 'extra-windows.json', host_resolver=connections.host_for)
     camera_logins = lambda: (
         [(credentials.username or 'root', credentials.secret())]
         + list(  # noqa: E731
@@ -386,6 +389,7 @@ def main():
         ('dvrRuntime', dvr_runtime),
         ('linkMonitor', link_monitor),
         ('linkDoctor', link_doctor),
+        ('extraWindows', extra_windows),
         ('starlinkDish', starlink_dish),
         ('controllerActions', controller_actions),
         ('videoPresets', video_preset_runtime),
