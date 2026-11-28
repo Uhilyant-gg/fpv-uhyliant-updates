@@ -43,7 +43,7 @@ ApplicationWindow {
  onConnectedChanged: { if (!connected) { dvrRuntime.stop(); extraWindows.closeAll(); w.mainSource = -1; connectionsRuntime.resumeListening() } else connectionsRuntime.pauseListening() }
  function attachDvrSink(){var sink=player.videoOutput ? player.videoOutput.videoSink : null;dvrRuntime.setVideoSink(sink);linkMonitor.setVideoSink(sink)}
  property bool linkWatchActive: connected && !simulation && !serviceMode
- onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive);controllerActions.setActive(linkWatchActive);starlinkDish.setActive(linkWatchActive)}
+ onLinkWatchActiveChanged: {linkMonitor.setActive(linkWatchActive);linkDoctor.setActive(linkWatchActive);controllerActions.setActive(linkWatchActive);starlinkDish.setActive(linkWatchActive);cameraAudio.setActive(linkWatchActive)}
  Connections{target:controllerActions;function onSwapRequested(){w.swapWindows()}}
  Connections{target:linkDoctor;function onRetryNeeded(){w.recoverPrimary()}}
  Connections{target:linkMonitor;function onRetryNeeded(){if(!videoRecovery.running)w.recoverPrimary()}}
@@ -75,6 +75,7 @@ ApplicationWindow {
   OsdOverlay{anchors.fill:parent;anchors.margins:12;visible:station.osdEnabled;positions:station.osdElements;enabledElements:station.osdEnabledElements;corner:station.osdPosition;opacityValue:station.osdOpacity;scaleFactor:station.osdScale;telemetry:t;video:sd}
  }
  property bool flightBarHidden: false
+ Shortcut{sequence:"M";enabled:pages.currentIndex===1&&!w.simulation;onActivated:cameraAudio.toggleMute()}
  Shortcut{sequence:"1";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("1")}
  Shortcut{sequence:"2";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("2")}
  Shortcut{sequence:"3";enabled:pages.currentIndex===1&&!w.simulation&&!w.serviceMode;onActivated:videoPresets.chooseMain("3")}
@@ -129,6 +130,7 @@ ApplicationWindow {
     anchors.bottom: parent.bottom
     width: visible ? implicitWidth : 0
     onOpenLayouts: layoutsPopup.open()
+    onOpenAudio: audioPopup.open()
     onOpenStreamSettings: function(stream) {
      if (stream.kind === "main") { videoPresets.editStream(0, ""); videoPresetsPopup.open(); return }
      streamSettingsContent.stream = stream
@@ -147,6 +149,15 @@ ApplicationWindow {
      onCloseRequested: streamSettingsPopup.close()
      onOpenPresets: function(channel, name) { streamSettingsPopup.close(); videoPresets.editStream(channel, name); videoPresetsPopup.open() }
     }
+   }
+   Popup {
+    id: audioPopup
+    objectName: "audioPopup"
+    x: streamsSidebar.width + 6
+    y: (flightBar.visible ? flightBar.height : 0) + 6
+    padding: 0
+    background: Rectangle { color: "#f20a1420"; border.color: "#71879c"; radius: 12 }
+    contentItem: AudioPanel { onCloseRequested: audioPopup.close() }
    }
    Popup {
     id: layoutsPopup
@@ -400,6 +411,13 @@ ApplicationWindow {
      Layout.fillWidth: true
      Layout.leftMargin: 14
      Layout.topMargin: 5
+    }
+    Button {
+     objectName: "flightMenuAudio"
+     text: "Звук з камери"; font.pixelSize: 15; Layout.fillWidth: true; Layout.preferredHeight: 46
+     enabled: !w.simulation
+     onClicked: { flightMenu.close(); audioPopup.open() }
+     background: Rectangle { radius: 8; color: parent.hovered ? "#40566e" : "#18233342"; border.color: parent.hovered ? "#7897b5" : "#435b72" }
     }
     Switch {
      text: "Додавати OSD станції поверх відео"

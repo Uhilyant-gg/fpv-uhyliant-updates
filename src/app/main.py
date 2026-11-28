@@ -312,6 +312,18 @@ def main():
             camera_setup.DEFAULT_CREDENTIALS
         )
     )
+    from camera_audio import AudioRuntime
+    from camera_features import CameraFeaturesRuntime
+
+    def not_armed():
+        return (telemetry.telemetry or {}).get('armed') is not True
+
+    camera_features = CameraFeaturesRuntime(d, connections, dish_shell, may_restart_video=not_armed)
+    camera_audio = AudioRuntime(
+        d, connections, camera_features, logins=lambda: camera_logins(), store_path=DATA / 'camera-audio.json'
+    )
+    if not x.first_run_acceptance_smoke:
+        camera_features.start()
     video_preset_runtime = video_presets.VideoPresetsRuntime(
         video_presets.VideoPresetStore(DATA / 'video-presets.json'),
         d,
@@ -347,6 +359,8 @@ def main():
     link_doctor.changed.connect(feed_auto)
     app._runtime_refs = app._runtime_refs + (
         starlink_dish,
+        camera_features,
+        camera_audio,
         flight_alerts,
         presets,
         dvr_runtime,
@@ -391,6 +405,8 @@ def main():
         ('linkDoctor', link_doctor),
         ('extraWindows', extra_windows),
         ('starlinkDish', starlink_dish),
+        ('cameraFeatures', camera_features),
+        ('cameraAudio', camera_audio),
         ('controllerActions', controller_actions),
         ('videoPresets', video_preset_runtime),
         ('connectionsRuntime', connections),
@@ -406,6 +422,8 @@ def main():
         credentials.clear()
         dvr_runtime.shutdown()
         connections.stop()
+        camera_features.stop()
+        camera_audio.setActive(False)
         inspector.close_all()
         video.stopAll()
         links.clear()

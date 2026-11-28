@@ -2,22 +2,31 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Left strip of the flight screen. At the top the main stream, then the camera's other
-// streams and the map: a click opens a window, another closes it (a closed stream is
-// stopped, no bitrate). ⚙ under a stream opens its own settings. At the bottom: layouts.
+// Left strip of the flight screen. At the top the main stream and the camera's sound, then the
+// camera's other streams (they appear here by themselves when the camera has them) and the map:
+// a click opens a window, another closes it (a closed stream is stopped, no bitrate). A dot in the
+// corner: green — the picture plays, amber — waiting for it. ⚙ under a tile opens its settings.
 Rectangle {
  id: root
  signal openLayouts()
  signal openStreamSettings(var stream)
+ signal openAudio()
  property color fg: "#f4f7fb"
  property color sub: "#b7c8da"
  property color green: "#27d59a"
- implicitWidth: 84
  color: "#0b1420"
  border.color: "#22364b"
 
- function glyph(kind) {
-  return kind === "map" ? "⌖" : (kind === "thermal" ? "◐" : (kind === "main" ? "◉" : "▶"))
+ property color amber: "#ffb84d"
+ implicitWidth: 76
+
+ // Green dot: the picture plays; amber: waiting for it; none: the stream is paused (no bitrate).
+ function dotFor(stream, slot) {
+  if (stream.kind === "main") return linkMonitor.lost ? root.amber : root.green
+  if (slot < 0) return "transparent"
+  if (stream.kind === "map") return root.green
+  var win = extraWindows.windows[slot] || {}
+  return win.state === "playing" ? root.green : root.amber
  }
 
  component StreamTile: ColumnLayout {
@@ -26,62 +35,101 @@ Rectangle {
   property bool on: false
   property bool main: false
   property bool settings: true
+  property string iconKind: stream.kind === "secondary" ? "sub" : (stream.kind || "sub")
+  property color dot: "transparent"
+  property string hint: ""
+  property bool muted: false
   signal toggled()
+  signal settingsRequested()
   Layout.fillWidth: true
-  spacing: 2
+  spacing: 1
   Button {
-   objectName: tile.main ? "sideMain" : "sideStream"
+   objectName: tile.main ? "sideMain" : (tile.iconKind === "sound" ? "sideSound" : "sideStream")
    Layout.fillWidth: true
-   Layout.preferredHeight: 58
-   padding: 3
-   enabled: tile.main || tile.on || extraWindows.openCount < 3
+   Layout.preferredHeight: 54
+   padding: 2
+   enabled: tile.main || tile.on || tile.iconKind === "sound" || extraWindows.openCount < 3
+   opacity: enabled ? 1 : 0.45
    background: Rectangle {
-    radius: 8
-    color: tile.on ? "#1d3a2f" : (parent.hovered ? "#22364b" : "#132235")
-    border.color: tile.on ? root.green : "#2f4860"
+    radius: 9
+    color: tile.on ? "#173528" : (parent.hovered ? "#1d3047" : "#111e2e")
+    border.color: tile.on ? root.green : (parent.hovered ? "#4f6c88" : "#22364b")
+    border.width: tile.on ? 1.5 : 1
+    Rectangle { // state dot
+     visible: tile.dot.a > 0
+     anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 5
+     width: 7; height: 7; radius: 4
+     color: tile.dot
+    }
    }
-   contentItem: ColumnLayout {
-    spacing: 1
-    Text { Layout.alignment: Qt.AlignHCenter; text: root.glyph(tile.stream.kind); color: tile.on ? root.green : root.sub; font.pixelSize: 18 }
+   contentItem: Column {
+    spacing: 2
+    topPadding: 4
+    SidebarIcon {
+     anchors.horizontalCenter: parent.horizontalCenter
+     width: 24; height: 24
+     kind: tile.iconKind
+     muted: tile.muted
+     color: tile.on ? root.green : root.fg
+    }
     Text {
-     Layout.fillWidth: true
+     width: parent.width
      horizontalAlignment: Text.AlignHCenter
      text: tile.stream.name || ""
-     color: root.fg; font.pixelSize: 10
+     color: tile.on ? root.fg : root.sub
+     font.pixelSize: 10
      wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
+     lineHeight: 0.9
     }
    }
    onClicked: tile.toggled()
-   HoverHint { text: tile.main ? "Основне відео: завжди на екрані" : ((tile.on ? "Закрити: " : "Показати у вікні: ") + (tile.stream.name || "") + (tile.on && tile.stream.kind !== "map" ? ". Потік стане на паузу." : "")) }
+   HoverHint { text: tile.hint }
   }
   Button {
    objectName: "sideSettings"
    visible: tile.settings
-   Layout.fillWidth: true
-   Layout.preferredHeight: 20
+   Layout.alignment: Qt.AlignHCenter
+   Layout.preferredWidth: 40
+   Layout.preferredHeight: 16
    padding: 0
    text: "⚙"
-   font.pixelSize: 12
-   background: Rectangle { radius: 5; color: parent.hovered ? "#22364b" : "transparent"; border.color: parent.hovered ? "#2f4860" : "transparent" }
-   onClicked: root.openStreamSettings(tile.stream)
-   HoverHint { text: "Налаштування цього потоку: якість (пресети) і показ у вікні" }
+   font.pixelSize: 11
+   contentItem: Text { text: parent.text; font: parent.font; color: parent.hovered ? root.fg : "#7f96ad"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+   background: Rectangle { radius: 5; color: parent.hovered ? "#22364b" : "transparent" }
+   onClicked: tile.settingsRequested()
+   HoverHint { text: "Налаштування: " + (tile.stream.name || "потік") }
   }
  }
 
  Flickable {
   anchors.fill: parent
   anchors.margins: 6
-  anchors.bottomMargin: 70
+  anchors.bottomMargin: 58
   contentHeight: list.implicitHeight
   clip: true
   ColumnLayout {
    id: list
    width: parent.width
-   spacing: 8
+   spacing: 6
    StreamTile {
     main: true
     on: true
+    dot: root.dotFor(stream, 0)
     stream: ({ id: streamWorkspace.state.primaryId || "", name: extraWindows.mainName || "Основне", kind: "main", channel: 0 })
+    hint: "Основне відео: завжди на екрані. ⚙ — пресети якості."
+    onSettingsRequested: root.openStreamSettings(stream)
+   }
+   StreamTile {
+    objectName: "sideSoundTile"
+    visible: cameraFeatures.audioSupported
+    iconKind: "sound"
+    on: cameraFeatures.micEnabled && !cameraAudio.muted
+    muted: cameraAudio.muted || !cameraFeatures.micEnabled
+    dot: cameraAudio.playing ? root.green : (on ? root.amber : "transparent")
+    stream: ({ name: "Звук" })
+    hint: (cameraFeatures.micEnabled ? (cameraAudio.muted ? "Увімкнути звук (M)" : "Вимкнути звук (M)") : "Мікрофон камери вимкнено: ⚙, щоб увімкнути") + " · " + cameraAudio.text
+    onToggled: cameraFeatures.micEnabled ? cameraAudio.toggleMute() : root.openAudio()
+    onSettingsRequested: root.openAudio()
    }
    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#22364b" }
    Repeater {
@@ -90,8 +138,11 @@ Rectangle {
      required property var modelData
      stream: modelData
      on: modelData.slot >= 0
+     dot: root.dotFor(modelData, modelData.slot)
      settings: modelData.kind !== "map"
+     hint: (modelData.slot >= 0 ? "Закрити: " : "Показати у вікні: ") + (modelData.name || "") + (modelData.slot >= 0 && modelData.kind !== "map" ? ". Потік стане на паузу і не витрачатиме бітрейт." : "")
      onToggled: modelData.slot >= 0 ? extraWindows.close(modelData.slot) : extraWindows.open(modelData.id)
+     onSettingsRequested: root.openStreamSettings(modelData)
     }
    }
   }
@@ -101,19 +152,10 @@ Rectangle {
   objectName: "sideLayouts"
   anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
   anchors.margins: 6
-  height: 52
-  padding: 2
+  height: 44
+  padding: 8
   background: Rectangle { radius: 8; color: parent.hovered ? "#22364b" : "#132235"; border.color: "#2f4860" }
-  contentItem: Item {
-   // A little screen with two windows: the layouts.
-   Rectangle {
-    anchors.centerIn: parent
-    width: 34; height: 22; radius: 3
-    color: "transparent"; border.color: root.fg; border.width: 1.5
-    Rectangle { x: 19; y: 3; width: 12; height: 7; radius: 1; color: root.green }
-    Rectangle { x: 19; y: 12; width: 12; height: 7; radius: 1; color: root.green; opacity: 0.6 }
-   }
-  }
+  contentItem: SidebarIcon { kind: "layouts"; color: root.fg }
   onClicked: root.openLayouts()
   HoverHint { text: "Розташування вікон: зберегти поточне, відкрити збережене, як минулого разу" }
  }

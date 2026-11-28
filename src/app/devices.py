@@ -384,6 +384,36 @@ class Devices(QObject):
         self.streamsChanged.emit()
         return sid
 
+    def syncAutoStreams(self, did, streams, auto_paths):
+        """Streams the station found on the camera itself: add the new ones, switch on the ones
+        that are back and switch off the ones that are gone (kept, so their settings stay)."""
+        if not any(x['id'] == did for x in self._items):
+            return False
+        wanted = {str(s['path']): s for s in streams if str(s.get('path')) in auto_paths}
+        changed = False
+        with self._connect() as d:
+            rows = d.execute(
+                'SELECT id,path,enabled FROM streams WHERE device_id=? AND protocol=?', (did, 'rtsp')
+            ).fetchall()
+            known = {path: (sid, enabled) for sid, path, enabled in rows}
+            for path in auto_paths:
+                stream = wanted.get(path)
+                if path in known:
+                    sid, enabled = known[path]
+                    if bool(enabled) != (stream is not None):
+                        d.execute('UPDATE streams SET enabled=? WHERE id=?', (int(stream is not None), sid))
+                        changed = True
+                elif stream is not None:
+                    d.execute(
+                        'INSERT INTO streams(id,device_id,name,kind,port,path,protocol,enabled) VALUES(?,?,?,?,?,?,?,1)',
+                        (uuid.uuid4().hex, did, stream['name'], stream['kind'], int(stream['port']), path, 'rtsp'),
+                    )
+                    changed = True
+        if changed:
+            self._load()
+            self.streamsChanged.emit()
+        return changed
+
     @Slot(str)
     def removeStream(self, sid):
         if not any(x.get('id') == sid for x in self._streams) or not self._protect_change():

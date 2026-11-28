@@ -146,6 +146,18 @@ Item {
    dot: linkDoctor.details.internet === true ? root.green : (linkDoctor.details.internet === false ? root.red : root.amber)
   }
   Row_ {
+   objectName: "hardwareUsbVideo"
+   title: "USB-відео на камері"
+   value: cameraFeatures.usbText
+   dot: (cameraFeatures.features.usb || {}).enabled ? root.green : ((cameraFeatures.features.usb || {}).device ? root.amber : root.grey)
+  }
+  Row_ {
+   objectName: "hardwareAudio"
+   title: "Звук з камери"
+   value: cameraAudio.text
+   dot: cameraAudio.playing ? root.green : (cameraFeatures.micEnabled ? root.amber : root.grey)
+  }
+  Row_ {
    objectName: "hardwareFlightController"
    title: "Польотний контролер"
    value: root.fcValue()
