@@ -20,6 +20,8 @@ Item {
  readonly property var home: hasHome ? QtPositioning.coordinate(Number(telemetry.homeLatitude), Number(telemetry.homeLongitude)) : QtPositioning.coordinate()
  readonly property real heading: isFinite(Number(telemetry.heading)) && telemetry.heading !== null ? Number(telemetry.heading) : 0
  property var trail: []
+ // Every time the map opens it follows the drone; panning by hand turns that off until pressed again.
+ property bool follow: true
  readonly property bool marksAvailable: typeof mapMarks !== "undefined" && mapMarks !== null
  property bool marksOpen: false
  // For checks: where the map looks and how it is turned.
@@ -39,14 +41,15 @@ Item {
   property real lat: 48.5
   property real lon: 31.2
   property real zoom: 6
-  property bool follow: true
   property bool courseUp: false
  }
 
  Plugin {
   id: satellite
   name: "osm"
-  PluginParameter { name: "osm.mapping.custom.host"; value: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/%z/%y/%x" }
+  // The station's own map server on this PC keeps every tile it once loaded and fills the area
+  // around the drone ahead of time; without it the map asks Esri directly.
+  PluginParameter { name: "osm.mapping.custom.host"; value: typeof mapTiles !== "undefined" && mapTiles ? mapTiles.url : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/%z/%y/%x" }
   PluginParameter { name: "osm.mapping.providersrepository.disabled"; value: true }
   // A real folder path from the station (a file:// URL turned into a path breaks on Windows: "/C:/...").
   PluginParameter { name: "osm.mapping.cache.directory"; value: typeof mapTilesDir !== "undefined" ? mapTilesDir : StandardPaths.writableLocation(StandardPaths.AppLocalDataLocation).toString().replace("file://", "") + "/map-tiles" }
@@ -64,7 +67,7 @@ Item {
    var last = points.length ? points[points.length - 1] : null
    if (!last || last.distanceTo(root.drone) > 2) points.push(root.drone)
    root.trail = points
-   if (saved.follow) root.centreOnDrone()
+   if (root.follow) root.centreOnDrone()
   }
  }
 
@@ -184,7 +187,7 @@ Item {
  function zoomAt(steps, position) {
   var map = view.map
   var level = Math.max(map.minimumZoomLevel, Math.min(map.maximumZoomLevel, map.zoomLevel + steps))
-  if (saved.follow && root.hasDrone) {
+  if (root.follow && root.hasDrone) {
    map.zoomLevel = level
    centreOnDrone()
    return
@@ -208,9 +211,9 @@ Item {
  Connections {
   target: view.map
   function onZoomLevelChanged() { root.zoomedAt = Date.now() }
-  function onCenterChanged() { if (!root.centring && saved.follow) Qt.callLater(root.checkPan) }
+  function onCenterChanged() { if (!root.centring && root.follow) Qt.callLater(root.checkPan) }
  }
- function checkPan() { if (Date.now() - zoomedAt > 300) saved.follow = false }
+ function checkPan() { if (Date.now() - zoomedAt > 300) root.follow = false }
 
  Column {
   z: 2
@@ -227,11 +230,11 @@ Item {
   MapButton {
    objectName: "flightMapFollow"
    text: "⌖"
-   on: saved.follow
+   on: root.follow
    enabled: root.hasDrone
    opacity: enabled ? 1 : 0.5
-   onClicked: { saved.follow = !saved.follow; if (saved.follow) root.centreOnDrone() }
-   HoverHint { text: saved.follow ? "Карта стежить за дроном. Перетягніть карту, щоб роздивитися інше місце." : "Стежити за дроном"; delay: 500 }
+   onClicked: { root.follow = !root.follow; if (root.follow) root.centreOnDrone() }
+   HoverHint { text: root.follow ? "Карта стежить за дроном. Перетягніть карту, щоб роздивитися інше місце." : "Стежити за дроном"; delay: 500 }
   }
   MapButton {
    objectName: "flightMapCourseUp"
@@ -248,6 +251,16 @@ Item {
    onClicked: root.marksOpen = !root.marksOpen
    HoverHint { text: "Точки на карті: додати за координатами MGRS. Правий клік по карті теж ставить точку."; delay: 500 }
   }
+ }
+
+ Rectangle {
+  objectName: "flightMapAhead"
+  visible: typeof mapTiles !== "undefined" && mapTiles && mapTiles.downloading && root.hasDrone
+  anchors.horizontalCenter: parent.horizontalCenter
+  anchors.bottom: parent.bottom; anchors.bottomMargin: 18
+  width: aheadText.implicitWidth + 16; height: aheadText.implicitHeight + 8; radius: 6
+  color: "#cc0b1420"
+  Text { id: aheadText; anchors.centerIn: parent; text: parent.visible ? mapTiles.text : ""; color: "#dddddd"; font.pixelSize: 11 }
  }
 
  Rectangle {
@@ -297,7 +310,7 @@ Item {
       height: 26; padding: 2
       contentItem: Text { text: modelData.name + "   " + modelData.mgrs; color: "#f4f7fb"; font.pixelSize: 12; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter }
       background: Rectangle { radius: 4; color: parent.hovered ? "#22364b" : "transparent" }
-      onClicked: { saved.follow = false; view.map.center = QtPositioning.coordinate(modelData.lat, modelData.lon) }
+      onClicked: { root.follow = false; view.map.center = QtPositioning.coordinate(modelData.lat, modelData.lon) }
      }
      Button { width: 28; height: 26; text: "✕"; onClicked: mapMarks.remove(modelData.index) }
     }

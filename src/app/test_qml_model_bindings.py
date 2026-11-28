@@ -71,6 +71,7 @@ MODELS = {
     "linkTest": ("link_test", "LinkTestRuntime"),
     "mapMarks": ("map_marks", "MapMarksRuntime"),
     "windRuntime": ("wind", "WindRuntime"),
+    "mapTiles": ("map_tiles", "MapTilesRuntime"),
     "controllerActions": ("controller_actions", "ControllerActions"),
     "videoPresets": ("video_presets", "VideoPresetsRuntime"),
     "connectionsRuntime": ("connections_runtime", "ConnectionsRuntime"),

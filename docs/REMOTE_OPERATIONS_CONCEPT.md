@@ -163,9 +163,13 @@ Wind: Open-Meteo forecast at the drone's point (rounded to ~5 km before it leave
 level nearest to its height (10/80/120/180 m): an arrow to where it blows, speed and gusts on the
 map, no warnings; also written to the black box. The map tile cache path comes from the station
 (the old file:// replace broke on Windows).
-Still to do: download an area in advance (Esri's terms forbid bulk download of its imagery; options
-for the owner: import a map file the pilot has the right to use, e.g. MBTiles), the Starlink
-position as a second source.
+Map kept on the PC (agreed 2026-11-28): a map server on 127.0.0.1 answers the map from its own
+folder (`map-tiles/<z>/<x>/<y>.jpg`) and fetches a missing tile once from Esri; while flying it also
+fetches ahead the area around the drone (about 1-2 km in detail up to zoom 17, 15 km overview, ~300
+tiles, ~6 MB) and, when the drone is 1 km further, the new tiles only. Nothing kept is fetched again;
+the folder is capped at 1.5 GB (least used tiles go first). No bulk download of whole regions: only
+what the pilot flies over, at a viewer's pace. Each map window starts following the drone.
+Still to do: the Starlink position as a second source.
 
 ## Out of scope
 - Payload-drop / impact-point calculators are not built by this project.

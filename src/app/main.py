@@ -418,6 +418,9 @@ def main():
     from wind import WindRuntime
 
     wind_runtime = WindRuntime(telemetry)
+    from map_tiles import MapTilesRuntime
+
+    map_tiles = MapTilesRuntime(DATA / 'map-tiles', telemetry, serve=not x.first_run_acceptance_smoke)
     from link_test import LinkTestRuntime
 
     def link_test_sample():
@@ -446,6 +449,7 @@ def main():
         link_test,
         map_marks,
         wind_runtime,
+        map_tiles,
         flight_alerts,
         presets,
         dvr_runtime,
@@ -496,13 +500,14 @@ def main():
         ('linkTest', link_test),
         ('mapMarks', map_marks),
         ('windRuntime', wind_runtime),
+        ('mapTiles', map_tiles),
         ('controllerActions', controller_actions),
         ('videoPresets', video_preset_runtime),
         ('connectionsRuntime', connections),
     ]:
         ctx.setContextProperty(name, obj)
     ctx.setContextProperty('appWindowTitle', WINDOW_TITLE)
-    ctx.setContextProperty('mapTilesDir', str(DATA / 'map-tiles'))
+    ctx.setContextProperty('mapTilesDir', str(DATA / 'map-cache'))
     harness.mark('qml-load-begin')
     e.load(QUrl.fromLocalFile(str(here / 'Main.qml')))
     harness.mark('qml-load-complete')
@@ -515,6 +520,7 @@ def main():
         camera_features.stop()
         camera_audio.setActive(False)
         black_box.setActive(False)
+        map_tiles.shutdown()
         inspector.close_all()
         video.stopAll()
         links.clear()
