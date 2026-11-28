@@ -92,6 +92,12 @@ assert abs(item.property("centerLatitude") - 50.46) < 1e-6, "following: the dron
 assert item.findChild(QObject, "flightMapFollow").property("on"), "a zoom is not a pan"
 pump(0.4)
 
+zoom = item.property("zoom")
+item.findChild(QObject, "flightMapZoomIn").clicked.emit()
+pump(0.2)
+assert abs(item.property("zoom") - (zoom + 1)) < 0.01, "the + button zooms in a step"
+pump(0.4)
+
 # A pan by the pilot turns following off.
 item.panTo(50.0, 30.0)
 pump(0.6)
