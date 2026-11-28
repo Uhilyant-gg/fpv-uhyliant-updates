@@ -45,6 +45,10 @@ def system_default_folder() -> str:
     return str(Path(movies) / "FPV Uhyliant") if movies else dvr.default_recordings_folder()
 
 
+# About 30 minutes of high-bitrate FPV video.
+LOW_SPACE_BYTES = 5 * 1024**3
+
+
 class QtRecorderPipeline:
     """Qt Multimedia encoder fed with QVideoFrames."""
 
@@ -156,12 +160,21 @@ class DvrRuntime(QObject):
     def elapsedText(self):
         return dvr.format_duration(self._elapsed)
 
-    @Property(str, notify=changed)
-    def freeSpaceText(self):
+    def _free(self):
         folder = Path(self.folder)
         while not folder.exists() and folder.parent != folder:
             folder = folder.parent
-        return dvr.format_free_space(dvr.free_bytes(folder))
+        return dvr.free_bytes(folder)
+
+    @Property(str, notify=changed)
+    def freeSpaceText(self):
+        return dvr.format_free_space(self._free())
+
+    @Property(bool, notify=changed)
+    def lowSpace(self):
+        """Less than about half an hour of recording left: shown on the flight bar only then."""
+        free = self._free()
+        return free is not None and free < LOW_SPACE_BYTES
 
     @Property(str, notify=changed)
     def status(self):
