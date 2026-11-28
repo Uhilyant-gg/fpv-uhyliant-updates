@@ -87,6 +87,12 @@ Order: 1+2+6, then 3, then 4+5 with telemetry forwarding, then 8+9, then 7 on re
 - PC keyboard: key 1 turns on "Auto"; keys 2…0 switch the camera presets, 2 is the weakest link,
   up to 0. Choosing a preset by hand turns Auto off.
 - A controller channel swaps the streams (main ↔ additional).
+- The presets are built by the station (owner's choice, 2026-11-28): for each of nine bitrates the
+  largest picture that still gets enough data per pixel to stay free of blocks, never below 30 fps
+  and 60 fps as soon as the bitrate carries it; an even (CBR) stream; a short full-frame interval on
+  weak links. The pilot may edit any preset and rebuild them all.
+- Delay target: at most 150 ms from the camera to the pilot's screen. A small smoothing buffer on
+  the PC is allowed inside that budget.
 - Additional camera (thermal) on the camera's USB through UVC or a capture card: first tried on the
   official OpenIPC firmware, without a custom build. Picture-in-picture made on the camera to save
   bitrate comes after the separate stream works.
